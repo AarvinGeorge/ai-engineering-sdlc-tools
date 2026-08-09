@@ -137,8 +137,15 @@ def run(root=None):
     updated = parse_iso(d.get("meta", {}).get("updated"))
     lw = parse_iso(last_work)
     if lw and updated and lw > updated:
-        drifts.append("last substantive commit (%s) is newer than meta.updated (%s)"
-                      % (lw.strftime("%Y-%m-%d %H:%M"), updated.strftime("%Y-%m-%d %H:%M")))
+        # Both rendered in UTC. git reports commit times in the committer's local
+        # zone with an offset; meta.updated is usually written as Z. The
+        # comparison was always correct, but printing 17:26-04:00 next to 21:22Z
+        # made a true finding read as nonsense -- and a check nobody believes is
+        # a check nobody acts on.
+        drifts.append("last substantive commit (%s) is newer than meta.updated (%s) — "
+                      "the plan may be behind what landed"
+                      % (lw.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%MZ"),
+                         updated.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%MZ")))
 
     # An artifact nobody has touched in a fortnight is decoration.
     if updated:

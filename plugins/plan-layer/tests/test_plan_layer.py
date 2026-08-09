@@ -183,6 +183,31 @@ class TestGate(Base):
         run("render.py", project=self.dir)
         self.assertEqual(run("check.py", project=self.dir).returncode, 1)
 
+    def test_commit_drift_message_is_in_one_timezone(self):
+        """A true finding printed across two zones reads as nonsense.
+
+        git reports commit times with a local offset; meta.updated is usually Z.
+        Both must be shown in UTC or the message looks self-contradictory.
+        """
+        d = self.make_plan()
+        d["meta"]["updated"] = "2000-01-01T00:00:00Z"      # guarantee the drift fires
+        self.write(d)
+        run("render.py", project=self.dir)
+        # The signal is about work landing OUTSIDE the plan directory -- a commit
+        # touching only plan/ is the plan being updated, which is the opposite of
+        # drift. The first version of this test committed only plan files and
+        # correctly got nothing.
+        with open(os.path.join(self.dir, "src.py"), "w") as fh:
+            fh.write("# substantive work\n")
+        subprocess.run(["git", "add", "-A"], cwd=self.dir, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-qm", "work"], cwd=self.dir, capture_output=True)
+        out = run("check.py", project=self.dir).stdout
+        line = next((l for l in out.splitlines() if "newer than meta.updated" in l), "")
+        self.assertTrue(line, "commit-drift signal did not fire: %s" % out)
+        self.assertEqual(line.count("Z"), 2,
+                         "both timestamps must be rendered in UTC: %s" % line)
+
     def test_porcelain_paths_are_parsed_intact(self):
         """A bare .strip() eats porcelain's leading status column on line one,
         shifting every path by a character. That bug shipped once; it stays tested."""
