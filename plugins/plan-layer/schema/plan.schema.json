@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AarvinGeorge/ai-engineering-sdlc-tools/plan-layer/plan.schema.json",
+  "title": "plan-layer plan file",
+  "description": "Shared state between a human developer and a coding agent. Every section is optional: the page renders only what is present, so a project can start with `plans` alone and grow into the rest.",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "project": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "plan_version": { "type": "string", "description": "Bumped whenever the plan changes materially. Must match the newest changelog entry." },
+        "updated": { "type": "string", "description": "ISO-8601 UTC. Read from a clock, never from memory." },
+        "north_star": { "type": "string" },
+        "north_star_owner": { "type": "string", "description": "Who is allowed to change the north star. Naming an owner is what makes it frozen." },
+        "headings": {
+          "type": "object",
+          "description": "Override any section heading: { \"systems\": [\"Environments\", \"hint text\"] }",
+          "additionalProperties": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+        },
+        "changelog": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "version": { "type": "string" }, "date": { "type": "string" }, "note": { "type": "string" } },
+            "required": ["version", "date", "note"]
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "description": "The obligation each side accepts. Stating it in the data beats a convention someone has to remember.",
+      "properties": {
+        "for_agent": { "type": "string" },
+        "for_human": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "orientation": {
+      "type": "object",
+      "properties": {
+        "what": { "type": "string" }, "why": { "type": "string" },
+        "shape": { "type": "string" }, "how_to_read": { "type": "string" }
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "description": "The stages every unit of work moves through. Omit to inherit the built-in six.",
+      "properties": {
+        "what": { "type": "string" },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+              "name": { "type": "string" },
+              "who": { "type": "string" },
+              "done_when": { "type": "string" },
+              "skipped_looks_like": { "type": "string", "description": "The failure this stage exists to prevent. Write it from one you actually hit." }
+            },
+            "required": ["id", "name"]
+          }
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "description": "Environments you are moving between, side by side.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }, "label": { "type": "string" },
+          "serves": { "type": "string" }, "status": { "type": "string" }, "note": { "type": "string" },
+          "facts": { "type": "array", "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 } }
+        },
+        "required": ["id", "label"]
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": ["integer", "string"] },
+          "name": { "type": "string" },
+          "what": { "type": "string" },
+          "build": { "enum": ["done", "active", "partial", "not-started"] },
+          "plan": { "enum": ["planned", "partial", "none"] },
+          "where": { "type": "string" },
+          "evidence": { "type": "string", "description": "Required once build is anything but not-started. Progress claimed without evidence is the shape of a comfortable lie." }
+        },
+        "required": ["name", "build", "plan"]
+      }
+    },
+    "plans": {
+      "type": "object",
+      "properties": {
+        "done": { "type": "array", "items": { "type": "object" } },
+        "now": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }, "status": { "type": "string" },
+              "updated": { "type": "string" }, "stage": { "type": "string" },
+              "plan_file": { "type": ["string", "null"] }
+            },
+            "required": ["name", "status", "updated", "stage"]
+          }
+        },
+        "next": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }, "why": { "type": "string" },
+              "unblocks": { "type": "string" }, "stage": { "type": "string" },
+              "plan_file": { "type": ["string", "null"] }
+            },
+            "required": ["name", "why", "unblocks", "stage"]
+          }
+        }
+      }
+    },
+    "parked": {
+      "type": "array",
+      "description": "Questions deferred by decision, not oversight. Each names when it must be answered, so parked never quietly becomes dropped.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }, "q": { "type": "string" },
+          "trigger": { "type": "string" }, "note": { "type": "string" }
+        },
+        "required": ["id", "q", "trigger"]
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule": { "type": "string" },
+          "state": { "enum": ["holding", "at risk", "broken"] },
+          "detail": { "type": "string" }
+        },
+        "required": ["rule", "state"]
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": { "term": { "type": "string" }, "def": { "type": "string" } },
+        "required": ["term", "def"]
+      }
+    }
+  }
+}

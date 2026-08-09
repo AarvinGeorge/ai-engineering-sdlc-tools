@@ -1,0 +1,13 @@
+{
+  "name": "plan-layer",
+  "description": "A shared planning surface between a human developer and a coding agent. plan.json is the state, a self-contained HTML page is the view, a gate catches drift, and session hooks brief the agent before the first word is typed.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Aarvin George Poozhikala",
+    "url": "https://github.com/AarvinGeorge"
+  },
+  "repository": "https://github.com/AarvinGeorge/ai-engineering-sdlc-tools",
+  "license": "MIT",
+  "keywords": ["planning", "workflow", "sdlc", "state", "hooks", "documentation"],
+  "skills": "./skills/"
+}

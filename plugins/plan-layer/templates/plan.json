@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "project": "PROJECT NAME",
+    "subtitle": "One line on what this project is",
+    "plan_version": "0.1.0",
+    "updated": "REPLACE WITH ISO-8601 UTC READ FROM A CLOCK",
+    "changelog": [
+      { "version": "0.1.0", "date": "REPLACE", "note": "Plan created." }
+    ]
+  },
+  "contract": {
+    "for_agent": "Read this file at the START of every session, before touching anything. It is the current state: what is built, what is planned, what is active right now. Update it as work progresses, not at the end, then re-render the page. If this file and the repository disagree about status, this file is wrong — fix it.",
+    "for_human": "This is the canonical view. Status lives here; task-level detail lives in the linked plan documents. If this page and reality disagree, the page is wrong — say so."
+  },
+  "orientation": {
+    "what": "What this plan covers.",
+    "why": "Why this work matters.",
+    "shape": "How the work is organised.",
+    "how_to_read": "Start with what is active now, then what is next."
+  },
+  "capabilities": [
+    {
+      "id": 1,
+      "name": "First capability",
+      "what": "What it does, in one line.",
+      "build": "not-started",
+      "plan": "none",
+      "where": "No plan yet",
+      "evidence": ""
+    }
+  ],
+  "plans": {
+    "done": [],
+    "now": [],
+    "next": [
+      {
+        "name": "First thing to do",
+        "why": "Why this one first.",
+        "unblocks": "What it makes possible.",
+        "stage": "intent",
+        "plan_file": null
+      }
+    ]
+  },
+  "parked": [],
+  "invariants": [],
+  "glossary": []
+}

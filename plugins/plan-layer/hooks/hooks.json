@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/brief.py\" --session-start 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 10,
+            "async": false,
+            "statusMessage": "Reading plan state"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/brief.py\" --pre-compact 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 10,
+            "async": false,
+            "statusMessage": "Flushing plan state"
+          }
+        ]
+      }
+    ]
+  }
+}

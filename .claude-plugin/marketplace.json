@@ -1,0 +1,25 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-engineering-sdlc-tools",
+  "metadata": {
+    "description": "Software-development-lifecycle tooling for AI engineering work: shared state between a human developer and a coding agent."
+  },
+  "owner": {
+    "name": "Aarvin George Poozhikala",
+    "url": "https://github.com/AarvinGeorge"
+  },
+  "plugins": [
+    {
+      "name": "plan-layer",
+      "description": "A shared planning surface between you and your coding agent. One JSON file is the state; a self-contained HTML page is the view; a gate catches drift; session hooks brief the agent automatically.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Aarvin George Poozhikala",
+        "url": "https://github.com/AarvinGeorge"
+      },
+      "source": "./plugins/plan-layer",
+      "category": "workflow",
+      "keywords": ["planning", "workflow", "sdlc", "state", "hooks", "documentation"]
+    }
+  ]
+}
