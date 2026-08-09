@@ -289,6 +289,62 @@ class TestBrief(Base):
         json.loads(r.stdout)  # must still be a well-formed hook response
 
 
+class TestContrast(unittest.TestCase):
+    """Every palette token must clear WCAG AA against both grounds it sits on.
+
+    Two tokens shipped at 4.31:1 and 4.09:1 — close enough to look fine and
+    still fail. Colour is the one thing that cannot be eyeballed, so it is
+    measured.
+    """
+
+    @staticmethod
+    def _lum(h):
+        h = h.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        ch = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        ch = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in ch]
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+
+    @classmethod
+    def _ratio(cls, a, b):
+        l1, l2 = cls._lum(a), cls._lum(b)
+        return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+    @staticmethod
+    def _tokens(block):
+        import re as _re
+        return dict(_re.findall(r"--([\w-]+):\s*(#[0-9a-fA-F]{3,6})", block))
+
+    def _palette(self, marker):
+        import re as _re
+        sys.path.insert(0, SCRIPTS)
+        import render
+        m = _re.search(_re.escape(marker) + r"\{([^}]*)\}", render.CSS)
+        self.assertTrue(m, "palette block %s not found" % marker)
+        return self._tokens(m.group(1))
+
+    def _assert_aa(self, tokens, grounds):
+        text_roles = ["ink", "ink-2", "muted", "accent", "done", "active", "gap", "partial"]
+        for role in text_roles:
+            fg = tokens.get(role)
+            if not fg:
+                continue
+            for ground in grounds:
+                r = self._ratio(fg, ground)
+                self.assertGreaterEqual(
+                    round(r, 2), 4.5,
+                    "--%s (%s) on %s is %.2f:1, below WCAG AA 4.5:1" % (role, fg, ground, r))
+
+    def test_light_palette_meets_aa(self):
+        t = self._palette(":root")
+        self._assert_aa(t, [t["card"], t["ground"]])
+
+    def test_dark_palette_meets_aa(self):
+        t = self._palette(':root[data-theme="dark"]')
+        self._assert_aa(t, [t["card"], t["ground"]])
+
+
 class TestManifests(unittest.TestCase):
     def test_manifests_parse_and_agree(self):
         root = os.path.dirname(os.path.dirname(PLUGIN))

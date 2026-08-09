@@ -331,8 +331,12 @@ def metrics(d):
 
 
 CSS = """
-  :root{--ink:#14171c;--ink-2:#3d4652;--muted:#6b7683;--ground:#f6f7f9;--card:#fff;
-    --line:#e2e6ea;--accent:#0f6b68;--accent-soft:#e6f0ef;--done:#2f7d5d;--active:#b06f13;
+  /* Light-theme --muted and --active were measured at 4.31:1 and 4.09:1 against
+     the card ground -- both just under WCAG AA's 4.5:1 for body text, and both
+     used for real content (section hints, sub-labels inside diagrams). Darkened
+     to 4.89:1 and 4.94:1. The dark palette measured 5.2:1 and up already. */
+  :root{--ink:#14171c;--ink-2:#3d4652;--muted:#67727f;--ground:#f6f7f9;--card:#fff;
+    --line:#e2e6ea;--accent:#0f6b68;--accent-soft:#e6f0ef;--done:#2f7d5d;--active:#a26105;
     --gap:#a03232;--partial:#5b6f8a;--radius:6px}
   @media(prefers-color-scheme:dark){:root{--ink:#e8ecf1;--ink-2:#b9c3ce;--muted:#8794a3;
     --ground:#12151a;--card:#191d24;--line:#2a313a;--accent:#4fb3ac;--accent-soft:#12302f;
@@ -340,9 +344,9 @@ CSS = """
   :root[data-theme="dark"]{--ink:#e8ecf1;--ink-2:#b9c3ce;--muted:#8794a3;--ground:#12151a;
     --card:#191d24;--line:#2a313a;--accent:#4fb3ac;--accent-soft:#12302f;--done:#5cb98c;
     --active:#d9a04a;--gap:#d97070;--partial:#8aa2bf}
-  :root[data-theme="light"]{--ink:#14171c;--ink-2:#3d4652;--muted:#6b7683;--ground:#f6f7f9;
+  :root[data-theme="light"]{--ink:#14171c;--ink-2:#3d4652;--muted:#67727f;--ground:#f6f7f9;
     --card:#fff;--line:#e2e6ea;--accent:#0f6b68;--accent-soft:#e6f0ef;--done:#2f7d5d;
-    --active:#b06f13;--gap:#a03232;--partial:#5b6f8a}
+    --active:#a26105;--gap:#a03232;--partial:#5b6f8a}
   *{box-sizing:border-box}
   body{margin:0;background:var(--ground);color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.55;

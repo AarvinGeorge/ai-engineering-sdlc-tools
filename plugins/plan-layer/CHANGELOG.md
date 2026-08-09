@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 — 2026-08-09
+
+- **Light palette now clears WCAG AA.** `--muted` measured 4.31:1 and `--active` 4.09:1
+  against the card ground, both just under the 4.5:1 body-text threshold and both used
+  for real content (section hints, glossary definitions, diagram sub-labels). Darkened to
+  4.89:1 and 4.94:1. The dark palette already measured 5.2:1 and up; unchanged.
+- Two tests assert every text token against both grounds, in both themes. Colour is the
+  one thing that cannot be eyeballed.
+
 ## 0.1.2 — 2026-08-09
 
 - **Figures can ship their own CSS.** A `figures.py` may define a module-level `CSS`
