@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-08-09
+
+- **Figures can ship their own CSS.** A `figures.py` may define a module-level `CSS`
+  string, appended to the page stylesheet. Markup alone was never enough: an SVG `rect`
+  with no fill rule renders solid black with invisible text, so a figure without styles
+  looks like a broken page rather than a plain one. Found by shipping exactly that.
+- The renderer now says so out loud when a figures module supplies markup and no CSS.
+
 ## 0.1.1 — 2026-08-09
 
 - Drift message renders both timestamps in UTC. git reports commit times with a local

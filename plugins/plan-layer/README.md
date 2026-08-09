@@ -94,12 +94,23 @@ The engine ships none: diagrams are about one project's specific mechanism and d
 generalise. To add your own, create `plan/figures.py`:
 
 ```python
+CSS = """
+  .my-box{fill:none;stroke:var(--line)}
+  .my-lbl{font-size:12.5px;fill:var(--ink)}
+"""
+
 def build(data):                  # data is the parsed plan.json
     return "<figure>…</figure>"   # any HTML; inline SVG works well
 ```
 
-The renderer picks it up automatically, and skips the section if it is missing or raises —
-a broken figure never costs you the page.
+**Ship the CSS with the markup.** An SVG `<rect>` with no fill rule renders **solid black
+with invisible text**, so a figure whose styles are missing looks like a broken page rather
+than a plain one. The module-level `CSS` string is appended to the page stylesheet, so your
+rules can use the same theme tokens (`--ink`, `--line`, `--accent`, `--done`, `--gap`) and
+work in light and dark automatically.
+
+The renderer picks the module up automatically, and skips the section if it is missing or
+raises — a broken figure never costs you the page.
 
 ## Configuration
 

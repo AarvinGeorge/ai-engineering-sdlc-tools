@@ -92,16 +92,30 @@ def h2(d, key):
 # Section builders. Each returns "" when its data is absent, so the page
 # contains exactly the sections the project actually filled in.
 # --------------------------------------------------------------------------
-def sec_figures(d, root):
-    mod = L.load_figures(root)
+def sec_figures(d, mod):
+    """Figures come as a (markup, css) pair.
+
+    Markup alone is not enough and shipping it alone was a real bug: an SVG
+    <rect> with no stylesheet defaults to solid black fill, so a figure whose
+    styles went missing renders as a row of black boxes with invisible text --
+    worse than no figure, because it looks like the page is broken rather than
+    the styles. A figures module may define a module-level CSS string, which is
+    appended to the page stylesheet.
+    """
     if not mod:
-        return ""
+        return "", ""
     try:
         body = mod.build(d)
     except Exception as exc:
         print("  warning: figures.build() raised (%s); skipping figures" % exc)
-        return ""
-    return (h2(d, "figures") + body) if body else ""
+        return "", ""
+    if not body:
+        return "", ""
+    css = getattr(mod, "CSS", "") or ""
+    if not css:
+        print("  note: figures supply no CSS. If the markup uses classes, they will be "
+              "unstyled — an SVG rect with no fill rule renders solid black.")
+    return h2(d, "figures") + body, css
 
 
 def sec_systems(d):
@@ -461,6 +475,7 @@ CSS = """
 
 def build(d, root, fp):
     m = d.get("meta", {})
+    figures_html, figures_css = sec_figures(d, L.load_figures(root))
     body = [
         '<div class="wrap" data-fingerprint="%s">' % fp,
         '<div class="bar"><div><h1>%s</h1>%s</div>%s</div>' % (
@@ -470,7 +485,7 @@ def build(d, root, fp):
         sec_contract(d),
         sec_orientation(d),
         sec_northstar(d),
-        sec_figures(d, root),
+        figures_html,
         sec_systems(d),
         sec_capabilities(d),
         sec_cycle(d),
@@ -494,8 +509,9 @@ def build(d, root, fp):
             ' · data updated <time>%s</time>' % e(m["updated"]) if m.get("updated") else "",
             fp, '<ul>%s</ul>' % changes if changes else ""))
     body.append("</div>")
-    return ("<title>%s</title>\n<style>%s</style>\n%s"
-            % (e(m.get("project", "Plan")), CSS, "\n".join(x for x in body if x)))
+    return ("<title>%s</title>\n<style>%s%s</style>\n%s"
+            % (e(m.get("project", "Plan")), CSS, figures_css,
+               "\n".join(x for x in body if x)))
 
 
 def main():

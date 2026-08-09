@@ -101,11 +101,21 @@ The engine ships none — diagrams are about one project's specific mechanism an
 generalise. A project that wants them creates `plan/figures.py` exposing:
 
 ```python
+CSS = """
+  .my-box{fill:none;stroke:var(--line)}
+"""
+
 def build(data):     # data is the parsed plan.json
     return "<figure>…</figure>"   # any HTML; inline SVG works well
 ```
 
-The renderer picks it up automatically and skips the section if it is absent or raises.
+**A figure must ship its own CSS.** An SVG `<rect>` with no fill rule renders solid black
+with invisible text — a missing stylesheet looks like a broken page, not a plain one. The
+module-level `CSS` string is appended to the page stylesheet, so it can use the theme tokens
+(`--ink`, `--line`, `--accent`, `--done`, `--gap`) and work in both themes.
+
+The renderer picks the module up automatically and skips the section if it is absent or
+raises.
 
 ## Configuration
 

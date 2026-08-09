@@ -130,6 +130,50 @@ class TestFigures(Base):
         run("render.py", project=self.dir)
         self.assertIn('id="mine"', self.page())
 
+    def test_figure_css_reaches_the_stylesheet(self):
+        """Markup without styles is worse than no figure.
+
+        An SVG rect with no fill rule renders solid black with invisible text,
+        so the page looks broken rather than plain. This shipped once.
+        """
+        self.make_plan()
+        with open(os.path.join(self.dir, "plan", "figures.py"), "w") as fh:
+            fh.write('CSS = "\\n  .dg-box{fill:none;stroke:red}\\n"\n'
+                     'def build(data):\n'
+                     '    return \'<figure><svg><rect class="dg-box"/></svg></figure>\'\n')
+        run("render.py", project=self.dir)
+        page = self.page()
+        self.assertIn(".dg-box{fill:none;stroke:red}", page,
+                      "figure CSS never reached the stylesheet")
+        self.assertLess(page.index(".dg-box{"), page.index("</style>"),
+                        "figure CSS landed outside the stylesheet")
+
+    ORPHAN_FIGURES = (
+        'CSS = "\\n  .known{fill:none}\\n"\n'
+        'def build(data):\n'
+        '    return (\'<figure><svg><rect class="known"/>\'\n'
+        '            \'<rect class="orphan"/></svg></figure>\')\n'
+    )
+
+    def test_every_class_used_by_figures_has_a_rule(self):
+        """The generic guard against the bug above: markup that references a
+        class the stylesheet never defines is a silently broken figure."""
+        import re as _re
+        self.make_plan()
+        with open(os.path.join(self.dir, "plan", "figures.py"), "w") as fh:
+            fh.write(self.ORPHAN_FIGURES)
+        r = run("render.py", project=self.dir)
+        self.assertNotIn("failed to load", r.stdout, "the fixture is not valid Python")
+        page = self.page()
+        style = page[page.index("<style>"):page.index("</style>")]
+        used = set()
+        for m in _re.finditer(r'class="([^"]+)"', page[page.index("</style>"):]):
+            used.update(m.group(1).split())
+        defined = set(_re.findall(r"\.([A-Za-z][\w-]*)", style))
+        self.assertIn("known", defined, "figure CSS did not reach the stylesheet")
+        self.assertIn("orphan", used - defined,
+                      "the orphan-class detector itself is broken")
+
     def test_broken_figures_do_not_cost_the_page(self):
         self.make_plan()
         with open(os.path.join(self.dir, "plan", "figures.py"), "w") as fh:
