@@ -176,6 +176,13 @@ for a human to dispute a claim in the file itself — plus the fact that it does
 with itself. Each is written up with the evidence that revealed it and a sketch of the fix in
 [ROADMAP.md](ROADMAP.md), along with the reason none of them is being worked on.
 
+## Durability
+
+The plan and the page are written atomically — to a temp file, then renamed. An interrupted
+write leaves the previous version intact rather than a truncated one, and a concurrent reader
+never sees a half-written file. This is not theoretical: the naive version was reproduced
+destroying `plan.json` with a single Ctrl-C.
+
 ## Licence
 
 MIT.

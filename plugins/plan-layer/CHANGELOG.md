@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.2 — %s
+
+- **Atomic writes.** `open(path, "w")` truncates immediately, so an interruption between
+  the truncate and the last byte left a half-written file. Reproduced: a Ctrl-C mid-write
+  left `plan.json` unparseable — data loss in the one file this tool exists to protect.
+  Both the plan and the page are now written to a sibling temp file and renamed, so a
+  reader sees the old contents or the new ones and never a mixture. fsync before the
+  rename, so a power loss cannot make the rename durable while the contents are not.
+- Three tests, including one that interrupts a write and asserts the original survived.
+
+
 ## 0.3.1 — 2026-08-10
 
 - The commit-vs-plan drift signal now tolerates 120 seconds. Plan and commit are normally

@@ -551,8 +551,9 @@ def main():
     d = L.load()
     fp = fingerprint(p["src"])
     doc = build(d, p["root"], fp)
-    with open(p["out"], "w", encoding="utf-8") as fh:
-        fh.write(doc)
+    # Atomic: a reader (check.py, a browser, another session) sees the old page
+    # or the new one, never a half-written one.
+    L.atomic_write(p["out"], doc)
     print("  wrote %s (%s bytes)" % (p["out"], format(len(doc), ",")))
     return 0
 

@@ -505,6 +505,53 @@ class TestContrast(unittest.TestCase):
         self._assert_aa(t, [t["card"], t["ground"]])
 
 
+class TestDurability(Base):
+    """The source of truth must survive an interrupted write."""
+
+    def test_interrupted_write_leaves_the_original_intact(self):
+        import plan_lib as L
+        self.make_plan()
+        p = os.path.join(self.dir, "plan", "plan.json")
+        before = open(p).read()
+
+        class Boom(Exception):
+            pass
+
+        real = L.os.replace
+
+        def explode(a, b):
+            raise Boom("interrupted just before the rename")
+
+        L.os.replace = explode
+        try:
+            with self.assertRaises(Boom):
+                L.atomic_write(p, "TOTAL GARBAGE")
+        finally:
+            L.os.replace = real
+
+        self.assertEqual(open(p).read(), before,
+                         "an interrupted write damaged the file it was replacing")
+        json.loads(open(p).read())          # still parseable
+
+    def test_no_temp_files_are_left_behind(self):
+        import plan_lib as L
+        self.make_plan()
+        p = os.path.join(self.dir, "plan", "plan.json")
+        L.atomic_write(p, '{"ok": true}\n')
+        leftovers = [f for f in os.listdir(os.path.dirname(p)) if f.startswith(".plan-layer-")]
+        self.assertEqual(leftovers, [], "temp files left in the plan directory")
+        self.assertEqual(json.load(open(p)), {"ok": True})
+
+    def test_page_is_written_atomically(self):
+        """A concurrent reader must never see a partial page."""
+        self.make_plan()
+        run("render.py", project=self.dir)
+        page = self.page()
+        self.assertTrue(page.rstrip().endswith("</div>"),
+                        "page looks truncated: %r" % page[-40:])
+        self.assertIn("data-fingerprint=", page)
+
+
 class TestManifests(unittest.TestCase):
     def test_manifests_parse_and_agree(self):
         root = os.path.dirname(os.path.dirname(PLUGIN))

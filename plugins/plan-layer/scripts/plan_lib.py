@@ -11,6 +11,7 @@ project's plan, and does it exist? -- so the three scripts cannot disagree.
 import json
 import os
 import subprocess
+import tempfile
 
 PLAN_DIRNAME = "plan"
 PLAN_FILENAME = "plan.json"
@@ -80,11 +81,40 @@ def load(root=None):
     return json.load(open(paths(root)["src"], encoding="utf-8"))
 
 
+def atomic_write(path, text):
+    """Replace a file's contents in one step, or not at all.
+
+    `open(path, "w")` truncates immediately, so an interruption between the
+    truncate and the final byte leaves a half-written file. For a generated
+    page that is annoying. For plan.json -- the source of truth this whole
+    tool exists to protect -- it is data loss, and it was reproducible: a
+    Ctrl-C mid-write left the file unparseable.
+
+    Writing to a sibling temp file and renaming means a reader sees either the
+    old contents or the new ones, never a mixture. os.replace is atomic on
+    POSIX, and the temp file is in the same directory so the rename cannot
+    cross a filesystem boundary. fsync before the rename so a power loss
+    cannot leave the rename durable while the contents are not.
+    """
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".plan-layer-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save(data, root=None):
-    p = paths(root)["src"]
-    with open(p, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+    atomic_write(paths(root)["src"],
+                 json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
 def git(root, *args):
