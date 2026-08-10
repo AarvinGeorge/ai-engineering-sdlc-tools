@@ -91,6 +91,21 @@ Two kinds of finding, kept separate on purpose:
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays a human and agent job.
 
+## Edge cases
+
+Hazards found while designing, kept until they are dealt with:
+
+```json
+"edge_cases": [
+  { "id": "E3", "case": "Redaction fails open when the model returns bad JSON.",
+    "surface": "privacy layer", "status": "open",
+    "mitigation": "Fail closed: refuse the turn rather than forward raw content." }
+]
+```
+
+`status` is `open`, `mitigated` or `accepted`. The gate fails on an `accepted` case with no
+reasoning, because accepting a hazard silently is how it stops being a decision.
+
 ## Checking the plan against reality
 
 The gate above checks that the plan is *consistent*. It cannot tell whether it is

@@ -255,6 +255,15 @@ def run(root=None):
                          % (i.get("rule"), i.get("state")))
 
     # Parked means deferred, not dropped. Without a trigger it is dropped.
+    # An edge case with no status is a note; with a status it is tracked work.
+    for c in d.get("edge_cases", []):
+        if c.get("status") not in ("open", "mitigated", "accepted"):
+            fails.append("edge case %r: status=%r must be open, mitigated or accepted"
+                         % (c.get("id"), c.get("status")))
+        if c.get("status") == "accepted" and not (c.get("mitigation") or "").strip():
+            fails.append("edge case %r is 'accepted' with no reasoning — accepting a hazard "
+                         "silently is how it stops being a decision" % c.get("id"))
+
     for q in d.get("parked", []):
         if not (q.get("trigger") or "").strip():
             fails.append("parked question %r has no trigger — parked without one is dropped"

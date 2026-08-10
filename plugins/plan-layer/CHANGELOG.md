@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — %s
+
+- **Edge-case register.** A section for hazards found along the way, each with a surface and a
+  status of `open`, `mitigated` or `accepted`. They surface during design conversations and
+  otherwise die in a chat log.
+- The gate requires a valid status, and **fails on an `accepted` case with no reasoning** —
+  accepting a hazard silently is how it stops being a decision.
+
+
 ## 0.4.0 — %s
 
 The loop said "finish every turn by running the gate". That was an instruction, and the

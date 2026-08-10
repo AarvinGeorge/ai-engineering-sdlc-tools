@@ -49,6 +49,8 @@ HEADINGS = {
     "now": ("Active now", ""),
     "next": ("Next", "agreed direction; each still needs a written plan before work starts"),
     "parked": ("Parked", "deferred by decision, not oversight"),
+    "edge_cases": ("Edge cases", "hazards found along the way; open until mitigated "
+                   "or consciously accepted"),
     "invariants": ("Invariants", "things that must stay true"),
     "glossary": ("Glossary", ""),
 }
@@ -258,6 +260,27 @@ def sec_parked(d):
             '<p class="pn">%s</p>' % e(p["note"]) if p.get("note") else "")
         for p in items)
     return h2(d, "parked") + '<ul class="parked">%s</ul>' % li
+
+
+def sec_edge_cases(d):
+    """Hazards found along the way.
+
+    They surface during design conversations and are exactly the kind of thing
+    that lives in a chat log and dies there. A register keeps them until they
+    are mitigated or consciously accepted.
+    """
+    items = d.get("edge_cases") or []
+    if not items:
+        return ""
+    li = "".join(
+        '<li class="edge edge--%s"><div class="pk"><code>%s</code>'
+        '<span class="trigger">%s</span><span class="edgestate">%s</span></div>'
+        '<p class="pq">%s</p>%s</li>' % (
+            e(c.get("status", "open")), e(c.get("id", "")), e(c.get("surface", "")),
+            e(c.get("status", "open")), e(c.get("case", "")),
+            '<p class="pn">%s</p>' % e(c["mitigation"]) if c.get("mitigation") else "")
+        for c in items)
+    return h2(d, "edge_cases") + '<ul class="parked">%s</ul>' % li
 
 
 def sec_invariants(d):
@@ -474,6 +497,11 @@ CSS = """
   .trigger{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .pq{margin:5px 0 0;font-size:13.5px;font-weight:500}
   .pn{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
+  .edgestate{font-size:10px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.06em;margin-left:auto}
+  .edge--open .edgestate{color:var(--gap)}
+  .edge--mitigated .edgestate{color:var(--done)}
+  .edge--accepted .edgestate{color:var(--muted)}
   ul.invs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
   .inv{display:grid;grid-template-columns:250px 78px 1fr;gap:12px;align-items:baseline;
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -515,6 +543,7 @@ def build(d, root, fp):
         sec_now(d),
         sec_next(d),
         sec_parked(d),
+        sec_edge_cases(d),
         sec_invariants(d),
         sec_glossary(d),
     ]
