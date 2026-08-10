@@ -196,6 +196,29 @@ def capchip(d, p):
         e(cid), e(cap["name"]) if cap else "unknown capability")
 
 
+TASK_STATE = {"done": "t--done", "active": "t--active",
+              "blocked": "t--blocked", "todo": "t--todo"}
+TASK_MARK = {"done": "&#10003;", "active": "&#9679;", "blocked": "!", "todo": ""}
+
+
+def tasklist(p):
+    """The plan's shape, inline. Without this the page names a file nobody
+    reading it can open, which is worse than saying nothing."""
+    items = p.get("tasks") or []
+    if not items:
+        return ""
+    n_done = sum(1 for t in items if t.get("state") == "done")
+    li = "".join(
+        '<li class="t %s"><span class="tmark">%s</span><span class="tname">%s</span>%s</li>' % (
+            TASK_STATE.get(t.get("state", "todo"), "t--todo"),
+            TASK_MARK.get(t.get("state", "todo"), ""),
+            e(t.get("name", "")),
+            '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
+        for t in items)
+    return ('<div class="tasks"><div class="tcount">%d of %d done</div>'
+            '<ol class="tlist">%s</ol></div>' % (n_done, len(items), li))
+
+
 def planlink(p):
     """A pointer to the executable plan, or an honest statement that none exists."""
     return ('<code class="planfile">%s</code>' % e(p["plan_file"])) if p.get("plan_file") \
@@ -228,7 +251,8 @@ def sec_now(d):
         '%s%s%s%s</div>%s</li>' % (
             e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
             '<span class="planmeta">updated %s</span>' % e(p["updated"]) if p.get("updated") else "",
-            '<p class="planout">%s</p>' % e(p["status"]) if p.get("status") else "")
+            ('<p class="planout">%s</p>' % e(p["status"]) if p.get("status") else "")
+            + tasklist(p))
         for p in items) or '<li class="plan plan--idle"><p class="planout">Nothing active.</p></li>'
     return h2(d, "now") + '<ul class="plans">%s</ul>' % li
 
@@ -242,8 +266,8 @@ def sec_next(d):
         '%s%s%s</div>%s%s</li>' % (
             e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
             '<p class="planout">%s</p>' % e(p["why"]) if p.get("why") else "",
-            '<p class="unblocks"><b>Unblocks:</b> %s</p>' % e(p["unblocks"])
-            if p.get("unblocks") else "")
+            ('<p class="unblocks"><b>Unblocks:</b> %s</p>' % e(p["unblocks"])
+             if p.get("unblocks") else "") + tasklist(p))
         for p in items)
     return h2(d, "next") + '<ul class="plans">%s</ul>' % li
 
@@ -487,6 +511,25 @@ CSS = """
   .planmeta{font-size:11.5px;color:var(--muted);font-family:ui-monospace,monospace}
   .planfile{font-size:11.5px;color:var(--accent)}
   .planout{margin:7px 0 0;font-size:13px;color:var(--ink-2)}
+  .tasks{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line)}
+  .tcount{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    margin-bottom:6px}
+  ol.tlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;
+    counter-reset:t}
+  .t{display:flex;align-items:baseline;gap:9px;font-size:12.5px;color:var(--ink-2)}
+  .t::before{counter-increment:t;content:counter(t);font-variant-numeric:tabular-nums;
+    font-size:10.5px;color:var(--muted);min-width:13px}
+  .tmark{width:13px;flex:none;font-weight:700;font-size:11px}
+  .tname{flex:1 1 auto;min-width:0}
+  .tnote{font-size:11.5px;color:var(--muted)}
+  .t--done .tmark{color:var(--done)}
+  .t--done .tname{color:var(--muted);text-decoration:line-through;
+    text-decoration-color:var(--line)}
+  .t--active .tmark{color:var(--active)}
+  .t--active .tname{font-weight:600;color:var(--ink)}
+  .t--blocked .tmark{color:var(--gap)}
+  .t--blocked .tname{color:var(--gap)}
+  .t--todo .tname{color:var(--ink-2)}
   .plannote,.unblocks{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
   .plannote b,.unblocks b{color:var(--ink-2)}
   ul.parked{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}

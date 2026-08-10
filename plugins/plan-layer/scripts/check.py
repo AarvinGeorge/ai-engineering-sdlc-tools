@@ -37,6 +37,7 @@ import plan_lib as L  # noqa: E402
 VALID_BUILD = {"done", "active", "partial", "not-started"}
 VALID_PLAN = {"planned", "partial", "none"}
 VALID_INV = {"holding", "at risk", "broken"}
+VALID_TASK = {"done", "active", "todo", "blocked"}
 
 
 
@@ -190,6 +191,20 @@ def run(root=None):
         if p.get("stage") in {"building", "verified", "recorded"} and not p.get("plan_file"):
             fails.append("active item %r: stage=%s but no plan_file — work is running "
                          "without a written plan" % (who, p.get("stage")))
+        # A mistyped state renders as 'todo', so a finished task would silently
+        # read as outstanding -- the page would understate progress and nobody
+        # would know why.
+        tasks = p.get("tasks") or []
+        for t in tasks:
+            if t.get("state") not in VALID_TASK:
+                fails.append("active item %r: task %r has state=%r, not one of %s"
+                             % (who, t.get("name", "?"), t.get("state"),
+                                ", ".join(sorted(VALID_TASK))))
+        if tasks and all(t.get("state") == "done" for t in tasks) \
+                and p.get("stage") not in {"verified", "recorded"}:
+            drifts.append("active item %r has every task done but sits at stage %r — "
+                          "either it is finished, or the task list is behind"
+                          % (who, p.get("stage")))
 
     for p in plans.get("next", []):
         who = p.get("name") or "queued item"

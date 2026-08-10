@@ -73,6 +73,32 @@ It renders as a chip beside the item, and the gate checks it: a reference to a c
 that does not exist **fails**; an item that names none **drifts**. Without the link, the plan
 lists and the capabilities table are two documents that happen to share a page.
 
+## Showing the plan, not just its filename
+
+An active item that only points at a plan document tells the reader "a plan exists, here is a
+file you cannot open." Give it a checklist:
+
+```json
+{
+  "name": "Email channel",
+  "stage": "building",
+  "plan_file": "13_email_channel.md",
+  "tasks": [
+    { "name": "Prove the round trip", "state": "done", "note": "the door is fire-and-forget" },
+    { "name": "Build the adapter",    "state": "blocked", "note": "needs the Google project" },
+    { "name": "Trust tiers",          "state": "todo" }
+  ]
+}
+```
+
+It renders as a numbered checklist with a count. `state` is one of `done`, `active`, `todo`,
+`blocked`, and the gate **fails** on anything else — a typo would otherwise render as `todo`,
+so finished work would quietly read as outstanding. When every task is done but the item still
+sits before `verified`, that **drifts**: either it is finished, or the checklist is behind.
+
+Keep the list flat. Individual steps belong in the plan document; the page carries the shape of
+the work and where it has got to.
+
 ## The gate
 
 ```bash

@@ -8,23 +8,59 @@
     "meta": {
       "type": "object",
       "properties": {
-        "project": { "type": "string" },
-        "subtitle": { "type": "string" },
-        "plan_version": { "type": "string", "description": "Bumped whenever the plan changes materially. Must match the newest changelog entry." },
-        "updated": { "type": "string", "description": "ISO-8601 UTC. Read from a clock, never from memory." },
-        "north_star": { "type": "string" },
-        "north_star_owner": { "type": "string", "description": "Who is allowed to change the north star. Naming an owner is what makes it frozen." },
+        "project": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "plan_version": {
+          "type": "string",
+          "description": "Bumped whenever the plan changes materially. Must match the newest changelog entry."
+        },
+        "updated": {
+          "type": "string",
+          "description": "ISO-8601 UTC. Read from a clock, never from memory."
+        },
+        "north_star": {
+          "type": "string"
+        },
+        "north_star_owner": {
+          "type": "string",
+          "description": "Who is allowed to change the north star. Naming an owner is what makes it frozen."
+        },
         "headings": {
           "type": "object",
           "description": "Override any section heading: { \"systems\": [\"Environments\", \"hint text\"] }",
-          "additionalProperties": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
         },
         "changelog": {
           "type": "array",
           "items": {
             "type": "object",
-            "properties": { "version": { "type": "string" }, "date": { "type": "string" }, "note": { "type": "string" } },
-            "required": ["version", "date", "note"]
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "version",
+              "date",
+              "note"
+            ]
           }
         }
       }
@@ -33,35 +69,71 @@
       "type": "object",
       "description": "The obligation each side accepts. Stating it in the data beats a convention someone has to remember.",
       "properties": {
-        "for_agent": { "type": "string" },
-        "for_human": { "type": "string" },
-        "sources": { "type": "array", "items": { "type": "object" } }
+        "for_agent": {
+          "type": "string"
+        },
+        "for_human": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
     "orientation": {
       "type": "object",
       "properties": {
-        "what": { "type": "string" }, "why": { "type": "string" },
-        "shape": { "type": "string" }, "how_to_read": { "type": "string" }
+        "what": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "string"
+        },
+        "how_to_read": {
+          "type": "string"
+        }
       }
     },
     "cycle": {
       "type": "object",
       "description": "The stages every unit of work moves through. Omit to inherit the built-in six.",
       "properties": {
-        "what": { "type": "string" },
+        "what": {
+          "type": "string"
+        },
         "stages": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-              "name": { "type": "string" },
-              "who": { "type": "string" },
-              "done_when": { "type": "string" },
-              "skipped_looks_like": { "type": "string", "description": "The failure this stage exists to prevent. Write it from one you actually hit." }
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "who": {
+                "type": "string"
+              },
+              "done_when": {
+                "type": "string"
+              },
+              "skipped_looks_like": {
+                "type": "string",
+                "description": "The failure this stage exists to prevent. Write it from one you actually hit."
+              }
             },
-            "required": ["id", "name"]
+            "required": [
+              "id",
+              "name"
+            ]
           }
         }
       }
@@ -72,11 +144,37 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" }, "label": { "type": "string" },
-          "serves": { "type": "string" }, "status": { "type": "string" }, "note": { "type": "string" },
-          "facts": { "type": "array", "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 } }
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "serves": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
         },
-        "required": ["id", "label"]
+        "required": [
+          "id",
+          "label"
+        ]
       }
     },
     "capabilities": {
@@ -84,31 +182,115 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": ["integer", "string"] },
-          "name": { "type": "string" },
-          "what": { "type": "string" },
-          "build": { "enum": ["done", "active", "partial", "not-started"] },
-          "plan": { "enum": ["planned", "partial", "none"] },
-          "where": { "type": "string" },
-          "evidence": { "type": "string", "description": "Required once build is anything but not-started. Progress claimed without evidence is the shape of a comfortable lie." }
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string"
+          },
+          "build": {
+            "enum": [
+              "done",
+              "active",
+              "partial",
+              "not-started"
+            ]
+          },
+          "plan": {
+            "enum": [
+              "planned",
+              "partial",
+              "none"
+            ]
+          },
+          "where": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Required once build is anything but not-started. Progress claimed without evidence is the shape of a comfortable lie."
+          }
         },
-        "required": ["name", "build", "plan"]
+        "required": [
+          "name",
+          "build",
+          "plan"
+        ]
       }
     },
     "plans": {
       "type": "object",
       "properties": {
-        "done": { "type": "array", "items": { "type": "object" } },
+        "done": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
         "now": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" }, "status": { "type": "string" },
-              "updated": { "type": "string" }, "stage": { "type": "string" },
-              "plan_file": { "type": ["string", "null"] }
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "updated": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              },
+              "plan_file": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tasks": {
+                "type": "array",
+                "description": "Flat checklist showing the shape of the plan and where it has got to. Individual steps belong in the plan document, not here.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "done",
+                        "active",
+                        "todo",
+                        "blocked"
+                      ]
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "state"
+                  ]
+                }
+              }
             },
-            "required": ["name", "status", "updated", "stage"]
+            "required": [
+              "name",
+              "status",
+              "updated",
+              "stage"
+            ]
           }
         },
         "next": {
@@ -116,11 +298,59 @@
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" }, "why": { "type": "string" },
-              "unblocks": { "type": "string" }, "stage": { "type": "string" },
-              "plan_file": { "type": ["string", "null"] }
+              "name": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              },
+              "unblocks": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              },
+              "plan_file": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tasks": {
+                "type": "array",
+                "description": "Flat checklist showing the shape of the plan and where it has got to. Individual steps belong in the plan document, not here.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "done",
+                        "active",
+                        "todo",
+                        "blocked"
+                      ]
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "state"
+                  ]
+                }
+              }
             },
-            "required": ["name", "why", "unblocks", "stage"]
+            "required": [
+              "name",
+              "why",
+              "unblocks",
+              "stage"
+            ]
           }
         }
       }
@@ -131,10 +361,24 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" }, "q": { "type": "string" },
-          "trigger": { "type": "string" }, "note": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "q": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
         },
-        "required": ["id", "q", "trigger"]
+        "required": [
+          "id",
+          "q",
+          "trigger"
+        ]
       }
     },
     "invariants": {
@@ -142,19 +386,42 @@
       "items": {
         "type": "object",
         "properties": {
-          "rule": { "type": "string" },
-          "state": { "enum": ["holding", "at risk", "broken"] },
-          "detail": { "type": "string" }
+          "rule": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "holding",
+              "at risk",
+              "broken"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
         },
-        "required": ["rule", "state"]
+        "required": [
+          "rule",
+          "state"
+        ]
       }
     },
     "glossary": {
       "type": "array",
       "items": {
         "type": "object",
-        "properties": { "term": { "type": "string" }, "def": { "type": "string" } },
-        "required": ["term", "def"]
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "def": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "def"
+        ]
       }
     }
   }

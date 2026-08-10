@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0 — 2026-08-10
+
+**An active plan can now show its tasks.** Before this, an active item could
+name a plan document and say nothing about what was in it, so the page told a
+reader "a plan exists, here is a filename you cannot open" — the one thing this
+page is meant to prevent. Found the way these things are always found: the human
+asked why he could not see the active plan, and the honest answer was that it
+was never rendered.
+
+- `plans.now[].tasks` and `plans.next[].tasks` — a flat checklist of
+  `{name, state, note?}`, `state` in `done | active | todo | blocked`.
+  Deliberately flat: individual steps belong in the plan document, while the
+  page carries the shape of the work and where it has got to.
+- The gate **fails** on an unrecognised state. A typo would otherwise render as
+  `todo`, so finished work would silently read as outstanding.
+- The gate **drifts** when every task is done but the item still sits before
+  `verified` — either it is finished, or the checklist is behind.
+- Five tests, including one asserting a plan with no `tasks` key renders exactly
+  as it did before.
+
 ## 0.6.1 — %s
 
 - Orientation now comes before the contract. A first-time reader was being handed

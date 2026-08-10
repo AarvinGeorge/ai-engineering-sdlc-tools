@@ -456,6 +456,55 @@ class TestEdgeCases(Base):
         self.assertIn("belongs in plans.done", run("check.py", project=self.dir).stdout)
 
 
+
+class TestTasks(Base):
+    """An active item may carry a task checklist. Without it the page named a
+    plan document and showed nothing of what was in it -- which is how the
+    human reading it ends up unable to see the active plan."""
+
+    def _with_tasks(self, tasks, stage="building"):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "Ship it", "status": "under way",
+                              "updated": "2026-01-01", "stage": stage,
+                              "plan_file": "p.md", "tasks": tasks}]
+        self.write(d)
+        return d
+
+    def test_tasks_render_with_a_count(self):
+        self._with_tasks([{"name": "Alpha", "state": "done"},
+                          {"name": "Beta", "state": "todo"}])
+        run("render.py", project=self.dir)
+        page = self.page()
+        self.assertIn("Alpha", page)
+        self.assertIn("Beta", page)
+        self.assertIn("1 of 2 done", page)
+
+    def test_bad_state_fails_rather_than_rendering_as_todo(self):
+        self._with_tasks([{"name": "Alpha", "state": "in-progress"}])
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("in-progress", r.stdout)
+
+    def test_all_done_but_still_active_is_drift(self):
+        self._with_tasks([{"name": "Alpha", "state": "done"}])
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertIn("every task done", r.stdout)
+
+    def test_all_done_at_verified_is_not_drift(self):
+        self._with_tasks([{"name": "Alpha", "state": "done"}], stage="verified")
+        run("render.py", project=self.dir)
+        self.assertNotIn("every task done", run("check.py", project=self.dir).stdout)
+
+    def test_no_tasks_key_renders_nothing_extra(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "Ship it", "status": "s", "updated": "2026-01-01",
+                              "stage": "planned"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertNotIn('class="tasks"', self.page())
+
 class TestContrast(unittest.TestCase):
     """Every palette token must clear WCAG AA against both grounds it sits on.
 
