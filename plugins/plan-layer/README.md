@@ -41,7 +41,8 @@ your-project/
 - **`index.html`** is fully self-contained: no scripts, no fonts, no network requests. Open
   it locally, host it anywhere, or publish it so the human can read it without a terminal.
   It carries a fingerprint of the JSON, so a stale page says so instead of quietly showing
-  old data.
+  old data. Light and dark both meet **WCAG AA** on every text token, asserted by a test
+  rather than judged by eye.
 
 ## The cycle
 

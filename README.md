@@ -26,8 +26,19 @@ claude plugin marketplace add /path/to/ai-engineering-sdlc-tools
 claude plugin install plan-layer@ai-engineering-sdlc-tools
 ```
 
-A local-directory marketplace is **cached** at install time. After editing the source, run
-`claude plugin marketplace update ai-engineering-sdlc-tools` to pick the changes up.
+### Picking up your own edits
+
+A marketplace is **cached** at install time, and updating the marketplace only refreshes the
+catalogue — it does **not** move the installed plugin. Both steps are needed:
+
+```bash
+claude plugin marketplace update ai-engineering-sdlc-tools   # refresh the catalogue
+claude plugin update plan-layer@ai-engineering-sdlc-tools    # move the installed copy
+```
+
+Bump the version in **both** `.claude-plugin/marketplace.json` and the plugin's own
+`plugin.json` first, or the second command finds nothing newer and does nothing. Confirm
+with `claude plugin list`.
 
 ## Layout
 
@@ -57,6 +68,9 @@ These are what the tools have in common, and what a new one here should honour.
   source, so it can never quietly show old data.
 - **Evidence over assertion.** Where a tool reports a state, it should be able to show what
   it measured.
+- **Colour is measured, never eyeballed.** Every text token clears WCAG AA against every
+  ground it sits on, in both themes, asserted by a test. Two tokens once shipped at 4.31:1
+  and 4.09:1 — close enough to look right and still fail.
 
 ## Licence
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-08-10
+
+- **Docs: the update instruction was wrong.** It said `claude plugin marketplace update`
+  was enough. It is not — that refreshes the catalogue and leaves the installed plugin
+  where it was. Both commands are needed, and the version must be bumped in both
+  manifests first. Found by following the instruction and watching nothing change.
+- Accessibility stated where it is relevant: the page meets WCAG AA in both themes, and
+  that is a test, not a claim.
+
 ## 0.1.3 — 2026-08-09
 
 - **Light palette now clears WCAG AA.** `--muted` measured 4.31:1 and `--active` 4.09:1
