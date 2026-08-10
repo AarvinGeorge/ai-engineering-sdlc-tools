@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — %s
+
+- Orientation now comes before the contract. A first-time reader was being handed
+  "read this first, every session" before being told what the project is.
+
+
 ## 0.6.0 — %s
 
 Readability, measured rather than guessed. A page nobody can be onboarded from is not a
