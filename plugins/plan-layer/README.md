@@ -169,6 +169,13 @@ Optional `.plan-layer.json` in the project root, if the defaults do not suit:
 is optional** — a project that fills in only `plans` gets a page with only plans on it, and
 nothing looks broken.
 
+## Known gaps
+
+Three things this deliberately does not do yet — no history, no independent reviewer, no way
+for a human to dispute a claim in the file itself — plus the fact that it does not yet plan
+with itself. Each is written up with the evidence that revealed it and a sketch of the fix in
+[ROADMAP.md](ROADMAP.md), along with the reason none of them is being worked on.
+
 ## Licence
 
 MIT.

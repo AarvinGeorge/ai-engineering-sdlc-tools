@@ -54,6 +54,13 @@ plugins/<name>/                    one directory per plugin
 Adding a plugin means adding a directory under `plugins/` and one entry to
 `marketplace.json`. Nothing else moves.
 
+## Where each tool is honest about its limits
+
+Every plugin here keeps a `ROADMAP.md` naming what it does **not** do, with the evidence that
+revealed each gap. A tool that only documents its strengths is a sales page.
+
+- [plan-layer/ROADMAP.md](plugins/plan-layer/ROADMAP.md)
+
 ## Design rules
 
 These are what the tools have in common, and what a new one here should honour.
