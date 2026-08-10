@@ -312,7 +312,12 @@ def run(root=None):
                     ":(exclude)%s" % plan_dir.rstrip("/"))
     updated = parse_iso(d.get("meta", {}).get("updated"))
     lw = parse_iso(last_work)
-    if lw and updated and lw > updated:
+    # A tolerance, because plan and commit are usually written in the same minute
+    # and a 12-second gap is not drift. Without it the signal reports "00:44Z is
+    # newer than 00:44Z", which is true to the second and reads as nonsense --
+    # the same way the local-vs-UTC display bug did. A check people learn to
+    # dismiss is worse than no check.
+    if lw and updated and (lw - updated).total_seconds() > 120:
         # Both rendered in UTC. git reports commit times in the committer's local
         # zone with an offset; meta.updated is usually written as Z. The
         # comparison was always correct, but printing 17:26-04:00 next to 21:22Z

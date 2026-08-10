@@ -280,6 +280,24 @@ class TestGate(Base):
         self.assertEqual(line.count("Z"), 2,
                          "both timestamps must be rendered in UTC: %s" % line)
 
+    def test_same_minute_commit_is_not_drift(self):
+        """Plan and commit are normally written seconds apart. Reporting that as
+        drift trains people to ignore the signal."""
+        import subprocess as sp, datetime
+        d = self.make_plan()
+        d["meta"]["updated"] = datetime.datetime.now(
+            datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.write(d)
+        run("render.py", project=self.dir)
+        with open(os.path.join(self.dir, "src.py"), "w") as fh:
+            fh.write("# work\n")
+        sp.run(["git", "add", "-A"], cwd=self.dir, capture_output=True)
+        sp.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "w"],
+               cwd=self.dir, capture_output=True)
+        out = run("check.py", project=self.dir).stdout
+        self.assertNotIn("newer than meta.updated", out,
+                         "a same-minute commit was reported as drift")
+
     def test_porcelain_paths_are_parsed_intact(self):
         """A bare .strip() eats porcelain's leading status column on line one,
         shifting every path by a character. That bug shipped once; it stays tested."""

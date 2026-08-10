@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 2026-08-10
+
+- The commit-vs-plan drift signal now tolerates 120 seconds. Plan and commit are normally
+  written moments apart, and reporting "00:44Z is newer than 00:44Z" is true to the second
+  and reads as nonsense. A check people learn to dismiss is worse than no check.
+
 ## 0.3.0 — %s
 
 The gate could check that a plan was internally consistent. It could not check
