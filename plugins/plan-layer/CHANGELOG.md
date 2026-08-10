@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-08-10
+
+- **Plan items can name the capability they serve** (`capability: <id>`), shown as a chip
+  beside the item. Without it a plan list and a capabilities table are two documents that
+  happen to share a page — a reader cannot tell that "tenant identity in traces" IS the
+  observability row.
+- The gate enforces it: a dangling reference **fails**; an unlinked item **drifts**.
+- New drift signal: a capability whose evidence reads as blocked while nothing is queued
+  against it — a claim the plan never follows up on.
+- Capabilities may carry a `short` label for figures, since a name that reads well in a
+  table row overflows a diagram box.
+
 ## 0.1.4 — 2026-08-10
 
 - **Docs: the update instruction was wrong.** It said `claude plugin marketplace update`

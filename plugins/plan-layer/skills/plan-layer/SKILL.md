@@ -78,6 +78,10 @@ data.
 must carry `evidence`. The gate enforces this, because progress claimed without evidence is
 the shape of a comfortable lie.
 
+**Link every plan item to a capability.** `"capability": <id>` on items in `plans.now` and
+`plans.next`. It is what lets a reader reconcile the plan lists with the capabilities table,
+and the gate checks it. Capabilities may carry a `short` label for figures.
+
 **Parked is not dropped.** A question deferred goes in `parked` with a `trigger` naming when
 it must be answered.
 

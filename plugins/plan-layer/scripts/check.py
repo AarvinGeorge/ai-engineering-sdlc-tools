@@ -99,6 +99,31 @@ def run(root=None):
         if p.get("stage") not in stage_ids:
             fails.append("queued item %r: stage=%r is not a cycle stage" % (who, p.get("stage")))
 
+    # A plan item may name the capability it serves. If it does, that capability
+    # must exist -- a dangling reference is how the two halves of the page drift
+    # apart. And every capability with work queued against it should be findable
+    # from that work, which is what makes the document one argument.
+    cap_ids = {str(c.get("id")) for c in caps}
+    for bucket in ("now", "next"):
+        for p in plans.get(bucket, []):
+            cid = p.get("capability")
+            if cid is not None and str(cid) not in cap_ids:
+                fails.append("%s item %r: capability=%r does not exist"
+                             % (bucket, p.get("name"), cid))
+            if cid is None:
+                drifts.append("%s item %r names no capability — the plan list and the "
+                              "capabilities table cannot be reconciled by a reader"
+                              % (bucket, p.get("name")))
+
+    # A capability whose evidence says it is blocked, with nothing queued against
+    # it, is a claim the plan never follows up on.
+    served = {str(p.get("capability")) for b in ("now", "next") for p in plans.get(b, [])}
+    for c in caps:
+        ev = (c.get("evidence") or "").lower()
+        if ("blocked" in ev or "no plan" in ev) and str(c.get("id")) not in served:
+            drifts.append("capability %s %r reads as blocked but has nothing queued against it"
+                          % (c.get("id"), c.get("name")))
+
     for inv in d.get("invariants", []):
         if inv.get("state") not in VALID_INV:
             fails.append("invariant %r: state=%r is not one of %s"

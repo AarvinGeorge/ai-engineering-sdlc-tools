@@ -178,6 +178,22 @@ def stagechip(d, p):
     return '<span class="stage stage--%s">%s</span>' % (e(sid), e(names.get(sid, sid)))
 
 
+def capchip(d, p):
+    """Which capability this work serves.
+
+    Without it, the capabilities table and the plan lists are two documents
+    that happen to share a page: a reader cannot tell that "tenant identity in
+    traces" IS the observability row. Naming the link makes the page one
+    argument instead of several.
+    """
+    cid = p.get("capability")
+    if cid is None:
+        return ""
+    cap = next((c for c in d.get("capabilities", []) if str(c.get("id")) == str(cid)), None)
+    return '<span class="capref">%s %s</span>' % (
+        e(cid), e(cap["name"]) if cap else "unknown capability")
+
+
 def planlink(p):
     """A pointer to the executable plan, or an honest statement that none exists."""
     return ('<code class="planfile">%s</code>' % e(p["plan_file"])) if p.get("plan_file") \
@@ -207,8 +223,8 @@ def sec_now(d):
         return ""
     li = "".join(
         '<li class="plan plan--active"><div class="planhead"><span class="planname">%s</span>'
-        '%s%s%s</div>%s</li>' % (
-            e(p.get("name", "")), stagechip(d, p), planlink(p),
+        '%s%s%s%s</div>%s</li>' % (
+            e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
             '<span class="planmeta">updated %s</span>' % e(p["updated"]) if p.get("updated") else "",
             '<p class="planout">%s</p>' % e(p["status"]) if p.get("status") else "")
         for p in items) or '<li class="plan plan--idle"><p class="planout">Nothing active.</p></li>'
@@ -221,8 +237,8 @@ def sec_next(d):
         return ""
     li = "".join(
         '<li class="plan plan--next"><div class="planhead"><span class="planname">%s</span>'
-        '%s%s</div>%s%s</li>' % (
-            e(p.get("name", "")), stagechip(d, p), planlink(p),
+        '%s%s%s</div>%s%s</li>' % (
+            e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
             '<p class="planout">%s</p>' % e(p["why"]) if p.get("why") else "",
             '<p class="unblocks"><b>Unblocks:</b> %s</p>' % e(p["unblocks"])
             if p.get("unblocks") else "")
@@ -434,6 +450,8 @@ CSS = """
   .stage--building{color:var(--active)}
   .stage--verified{color:var(--done)}
   .stage--recorded{color:var(--done)}
+  .capref{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10.5px;
+    font-weight:600;color:var(--accent);background:var(--accent-soft);white-space:nowrap}
   ul.plans{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
   .plan{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:14px 16px;border-left:3px solid var(--muted)}

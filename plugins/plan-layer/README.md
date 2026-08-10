@@ -61,6 +61,18 @@ skipped**.
 
 Define your own under `cycle.stages`, or omit the block to inherit these.
 
+## Keeping the page one argument
+
+An item under Active or Next may name the capability it serves:
+
+```json
+{ "name": "Tenant identity in traces", "capability": 6, "stage": "intent", … }
+```
+
+It renders as a chip beside the item, and the gate checks it: a reference to a capability
+that does not exist **fails**; an item that names none **drifts**. Without the link, the plan
+lists and the capabilities table are two documents that happen to share a page.
+
 ## The gate
 
 ```bash

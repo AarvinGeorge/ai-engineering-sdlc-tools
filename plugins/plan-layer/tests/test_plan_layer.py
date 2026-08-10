@@ -215,6 +215,34 @@ class TestGate(Base):
         self.assertEqual(r.returncode, 1)
         self.assertIn("without a written plan", r.stdout)
 
+    def test_dangling_capability_reference_fails(self):
+        d = self.make_plan()
+        d["plans"]["next"][0]["capability"] = 99
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("does not exist", r.stdout)
+
+    def test_unlinked_plan_item_drifts(self):
+        """A plan list and a capabilities table that never reference each other
+        are two documents sharing a page."""
+        self.make_plan()          # template items carry no capability
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertIn("names no capability", r.stdout)
+        self.assertEqual(r.returncode, 0, "an unlinked item is drift, not a hard failure")
+
+    def test_valid_capability_reference_is_clean(self):
+        d = self.make_plan()
+        d["plans"]["next"][0]["capability"] = d["capabilities"][0]["id"]
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertNotIn("names no capability", r.stdout)
+        page = self.page()
+        self.assertIn("capref", page, "the link is gated but never shown to the reader")
+
     def test_stale_page_fails(self):
         self.make_plan()
         r = run("check.py", project=self.dir)  # never rendered
