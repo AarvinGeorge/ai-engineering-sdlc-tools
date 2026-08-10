@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — %s
+
+Readability, measured rather than guessed. A page nobody can be onboarded from is not a
+shared surface, it is an archive.
+
+- **"Active now" moved to the top**, above the figures. It was at position nine, behind five
+  diagrams and three tables — the single most-read fact on the page, buried.
+- **The changelog shows the five most recent entries**, with a line saying how many are left
+  off. Twenty entries was 15%% of the page, and git holds the full record anyway.
+
+
 ## 0.5.0 — %s
 
 - **Edge-case register.** A section for hazards found along the way, each with a surface and a

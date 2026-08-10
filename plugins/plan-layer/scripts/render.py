@@ -518,6 +518,7 @@ CSS = """
     font-size:11.5px;color:var(--muted)}
   footer ul{margin:9px 0 0;padding-left:17px}
   footer li{margin-bottom:3px}
+  .clmore{list-style:none;margin-left:-17px;font-style:italic}
   @media(max-width:760px){.metrics{margin-left:0;width:100%}
     .inv{grid-template-columns:1fr;gap:3px}}
 """
@@ -535,21 +536,28 @@ def build(d, root, fp):
         sec_contract(d),
         sec_orientation(d),
         sec_northstar(d),
+        sec_now(d),
         figures_html,
         sec_systems(d),
         sec_capabilities(d),
         sec_cycle(d),
         sec_done(d),
-        sec_now(d),
         sec_next(d),
         sec_parked(d),
         sec_edge_cases(d),
         sec_invariants(d),
         sec_glossary(d),
     ]
+    KEEP = 5
+    log = m.get("changelog", [])
+    recent = log[-KEEP:]
     changes = "".join('<li><code>%s</code> <time>%s</time> %s</li>' % (
         e(c.get("version", "")), e(c.get("date", "")), e(c.get("note", "")))
-        for c in m.get("changelog", []))
+        for c in reversed(recent))
+    if len(log) > KEEP:
+        changes += ('<li class="clmore">%d earlier entries are in the plan file and in git — '
+                    'left off the page so history does not crowd out state.</li>'
+                    % (len(log) - KEEP))
     body.append(
         '<footer>%s · rendered from commit <code>%s</code>%s · fingerprint <code>%s</code>'
         '%s<p>Generated from the plan JSON by plan-layer. Do not hand-edit this page — '
