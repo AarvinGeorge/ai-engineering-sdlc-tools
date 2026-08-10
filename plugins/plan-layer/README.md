@@ -127,6 +127,7 @@ errored check looks exactly like a false claim.
 |---|---|
 | `SessionStart` | Current state — active item and stage, next up, failing invariants, gate results — is injected before the agent's first word |
 | `PreCompact` | Fires when context is about to be summarised away, which is when working state gets lost. Flush to the plan first |
+| `Stop` | Runs the gate at the end of every turn and **blocks on FAIL**, so a structurally broken plan cannot survive to the next session. Drift never blocks — it fires during ordinary work, and a hook that interrupts every turn gets disabled. Guarded three ways against looping: honours `stop_hook_active`, never raises the same failures twice per session, fails open on error |
 
 Both are **silent in projects with no plan file**, and both **fail open** — a broken
 briefing never blocks a session.
@@ -154,6 +155,18 @@ work in light and dark automatically.
 
 The renderer picks the module up automatically, and skips the section if it is missing or
 raises — a broken figure never costs you the page.
+
+## Facts quoted in more than one place
+
+Numbers that appear in both the prose and a figure belong in `facts`, once:
+
+```json
+"facts": { "skills": "61", "subagents": "5" }
+```
+
+Figures receive the whole plan, so they read `data["facts"]` rather than restating the
+number. A figure that hardcodes a fact will eventually disagree with the table above it —
+this removes the possibility rather than checking for it afterwards.
 
 ## Configuration
 

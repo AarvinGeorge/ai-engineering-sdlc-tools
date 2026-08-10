@@ -70,6 +70,10 @@ where the work actually is right now. A plan updated only at the end is a report
 
 **Never hand-edit `index.html`.** It is generated and will be overwritten. Edit the JSON.
 
+**The gate runs itself at the end of every turn** via a Stop hook, and blocks on FAIL. You
+still re-render after editing the plan — the hook will tell you if you forgot, but finding
+out at the end of the turn is slower than doing it as you go.
+
 **Finish every substantive turn by re-rendering and running the gate.** The page stamps a
 fingerprint of the JSON, so a stale page announces itself instead of quietly showing old
 data.
@@ -81,6 +85,9 @@ the shape of a comfortable lie.
 **Link every plan item to a capability.** `"capability": <id>` on items in `plans.now` and
 `plans.next`. It is what lets a reader reconcile the plan lists with the capabilities table,
 and the gate checks it. Capabilities may carry a `short` label for figures.
+
+**Numbers quoted in two places belong in `facts`.** Figures read `data["facts"]` instead of
+restating a value that also appears in the prose.
 
 **Parked is not dropped.** A question deferred goes in `parked` with a `trigger` naming when
 it must be answered.

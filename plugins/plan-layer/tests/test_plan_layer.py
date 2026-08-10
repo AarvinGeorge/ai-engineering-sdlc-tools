@@ -38,6 +38,13 @@ class Base(unittest.TestCase):
         subprocess.run(["git", "init", "-q"], cwd=self.dir, capture_output=True)
 
     def tearDown(self):
+        import glob as _glob
+        for m in _glob.glob(os.path.join(tempfile.gettempdir(),
+                                         "plan-layer-gate-*" + os.path.basename(self.dir) + "*")):
+            try:
+                os.unlink(m)
+            except OSError:
+                pass
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def page(self):
@@ -505,6 +512,80 @@ class TestContrast(unittest.TestCase):
         self._assert_aa(t, [t["card"], t["ground"]])
 
 
+class TestGateHook(Base):
+    """The Stop hook must be impossible to get trapped by."""
+
+    def _hook(self, session=None):
+        """Always a fresh session id: the hook deliberately blocks only once per
+        session+failure, so a reused id would make the second test see silence
+        left over from the first."""
+        sid = session or ("t-" + os.path.basename(self.dir))
+        return run("gate_hook.py", project=self.dir,
+                   stdin=json.dumps({"session_id": sid}))
+
+    def _hook_raw(self, payload):
+        return run("gate_hook.py", project=self.dir, stdin=payload)
+
+    def test_blocks_when_the_gate_fails(self):
+        d = self.make_plan()
+        d["capabilities"][0].update(build="done", evidence="")
+        self.write(d)
+        run("render.py", project=self.dir)
+        out = json.loads(self._hook().stdout)
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("no evidence", out["reason"])
+
+    def test_silent_when_the_gate_passes(self):
+        self.make_plan()
+        run("render.py", project=self.dir)
+        self.assertEqual(self._hook().stdout.strip(), "")
+
+    def test_silent_where_there_is_no_plan(self):
+        self.assertEqual(self._hook().stdout.strip(), "")
+
+    def test_honours_stop_hook_active(self):
+        """The harness sets this when it is already re-running us. Ignoring it
+        is how a Stop hook becomes an infinite loop."""
+        d = self.make_plan()
+        d["capabilities"][0].update(build="done", evidence="")
+        self.write(d)
+        run("render.py", project=self.dir)
+        out = self._hook_raw(json.dumps({"stop_hook_active": True,
+                                         "session_id": "t-" + os.path.basename(self.dir)}))
+        self.assertEqual(out.stdout.strip(), "", "blocked despite stop_hook_active")
+
+    def test_does_not_block_twice_for_the_same_failure(self):
+        d = self.make_plan()
+        d["capabilities"][0].update(build="done", evidence="")
+        self.write(d)
+        run("render.py", project=self.dir)
+        sid = "once-" + os.path.basename(self.dir)
+        first = self._hook(sid)
+        second = self._hook(sid)
+        self.assertIn("block", first.stdout)
+        self.assertEqual(second.stdout.strip(), "",
+                         "same failure raised twice — that is nagging, not a gate")
+
+    def test_drift_alone_never_blocks(self):
+        """Drift fires during ordinary work. A hook that interrupts every turn
+        gets switched off."""
+        import subprocess as sp
+        self.make_plan()
+        run("render.py", project=self.dir)
+        with open(os.path.join(self.dir, "unrelated.py"), "w") as fh:
+            fh.write("# work in progress\n")
+        sp.run(["git", "add", "-A"], cwd=self.dir, capture_output=True)
+        out = self._hook("drift-" + os.path.basename(self.dir))
+        self.assertEqual(out.stdout.strip(), "", "blocked on drift: %s" % out.stdout[:120])
+
+    def test_a_broken_gate_never_traps_the_session(self):
+        os.makedirs(os.path.join(self.dir, "plan"), exist_ok=True)
+        with open(os.path.join(self.dir, "plan", "plan.json"), "w") as fh:
+            fh.write("{ not json")
+        r = self._hook()
+        self.assertEqual(r.returncode, 0)
+
+
 class TestDurability(Base):
     """The source of truth must survive an interrupted write."""
 
@@ -567,7 +648,7 @@ class TestManifests(unittest.TestCase):
     def test_hooks_declare_both_events(self):
         with open(os.path.join(PLUGIN, "hooks", "hooks.json")) as fh:
             h = json.load(fh)
-        self.assertEqual(set(h["hooks"]), {"SessionStart", "PreCompact"})
+        self.assertEqual(set(h["hooks"]), {"SessionStart", "PreCompact", "Stop"})
         for ev in h["hooks"].values():
             for group in ev:
                 for hook in group["hooks"]:

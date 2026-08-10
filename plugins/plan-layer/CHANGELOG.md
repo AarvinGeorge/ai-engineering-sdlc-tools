@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 — %s
+
+The loop said "finish every turn by running the gate". That was an instruction, and the
+human ended up being the one who noticed when it was skipped.
+
+- **Stop hook.** The gate runs at the end of every turn and **blocks on FAIL**, feeding the
+  failures back so they get fixed before the turn ends. Structural dishonesty can no longer
+  survive to the next session.
+- **Drift never blocks.** Every drift signal fires during ordinary work; a hook that
+  interrupts every turn is a hook someone disables. Drift is reported at session start.
+- **Three loop guards**, because a Stop hook that blocks forever makes a session unusable:
+  it honours `stop_hook_active`, never raises the same failures twice in one session
+  (keyed by session + project + failure set), and fails open on any internal error.
+- **New drift signal:** an invariant that is not holding while its detail overlaps work
+  already in `plans.done` — a stale alarm teaches people to ignore alarms. Found by hand
+  on a real plan before it was automated.
+- **`facts`**: a place for numbers quoted by both the prose and the figures, so the same
+  value cannot be typed twice and drift. A figure once said "6 sub-agents" while every
+  other statement said 5.
+
+
 ## 0.3.2 — %s
 
 - **Atomic writes.** `open(path, "w")` truncates immediately, so an interruption between

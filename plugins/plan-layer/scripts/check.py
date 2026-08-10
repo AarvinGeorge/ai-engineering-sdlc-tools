@@ -280,6 +280,25 @@ def run(root=None):
         drifts.append("assertions last verified %d days ago"
                       % (datetime.now(timezone.utc) - av).days)
 
+    # An invariant that alarms about work already finished. Found by hand on
+    # 2026-08-10: "off-machine backup at risk -- the archive misses the email
+    # layer" was still showing after the capture had put that layer in three
+    # places. A stale alarm teaches people to ignore alarms.
+    done_words = set()
+    for p_ in plans.get("done", []):
+        done_words.update(w.strip(".,:;()").lower()
+                          for w in (p_.get("name", "") + " " + p_.get("outcome", "")).split()
+                          if len(w) > 5)
+    for i in d.get("invariants", []):
+        if i.get("state") == "holding":
+            continue
+        detail = set(w.strip(".,:;()").lower() for w in (i.get("detail") or "").split())
+        shared = detail & done_words
+        if len(shared) >= 3:
+            drifts.append("invariant %r is %r, but its detail overlaps completed work (%s) — "
+                          "check whether the reason still stands"
+                          % (i.get("rule"), i.get("state"), ", ".join(sorted(shared)[:4])))
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"

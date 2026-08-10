@@ -28,6 +28,20 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/gate_hook.py\" 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 15,
+            "async": false,
+            "statusMessage": "Checking the plan"
+          }
+        ]
+      }
     ]
   }
 }
