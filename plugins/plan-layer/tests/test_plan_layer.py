@@ -317,6 +317,120 @@ class TestBrief(Base):
         json.loads(r.stdout)  # must still be a well-formed hook response
 
 
+class TestAssertions(Base):
+    """The plan checking itself against the real system."""
+
+    def test_matching_assertion_passes(self):
+        d = self.make_plan()
+        d["assertions"] = [{"claim": "echo works", "run": "echo hello", "expect": "hello"}]
+        d["meta"]["assertions_verified"] = "2026-01-01T00:00:00Z"
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("MATCH", r.stdout)
+
+    def test_mismatching_assertion_fails(self):
+        d = self.make_plan()
+        d["assertions"] = [{"claim": "pid unchanged", "run": "echo 999", "expect": "3001002"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("MISMATCH", r.stdout)
+
+    def test_regex_match_mode(self):
+        d = self.make_plan()
+        d["assertions"] = [{"claim": "healthy", "run": "echo 'Up 5 days (healthy)'",
+                            "expect": "healthy", "match": "regex"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertEqual(run("check.py", "--verify", project=self.dir).returncode, 0)
+
+    def test_assertions_never_run_from_the_hook(self):
+        """A repository must not be able to execute its author's commands just
+        by being opened. Assertions are explicit-only, forever."""
+        d = self.make_plan()
+        sentinel = os.path.join(self.dir, "SHOULD_NOT_EXIST")
+        d["assertions"] = [{"claim": "malicious", "run": "touch %s" % sentinel, "expect": ""}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        run("brief.py", "--session-start", project=self.dir)
+        run("brief.py", "--pre-compact", project=self.dir)
+        run("check.py", project=self.dir)          # the ordinary gate, no --verify
+        self.assertFalse(os.path.exists(sentinel),
+                         "an assertion executed without --verify")
+
+    def test_declared_but_never_verified_drifts(self):
+        d = self.make_plan()
+        d["assertions"] = [{"claim": "x", "run": "true", "expect": ""}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertIn("never recorded as run", run("check.py", project=self.dir).stdout)
+
+
+class TestEdgeCases(Base):
+    def test_duplicate_capability_ids_fail(self):
+        d = self.make_plan()
+        d["capabilities"].append(dict(d["capabilities"][0]))
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("duplicate capability ids", r.stdout)
+
+    def test_shared_plan_file_fails(self):
+        d = self.make_plan()
+        d["plans"]["next"] = [
+            {"name": "A", "why": "w", "unblocks": "u", "stage": "intent", "plan_file": "p.md"},
+            {"name": "B", "why": "w", "unblocks": "u", "stage": "intent", "plan_file": "p.md"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertEqual(run("check.py", project=self.dir).returncode, 1)
+
+    def test_alarm_without_detail_fails(self):
+        d = self.make_plan()
+        d["invariants"] = [{"rule": "backups exist", "state": "broken", "detail": ""}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("alarm nobody can act on", r.stdout)
+
+    def test_parked_without_trigger_fails(self):
+        d = self.make_plan()
+        d["parked"] = [{"id": "P1", "q": "which model?", "trigger": ""}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("parked without one is dropped", r.stdout)
+
+    def test_future_timestamp_fails(self):
+        d = self.make_plan()
+        d["meta"]["updated"] = "2099-01-01T00:00:00Z"
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("future", r.stdout)
+
+    def test_unparseable_timestamp_fails(self):
+        d = self.make_plan()
+        d["meta"]["updated"] = "last tuesday"
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertEqual(run("check.py", project=self.dir).returncode, 1)
+
+    def test_recorded_item_still_active_drifts(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "X", "status": "done", "updated": "2026-01-01",
+                              "stage": "recorded", "plan_file": "p.md"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertIn("belongs in plans.done", run("check.py", project=self.dir).stdout)
+
+
 class TestContrast(unittest.TestCase):
     """Every palette token must clear WCAG AA against both grounds it sits on.
 
@@ -402,8 +516,11 @@ class TestManifests(unittest.TestCase):
         version of this test failed on its own comment.
         """
         import ast as _ast
-        allowed = {"json", "os", "sys", "subprocess", "hashlib", "html", "datetime",
-                   "importlib", "plan_lib", "check", "re", "time"}
+        # Ask Python what the standard library is rather than maintaining a list
+        # by hand. The hand-written version rejected `tempfile` and reported it
+        # as "not standard library" -- a test that is wrong AND misleading about
+        # why is worse than no test.
+        allowed = set(sys.stdlib_module_names) | {"plan_lib", "check", "render", "diagrams"}
         for f in sorted(os.listdir(SCRIPTS)):
             if not f.endswith(".py"):
                 continue
@@ -417,7 +534,8 @@ class TestManifests(unittest.TestCase):
                     mods = [node.module]
                 for mod in mods:
                     self.assertIn(mod.split(".")[0], allowed,
-                                  "%s imports %s, which is not standard library" % (f, mod))
+                                  "%s imports %s, which is neither standard library nor a sibling "
+                                  "module of this plugin" % (f, mod))
 
 
 if __name__ == "__main__":

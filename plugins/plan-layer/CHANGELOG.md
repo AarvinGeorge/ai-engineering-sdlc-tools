@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — %s
+
+The gate could check that a plan was internally consistent. It could not check
+whether the plan was TRUE. Now it can, if the plan says how.
+
+- **Executable assertions.** A plan may declare `assertions` — a claim, a command,
+  an expected result — and `check.py --verify` runs them against the real system.
+- **Never automatic.** Assertions are shell commands read from a repository file.
+  Running them on session start would mean cloning a repo executes its author's
+  commands, so they run only on explicit `--verify`, never from a hook. There is a
+  test that opening a project cannot trigger one.
+- **`assertions_setup`: one gather, many checks.** Eight assertions that each opened
+  their own SSH connection tripped a host's `ufw limit 22/tcp` rule and locked us out
+  of our own server. The claims were all true; the method was the problem. A single
+  setup command now caches facts to `$PLAN_FACTS` and assertions read that.
+- **An errored check is reported as errored, not as a failed claim.** They look
+  identical from the outside and mean opposite things.
+- **Seven more structural checks:** duplicate capability ids, two items claiming one
+  plan document, an invariant alarming with no detail, a parked question with no
+  trigger, a future or unparseable timestamp, an item finished but still active,
+  assertions declared and never run.
+
+
 ## 0.2.0 — 2026-08-10
 
 - **Plan items can name the capability they serve** (`capability: <id>`), shown as a chip

@@ -99,6 +99,26 @@ it must be answered.
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays with the `grounded` and `verified` stages.
 
+## Assertions — the plan checking itself
+
+The gate checks consistency. `--verify` checks truth, if the plan declares how:
+`assertions_setup` gathers facts once into `$PLAN_FACTS`, and each entry in
+`assertions` reads from it and compares against `expect`.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" --verify
+```
+
+**Never run these from a hook or without being asked.** They are shell commands from
+a repository file. Explicit human request only.
+
+**Write them as one gather, many checks.** Separate connections per assertion are
+slow and can trip a host's rate limiting. Keep the remote command trivial and match
+locally; a check that errors looks identical to a claim that is false.
+
+**When an assertion mismatches, check the command before changing the claim.** Most
+early mismatches are quoting, not drift.
+
 ## Diagrams
 
 The engine ships none — diagrams are about one project's specific mechanism and do not

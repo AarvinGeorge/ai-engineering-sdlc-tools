@@ -21,10 +21,13 @@ Stdlib only, no arguments needed.
   check.py           # human output, exit 1 on any FAIL
   check.py --json    # machine output for the session hooks
   check.py --strict  # exit 1 on DRIFT as well
+  check.py --verify  # run the plan's assertions against the real system
+                     # (explicit only — never run from a hook)
 """
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -44,6 +47,103 @@ def parse_iso(s):
         return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+def verify(root=None):
+    """Run the plan's own assertions against the real system.
+
+    This is the one thing a structural gate cannot do on its own: decide
+    whether a claim is TRUE. The plan states how each claim is checked, and
+    this runs those checks and compares.
+
+    SECURITY, and the reason this is never automatic: assertions are shell
+    commands read out of a JSON file in the repository. Running them on session
+    start would mean cloning a repository executes its author's commands. So
+    they run only when a human types `check.py --verify`, never from a hook,
+    and never as part of the ordinary gate.
+    """
+    import subprocess as sp
+    import tempfile
+    P = L.paths(root)
+    d = json.load(open(P["src"], encoding="utf-8"))
+    items = d.get("assertions") or []
+    if not items:
+        print("  no assertions declared — nothing to verify against the real system")
+        return 0, 0
+
+    # One gather, many checks.
+    #
+    # Assertions that each open their own connection are slow, and worse: eight
+    # back-to-back SSH connections tripped a host's `ufw limit 22/tcp` rule and
+    # locked this machine out of its own server. The claims were all true; the
+    # verification method was the problem, and an assertion that ERRORS looks
+    # exactly like an assertion that FAILS.
+    #
+    # So a plan may declare `assertions_setup`: one command, run once, whose
+    # stdout is written to a file. Assertions then read that file via
+    # $PLAN_FACTS instead of reaching out again.
+    env = dict(os.environ)
+    facts_path = None
+    setup = d.get("assertions_setup")
+    if setup:
+        try:
+            r = sp.run(["bash", "-lc", setup], cwd=P["root"], capture_output=True,
+                       text=True, timeout=180)
+            if r.returncode != 0:
+                print("  SETUP FAILED (%s) — every assertion below would report a false "
+                      "mismatch, so nothing was run.\n  %s"
+                      % (r.returncode, (r.stderr or "").strip()[:200]))
+                return 0, 1
+            fh = tempfile.NamedTemporaryFile("w", suffix=".facts", delete=False)
+            fh.write(r.stdout)
+            fh.close()
+            facts_path = fh.name
+            env["PLAN_FACTS"] = facts_path
+            print("  setup: gathered %d lines of facts in one call\n"
+                  % len(r.stdout.splitlines()))
+        except Exception as exc:
+            print("  SETUP ERRORED (%s) — nothing was run." % exc)
+            return 0, 1
+
+    ok = bad = 0
+    for a in items:
+        claim, cmd = a.get("claim", "?"), a.get("run")
+        if not cmd:
+            print("  SKIP    %s — no `run` command" % claim)
+            continue
+        try:
+            r = sp.run(["bash", "-lc", cmd], cwd=P["root"], capture_output=True,
+                       text=True, timeout=a.get("timeout", 60), env=env)
+            got = r.stdout.strip()
+            # An empty result from a non-zero exit is the command failing, not
+            # the claim being false. Saying so is the difference between a
+            # useful signal and a false alarm.
+            if not got and r.returncode != 0:
+                print("  ERRORED %-46s command exited %d: %s"
+                      % (claim, r.returncode, (r.stderr or "").strip()[:60]))
+                bad += 1
+                continue
+        except Exception as exc:
+            print("  ERROR   %-46s %s" % (claim, exc))
+            bad += 1
+            continue
+        exp = str(a.get("expect", "")).strip()
+        hit = re.search(exp, got) is not None if a.get("match") == "regex" else got == exp
+        if hit:
+            ok += 1
+            print("  MATCH   %-46s %s" % (claim, got[:40]))
+        else:
+            bad += 1
+            print("  MISMATCH %-45s expected=%r actual=%r" % (claim, exp, got[:80]))
+    if facts_path:
+        try:
+            os.unlink(facts_path)
+        except Exception:
+            pass
+    print("\n  %d matched, %d mismatched, %d declared" % (ok, bad, len(items)))
+    if bad:
+        print("  note: an assertion that ERRORED is a broken check, not a broken claim.")
+    return ok, bad
 
 
 def run(root=None):
@@ -129,6 +229,57 @@ def run(root=None):
             fails.append("invariant %r: state=%r is not one of %s"
                          % (inv.get("rule"), inv.get("state"), sorted(VALID_INV)))
 
+    ids = [c.get("id") for c in caps]
+    dupes = {i for i in ids if ids.count(i) > 1}
+    if dupes:
+        fails.append("duplicate capability ids: %s — every reference to them is ambiguous"
+                     % sorted(dupes))
+
+    # Two items pointing at one plan document means one of them is mislabelled.
+    files = [p.get("plan_file") for b in ("now", "next")
+             for p in plans.get(b, []) if p.get("plan_file")]
+    for f in {x for x in files if files.count(x) > 1}:
+        fails.append("plan_file %r is claimed by more than one item" % f)
+
+    # 'recorded' is the end of the cycle; an item sitting there is finished and
+    # belongs in plans.done, or the stage is wrong.
+    for p in plans.get("now", []):
+        if p.get("stage") == "recorded":
+            drifts.append("active item %r is at stage 'recorded' — finished work belongs in "
+                          "plans.done" % p.get("name"))
+
+    # A broken invariant with no detail is an alarm with no information.
+    for i in d.get("invariants", []):
+        if i.get("state") != "holding" and not (i.get("detail") or "").strip():
+            fails.append("invariant %r is %r with no detail — an alarm nobody can act on"
+                         % (i.get("rule"), i.get("state")))
+
+    # Parked means deferred, not dropped. Without a trigger it is dropped.
+    for q in d.get("parked", []):
+        if not (q.get("trigger") or "").strip():
+            fails.append("parked question %r has no trigger — parked without one is dropped"
+                         % q.get("id"))
+
+    # A timestamp from the future is a clock error, and every age computed from
+    # it will be wrong in the reassuring direction.
+    upd = parse_iso(d.get("meta", {}).get("updated"))
+    if d.get("meta", {}).get("updated") and not upd:
+        fails.append("meta.updated %r is not an ISO-8601 timestamp"
+                     % d["meta"]["updated"])
+    elif upd and upd > datetime.now(timezone.utc):
+        fails.append("meta.updated is in the future (%s) — the clock was guessed, not read"
+                     % upd.isoformat())
+
+    # Assertions exist to be run. Declared and never run is worse than none,
+    # because the page looks verified.
+    if d.get("assertions") and not d.get("meta", {}).get("assertions_verified"):
+        drifts.append("%d assertions declared but never recorded as run — "
+                      "`check.py --verify`" % len(d["assertions"]))
+    av = parse_iso(d.get("meta", {}).get("assertions_verified"))
+    if av and (datetime.now(timezone.utc) - av).days > 7:
+        drifts.append("assertions last verified %d days ago"
+                      % (datetime.now(timezone.utc) - av).days)
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"
@@ -206,6 +357,12 @@ def main():
     if not L.has_plan():
         print("  no plan in this project — nothing to check")
         return 0
+
+    if "--verify" in sys.argv:
+        # Explicit only. Never wired to a hook: see verify()'s docstring.
+        _, bad = verify()
+        return 1 if bad else 0
+
     fails, drifts, summary = run()
 
     if "--json" in sys.argv:

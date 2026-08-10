@@ -91,6 +91,36 @@ Two kinds of finding, kept separate on purpose:
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays a human and agent job.
 
+## Checking the plan against reality
+
+The gate above checks that the plan is *consistent*. It cannot tell whether it is
+*true* — unless the plan says how to find out:
+
+```json
+"assertions_setup": "ssh host 'echo pid=$(systemctl show app -p MainPID --value)'",
+"assertions": [
+  { "claim": "the service never restarted",
+    "run": "grep '^pid=' \"$PLAN_FACTS\" | cut -d= -f2",
+    "expect": "3001002" }
+]
+```
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" --verify
+```
+
+**These never run automatically.** They are shell commands read from a file in the
+repository; running them on session start would mean cloning a repository executes
+its author's commands. Explicit `--verify` only, never from a hook, and there is a
+test that proves it.
+
+**Use `assertions_setup`.** One command gathers everything into `$PLAN_FACTS`, and
+each assertion reads from that. Assertions that each open their own connection are
+slow, and eight of them in a row is enough to trip a host's SSH rate limiting and
+lock you out of your own machine. Keep the remote side trivial and do the matching
+locally — nested quoting is the most common cause of a check that errors, and an
+errored check looks exactly like a false claim.
+
 ## The hooks
 
 | Event | What happens |
