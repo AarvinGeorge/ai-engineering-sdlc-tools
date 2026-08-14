@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 — 2026-08-14
+
+**Figures must not ask for facts that do not exist.** A drawing that reads a
+number from the plan degrades silently into "?" if that number is renamed or
+removed, and nobody re-reads a picture they have already seen. Drifts now.
+
+Prompted by the same failure one layer down: three figures still showed a
+component as unbuilt four days after it was built and used, because figures
+hardcode status. The durable fix is that a figure reads its state from the
+plan; this check makes sure the reading still resolves.
+
 ## 0.8.0 — 2026-08-14
 
 **The gate now catches the page contradicting itself, and catches it going

@@ -25,6 +25,7 @@ Stdlib only, no arguments needed.
                      # (explicit only — never run from a hook)
 """
 import hashlib
+import io
 import json
 import os
 import re
@@ -287,6 +288,29 @@ def check_readability(d):
     return fails, drifts
 
 
+def check_figures(root, d):
+    """A figure that asks for a fact nobody defined renders a question mark.
+
+    Figures read numbers and statuses from the plan so the picture cannot drift
+    from the words -- that is the whole point of the facts block. But a typo, or
+    a fact removed while a figure still wants it, degrades silently into "?" in
+    a drawing nobody re-reads. Cheap to catch, invisible otherwise.
+    """
+    drifts = []
+    fig = os.path.join(os.path.dirname(L.paths(root)["src"]), "figures.py")
+    if not os.path.exists(fig):
+        return drifts
+    try:
+        src = io.open(fig, encoding="utf-8").read()
+    except OSError:
+        return drifts
+    facts = set((d.get("facts") or {}).keys())
+    wanted = set(re.findall(r'F\.get\(\s*["\']([a-z_]+)["\']', src))
+    for k in sorted(wanted - facts):
+        drifts.append("a figure reads fact %r, which is not in the plan — it will draw '?'" % k)
+    return drifts
+
+
 def run(root=None):
     fails, drifts = [], []
     P = L.paths(root)
@@ -540,6 +564,7 @@ def run(root=None):
     }
     # Staleness detection (0.8.0). Structure was never the thing that rotted;
     # the page quietly disagreeing with itself was.
+    drifts.extend(check_figures(root, d))
     fails.extend(check_contradictions(d))
     rf, rd = check_readability(d)
     fails.extend(rf)
