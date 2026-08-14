@@ -99,6 +99,25 @@ sits before `verified`, that **drifts**: either it is finished, or the checklist
 Keep the list flat. Individual steps belong in the plan document; the page carries the shape of
 the work and where it has got to.
 
+## Catching the page going stale
+
+Structure was never what rotted. What rotted was a page that quietly stopped being true while
+every structural check stayed green: an item reading "waiting for its first real message"
+while its own task list recorded the work as done.
+
+The gate now checks two more things:
+
+**Contradiction — fails.** Not-yet language in an item whose own tasks are done. A capability
+marked `not-started` while an active item works on it. These are the page disagreeing with
+*itself*, so a script can be certain without knowing anything about the world.
+
+**Readability — fails on the unambiguous, drifts on the rest.** A stranger should be able to
+read the page. Insider shorthand fails; undefined jargon, bare cross-references like "P2",
+and sentences over 55 words drift.
+
+Both are FAIL rather than DRIFT on purpose: the end-of-turn hook blocks on FAIL, so a turn
+cannot end on a self-contradicting page. It stops depending on anyone remembering to look.
+
 ## The gate
 
 ```bash

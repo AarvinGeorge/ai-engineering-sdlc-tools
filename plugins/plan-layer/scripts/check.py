@@ -147,6 +147,146 @@ def verify(root=None):
     return ok, bad
 
 
+# Words that assert work has NOT happened yet. Harmless in a queued item;
+# a contradiction in one whose own tasks are recorded as finished.
+NOT_YET = re.compile(
+    r"\b(waiting for (its|the|a) first|has never (run|been)|not (yet )?(built|started|run)|"
+    r"yet to be (built|run|tested)|about to (build|start)|no (adapter|path) (exists|yet))\b",
+    re.I)
+
+# Cross-references only someone with the page open can resolve.
+BARE_REF = re.compile(r"(?<![\w-])([PE]\d{1,2})(?![\w-])")
+
+# Shorthand that assumes a conversation the reader did not have.
+INSIDER = re.compile(
+    r"\b(as discussed|as we said|you know the one|per our chat|the usual|"
+    r"is a Tuesday|obviously)\b", re.I)
+
+
+def _prose_fields(d):
+    """Every human-facing string on the page, with a label for each."""
+    out = []
+    for k, v in (d.get("orientation") or {}).items():
+        out.append(("orientation.%s" % k, v))
+    for k, v in (d.get("contract") or {}).items():
+        out.append(("contract.%s" % k, v))
+    for c in d.get("capabilities") or []:
+        who = "capability %s" % c.get("id")
+        for f in ("what", "evidence"):
+            if c.get(f):
+                out.append(("%s %s" % (who, f), c[f]))
+    plans = d.get("plans") or {}
+    for p in plans.get("now") or []:
+        if p.get("status"):
+            out.append(("active item %r" % p.get("name"), p["status"]))
+    for p in plans.get("next") or []:
+        for f in ("why", "unblocks"):
+            if p.get(f):
+                out.append(("queued item %r %s" % (p.get("name"), f), p[f]))
+    for q in d.get("parked") or []:
+        if q.get("note"):
+            out.append(("parked %s" % q.get("id"), q["note"]))
+    for e in d.get("edge_cases") or []:
+        for f in ("case", "mitigation"):
+            if e.get(f):
+                out.append(("edge case %s %s" % (e.get("id"), f), e[f]))
+    for i in d.get("invariants") or []:
+        if i.get("detail"):
+            out.append(("invariant %r" % i.get("rule"), i["detail"]))
+    return out
+
+
+def check_contradictions(d):
+    """Claims the plan's own state disproves.
+
+    Not a judgement about the world -- purely internal. If the page says a
+    thing has not happened while the same page records it as done, one of the
+    two is wrong and a human has to look.
+    """
+    fails = []
+    plans = d.get("plans") or {}
+
+    for p in plans.get("now") or []:
+        who = p.get("name") or "active item"
+        tasks = p.get("tasks") or []
+        done = [t for t in tasks if t.get("state") == "done"]
+        status = p.get("status") or ""
+        m = NOT_YET.search(status)
+        if m and done:
+            fails.append(
+                "active item %r says %r but %d of its own tasks are recorded done — "
+                "the page contradicts itself"
+                % (who, m.group(0), len(done)))
+
+    # A capability cannot be untouched if finished work claims to have served it.
+    served_by_done = set()
+    for p in plans.get("done") or []:
+        if p.get("capability") is not None:
+            served_by_done.add(str(p["capability"]))
+    for c in d.get("capabilities") or []:
+        if str(c.get("id")) in served_by_done and c.get("build") == "not-started":
+            fails.append(
+                "capability %s %r is 'not-started', but completed work is filed against it"
+                % (c.get("id"), c.get("name")))
+
+    # An active item's capability should not read as untouched either.
+    active_caps = {str(p["capability"]) for p in (plans.get("now") or [])
+                   if p.get("capability") is not None}
+    for c in d.get("capabilities") or []:
+        if str(c.get("id")) in active_caps and c.get("build") == "not-started":
+            fails.append(
+                "capability %s %r is 'not-started' while an active item works on it"
+                % (c.get("id"), c.get("name")))
+    return fails
+
+
+def check_readability(d):
+    """The property this page exists for.
+
+    A stranger should be able to read it and understand the project. That is
+    not decoration -- it is the stated purpose, and prose drifts toward
+    shorthand every single time someone who already knows the answer writes it.
+    """
+    fails, drifts = [], []
+    terms = {g.get("term", "").lower() for g in (d.get("glossary") or [])}
+    ids = {str(q.get("id")) for q in (d.get("parked") or [])}
+    ids |= {str(e.get("id")) for e in (d.get("edge_cases") or [])}
+
+    for label, text in _prose_fields(d):
+        m = INSIDER.search(text)
+        if m:
+            fails.append("%s uses %r — shorthand a new reader cannot resolve" % (label, m.group(0)))
+
+        for ref in set(BARE_REF.findall(text)):
+            if ref in ids and ref not in label:
+                drifts.append(
+                    "%s refers to %s without saying what it is — a reader has to go hunting"
+                    % (label, ref))
+
+        # Sentences long enough that a reader loses the thread.
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            n = len(sentence.split())
+            if n > 55:
+                drifts.append("%s has a %d-word sentence — hard to follow in one pass"
+                              % (label, n))
+                break
+
+    # Capitalised multi-word terms used in prose with no glossary entry.
+    if terms:
+        JARGON = re.compile(r"\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+){1,2})\b")
+        seen = {}
+        for label, text in _prose_fields(d):
+            for cand in JARGON.findall(text):
+                seen.setdefault(cand.lower(), label)
+        for cand, label in sorted(seen.items()):
+            if cand in terms:
+                continue
+            if len(cand.split()) < 2:
+                continue
+            drifts.append("%s uses %r, which is not in the glossary" % (label, cand.title()))
+    return fails, drifts
+
+
 def run(root=None):
     fails, drifts = [], []
     P = L.paths(root)
@@ -398,6 +538,13 @@ def run(root=None):
             for i in d.get("invariants", []) if i.get("state") != "holding"],
         "open_founder_actions": d.get("founder_actions", []),
     }
+    # Staleness detection (0.8.0). Structure was never the thing that rotted;
+    # the page quietly disagreeing with itself was.
+    fails.extend(check_contradictions(d))
+    rf, rd = check_readability(d)
+    fails.extend(rf)
+    drifts.extend(rd)
+
     return [("FAIL", f) for f in fails], [("DRIFT", f) for f in drifts], summary
 
 

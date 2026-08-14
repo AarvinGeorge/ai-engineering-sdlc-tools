@@ -505,6 +505,68 @@ class TestTasks(Base):
         run("render.py", project=self.dir)
         self.assertNotIn('class="tasks"', self.page())
 
+
+class TestStaleness(Base):
+    """The page disagreeing with ITSELF is detectable, and it is what actually
+    rotted. Structure was never the problem."""
+
+    def _active(self, **over):
+        d = self.make_plan()
+        item = {"name": "Ship it", "status": "under way", "updated": "2026-01-01",
+                "stage": "building", "plan_file": "p.md", "capability": 1,
+                "tasks": [{"name": "Alpha", "state": "done"}]}
+        item.update(over)
+        d["plans"]["now"] = [item]
+        self.write(d)
+        return d
+
+    def test_not_yet_language_with_done_tasks_fails(self):
+        self._active(status="Built and waiting for its first real message.")
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("contradicts itself", r.stdout)
+
+    def test_not_yet_language_without_done_tasks_is_fine(self):
+        self._active(status="Waiting for its first real message.", tasks=[])
+        run("render.py", project=self.dir)
+        self.assertNotIn("contradicts itself", run("check.py", project=self.dir).stdout)
+
+    def test_capability_not_started_while_active_fails(self):
+        d = self._active()
+        d["capabilities"][0]["build"] = "not-started"
+        d["capabilities"][0]["evidence"] = ""
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("while an active item works on it", r.stdout)
+
+    def test_insider_shorthand_fails(self):
+        d = self.make_plan()
+        d["orientation"]["shape"] = "It is a Tuesday, obviously."
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("shorthand", r.stdout)
+
+    def test_undefined_jargon_drifts(self):
+        d = self.make_plan()
+        d["orientation"]["why"] = "We rely on Quantum Flux Routing to do this."
+        d["glossary"] = [{"term": "Tenant", "def": "one customer"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertIn("not in the glossary", run("check.py", project=self.dir).stdout)
+
+    def test_clean_plan_stays_clean(self):
+        """The template must not trip its own new checks."""
+        self.make_plan()
+        run("render.py", project=self.dir)
+        out = run("check.py", project=self.dir).stdout
+        for phrase in ("contradicts itself", "shorthand"):
+            self.assertNotIn(phrase, out)
+
 class TestContrast(unittest.TestCase):
     """Every palette token must clear WCAG AA against both grounds it sits on.
 

@@ -16,6 +16,47 @@ The problem this solves: an agent's memory ends with its context window, and a h
 memory of what an agent did ends sooner than that. Written instructions get skipped.
 So the state lives in a file both sides read, and the reading is automatic.
 
+## The standing job — keep it true, every turn
+
+This is not a document written at the end. It is the shared state, and it is the agent's job
+to keep it accurate as the work happens. The human should never have to say "the page is out
+of date."
+
+**Every turn that changes anything, before finishing:**
+
+1. **Ask where the work actually is now.** A task finished? An item finished? Something
+   learned that changes a plan? Something found that belongs on the record?
+2. **Make the smallest edit that makes the page true.** Change the fields that moved. Do not
+   rewrite sections that did not change, and do not restructure because it would read better
+   — churn destroys the reader's sense of what is new.
+3. **Move items rather than duplicating them.** A finished item leaves `now` for `done`, and
+   something from `next` takes its place. An item's own `tasks` list is the first thing to
+   update, because the gate reads it.
+4. **Re-render, run the gate, republish.**
+
+**What "true" means here is specific:** the page must not disagree with itself. If an item's
+tasks say the work is done, its status must not say it is waiting to start. If an active item
+works on a capability, that capability cannot read as untouched. The gate **fails** on these,
+so a turn cannot end on a page that contradicts itself.
+
+## Who the page is for
+
+**A person who has never seen the project, reading it cold, should understand what is
+happening and why.** That is the point of the page. It is not a status file for people who
+already know the answer.
+
+That property decays every time someone who knows the context writes a sentence. So:
+
+- **Plain language, full substance.** Simplify the wording, never drop the information.
+  Explaining something clearly is not dumbing it down.
+- **No shorthand a stranger cannot resolve.** No "as discussed", no in-jokes, no phrase that
+  only makes sense to someone who was in the conversation. The gate **fails** on these.
+- **Spell out cross-references.** "Depends on P1" means nothing to a new reader; say what P1
+  is. The gate **drifts** on bare references.
+- **Define terms or do not use them.** Capitalised jargon with no glossary entry drifts.
+- **One idea per paragraph.** A paragraph doing three jobs is how a good page becomes an
+  unreadable one.
+
 ## Commands
 
 | Invocation | Does |

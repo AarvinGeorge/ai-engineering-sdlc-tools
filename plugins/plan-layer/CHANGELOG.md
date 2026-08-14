@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0 — 2026-08-14
+
+**The gate now catches the page contradicting itself, and catches it going
+opaque.** Structure was never what rotted. What rotted was a page that quietly
+stopped being true while every structural check stayed green — an item reading
+"waiting for its first real message" while its own task list recorded the work
+as done, and a capability saying a channel did not work while the active plan
+said it did. Four days, unnoticed, until a human read it.
+
+The published pattern for living documentation is three parts: detect
+staleness, route it to a person, make the fix cheap. Routing and cheap fixes
+already existed. Detection did not.
+
+- **Contradiction checks — FAIL.** Not-yet language in an item whose own tasks
+  are done. A capability marked `not-started` while an active item works on it,
+  or while finished work is filed against it. These are internal disagreements,
+  not judgements about the world, so a script can be certain.
+- **Readability checks.** The property the page exists for: a stranger should
+  be able to read it. Insider shorthand **fails**; jargon absent from the
+  glossary, bare cross-references like "P2", and sentences over 55 words
+  **drift**.
+- FAIL rather than DRIFT is the whole mechanism — the end-of-turn hook blocks
+  on FAIL, so a turn cannot end on a self-contradicting page. It stops
+  depending on anyone remembering to look.
+- Six tests, including the exact failure that prompted this, and one asserting
+  the shipped template does not trip its own new checks.
+
 ## 0.7.0 — 2026-08-10
 
 **An active plan can now show its tasks.** Before this, an active item could
