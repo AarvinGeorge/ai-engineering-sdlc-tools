@@ -696,7 +696,11 @@ class TestGateHook(Base):
     def test_silent_when_the_gate_passes(self):
         self.make_plan()
         run("render.py", project=self.dir)
-        self.assertEqual(self._hook().stdout.strip(), "")
+        out = self._hook()
+        payload = json.loads(out.stdout) if out.stdout.strip() else {}
+        # Never blocks, and never invents a failure.
+        self.assertNotIn("decision", payload)
+        self.assertNotIn("reason", payload)
 
     def test_silent_where_there_is_no_plan(self):
         self.assertEqual(self._hook().stdout.strip(), "")
@@ -734,7 +738,12 @@ class TestGateHook(Base):
             fh.write("# work in progress\n")
         sp.run(["git", "add", "-A"], cwd=self.dir, capture_output=True)
         out = self._hook("drift-" + os.path.basename(self.dir))
-        self.assertEqual(out.stdout.strip(), "", "blocked on drift: %s" % out.stdout[:120])
+        # The invariant is that drift never BLOCKS. Since 0.9.1 it may still be
+        # reported to the human, which is the point of that release -- silence
+        # was how staleness went unnoticed for days.
+        payload = json.loads(out.stdout) if out.stdout.strip() else {}
+        self.assertNotEqual(payload.get("decision"), "block",
+                            "blocked on drift: %s" % out.stdout[:120])
 
     def test_a_broken_gate_never_traps_the_session(self):
         os.makedirs(os.path.join(self.dir, "plan"), exist_ok=True)
@@ -743,6 +752,27 @@ class TestGateHook(Base):
         r = self._hook()
         self.assertEqual(r.returncode, 0)
 
+
+    def test_staleness_is_reported_to_the_human(self):
+        """0.9.1: silence is what let staleness sit unnoticed for days."""
+        d = self.make_plan()
+        d["orientation"]["why"] = "We rely on Quantum Flux Routing for this."
+        d["glossary"] = [{"term": "Tenant", "def": "one customer"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        out = self._hook()
+        payload = json.loads(out.stdout) if out.stdout.strip() else {}
+        self.assertIn("systemMessage", payload)
+        self.assertNotEqual(payload.get("decision"), "block")
+
+    def test_work_in_progress_drift_stays_quiet(self):
+        """Uncommitted files fire constantly mid-task. A notice that is always
+        there is one nobody reads."""
+        import importlib, sys
+        sys.path.insert(0, os.path.join(PLUGIN, "scripts"))
+        gh = importlib.import_module("gate_hook")
+        self.assertFalse(gh._is_staleness("3 uncommitted file(s) outside plan/ but the plan is untouched"))
+        self.assertTrue(gh._is_staleness("plan.json last updated 20 days ago"))
 
 class TestDurability(Base):
     """The source of truth must survive an interrupted write."""
