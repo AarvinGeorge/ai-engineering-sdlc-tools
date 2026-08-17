@@ -283,6 +283,20 @@
                     "state"
                   ]
                 }
+              },
+              "capability": {
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "description": "Which capability this work serves. The gate fails on a reference that does not exist."
+              },
+              "blocked_by": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Names of other plan items this one waits on. Written here rather than in prose, because a dependency described only in a document cannot be checked — and that is how an item stayed active while its blocker sat unstarted."
               }
             },
             "required": [
@@ -343,6 +357,20 @@
                     "state"
                   ]
                 }
+              },
+              "capability": {
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "description": "Which capability this work serves. The gate fails on a reference that does not exist."
+              },
+              "blocked_by": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Names of other plan items this one waits on. Written here rather than in prose, because a dependency described only in a document cannot be checked — and that is how an item stayed active while its blocker sat unstarted."
               }
             },
             "required": [
@@ -423,6 +451,70 @@
           "def"
         ]
       }
+    },
+    "edge_cases": {
+      "type": "array",
+      "description": "Hazards found along the way.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "case": {
+            "type": "string"
+          },
+          "surface": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "mitigated",
+              "accepted"
+            ]
+          },
+          "mitigation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "case",
+          "status"
+        ]
+      }
+    },
+    "assertions": {
+      "type": "array",
+      "description": "Claims the plan makes about the real system, each with a command that checks it. Run explicitly with check.py --verify; never from a hook, because they execute shell commands read from a repository file.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "type": "string"
+          },
+          "run": {
+            "type": "string"
+          },
+          "expect": {
+            "type": "string"
+          },
+          "refs": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim",
+          "run",
+          "expect"
+        ]
+      }
+    },
+    "assertions_setup": {
+      "type": "string",
+      "description": "One command run before the assertions; its stdout becomes $PLAN_FACTS, which each assertion then reads. One gather instead of many — eight separate connections once tripped a rate limit and locked the machine out of its own server."
     }
   }
 }

@@ -12,7 +12,7 @@
     {
       "name": "plan-layer",
       "description": "A shared planning surface between you and your coding agent. One JSON file is the state; a self-contained HTML page is the view; a gate catches drift; session hooks brief the agent automatically.",
-      "version": "0.9.1",
+      "version": "0.9.2",
       "author": {
         "name": "Aarvin George Poozhikala",
         "url": "https://github.com/AarvinGeorge"
@@ -26,7 +26,8 @@
         "state",
         "hooks",
         "documentation"
-      ]
+      ],
+      "whenToUse": "Use on any project where a coding agent and a human both need to know the current state — what is built, what is being worked on, what is deliberately deferred. Most useful when work spans many sessions, because an agent's memory ends with its context window and a human's memory of what the agent did ends sooner."
     }
   ]
 }

@@ -118,6 +118,25 @@ and sentences over 55 words drift.
 Both are FAIL rather than DRIFT on purpose: the end-of-turn hook blocks on FAIL, so a turn
 cannot end on a self-contradicting page. It stops depending on anyone remembering to look.
 
+## Saying what waits on what
+
+When one item cannot start until another finishes, record it as data:
+
+```json
+{ "name": "Screening", "blocked_by": ["Containment"], … }
+```
+
+A dependency described in a plan document, or explained in conversation, exists nowhere a check
+can see it — which is how an item stays marked active for days while the work it waits on sits
+unstarted at the bottom of the queue.
+
+- **Fails** when an active item with outstanding work waits on something only queued. One of the
+  two is in the wrong place.
+- **Fails** when it waits on something not on the plan at all.
+- **Drifts** when it still waits on something already finished.
+- **Drifts** when every unfinished task on an active item is blocked — that item is waiting, not
+  active.
+
 ## The gate
 
 ```bash

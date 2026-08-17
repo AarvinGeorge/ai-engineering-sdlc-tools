@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.9.1 — %s
+## 0.9.2 — 2026-08-17
+
+**Packaging caught up with the code.** Six releases shipped in a week and the
+things a stranger reads had fallen behind the things they describe.
+
+- **Eight release dates in this file were the literal text `%s`** — a format
+  string that was never substituted, going back to 0.3.0. Recovered from the
+  commits that bumped each version rather than guessed.
+- **The schema was missing five fields it should define:** `capability`,
+  `blocked_by`, `edge_cases`, `assertions` and `assertions_setup`. The schema is
+  the contract for anyone adopting this; an incomplete one is worse than none,
+  because it looks authoritative.
+- **The marketplace listing had no `whenToUse`.** Someone browsing could see what
+  the plugin *is* and not when to reach for it.
+- **The README did not mention `blocked_by`**, shipped hours earlier.
+- **The ROADMAP was updated honestly rather than tidily:** gap 2 is partly closed
+  (the gate now catches the page contradicting itself), gap 3 is unchanged and is
+  now the most valuable — every miss so far was caught by a human reading the
+  page, and there is still no way for them to mark a claim disputed.
+
+No behaviour change.
+
+## 0.9.1 — 2026-08-17
 
 **Drift is now shown to the human the moment it appears.** It was collected at
 the end of every turn and thrown away, surfacing only at the next session start
@@ -17,7 +39,7 @@ reality — surface immediately.
 
 A notice that is always present is one nobody reads.
 
-## 0.9.0 — %s
+## 0.9.0 — 2026-08-17
 
 **Dependencies between items are now data.** An item may declare
 `blocked_by: ["another item's name"]`.
@@ -95,13 +117,13 @@ was never rendered.
 - Five tests, including one asserting a plan with no `tasks` key renders exactly
   as it did before.
 
-## 0.6.1 — %s
+## 0.6.1 — 2026-08-10
 
 - Orientation now comes before the contract. A first-time reader was being handed
   "read this first, every session" before being told what the project is.
 
 
-## 0.6.0 — %s
+## 0.6.0 — 2026-08-10
 
 Readability, measured rather than guessed. A page nobody can be onboarded from is not a
 shared surface, it is an archive.
@@ -112,7 +134,7 @@ shared surface, it is an archive.
   off. Twenty entries was 15%% of the page, and git holds the full record anyway.
 
 
-## 0.5.0 — %s
+## 0.5.0 — 2026-08-10
 
 - **Edge-case register.** A section for hazards found along the way, each with a surface and a
   status of `open`, `mitigated` or `accepted`. They surface during design conversations and
@@ -121,7 +143,7 @@ shared surface, it is an archive.
   accepting a hazard silently is how it stops being a decision.
 
 
-## 0.4.0 — %s
+## 0.4.0 — 2026-08-10
 
 The loop said "finish every turn by running the gate". That was an instruction, and the
 human ended up being the one who noticed when it was skipped.
@@ -142,7 +164,7 @@ human ended up being the one who noticed when it was skipped.
   other statement said 5.
 
 
-## 0.3.2 — %s
+## 0.3.2 — 2026-08-10
 
 - **Atomic writes.** `open(path, "w")` truncates immediately, so an interruption between
   the truncate and the last byte left a half-written file. Reproduced: a Ctrl-C mid-write
@@ -159,7 +181,7 @@ human ended up being the one who noticed when it was skipped.
   written moments apart, and reporting "00:44Z is newer than 00:44Z" is true to the second
   and reads as nonsense. A check people learn to dismiss is worse than no check.
 
-## 0.3.0 — %s
+## 0.3.0 — 2026-08-09
 
 The gate could check that a plan was internally consistent. It could not check
 whether the plan was TRUE. Now it can, if the plan says how.

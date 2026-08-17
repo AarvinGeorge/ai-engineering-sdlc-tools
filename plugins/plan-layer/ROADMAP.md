@@ -5,6 +5,25 @@ so the reasoning survives the session it came from.
 
 ## Why this file exists
 
+> **Updated 2026-08-17.** Two of these have moved since the file was written, and saying so
+> matters more than keeping the list tidy.
+>
+> **Gap 2 is partly closed.** The agent no longer only grades itself: the gate now catches the
+> page contradicting *itself* — not-yet language beside finished tasks, a capability marked
+> untouched while work runs against it, a dependency pointing at something merely queued. Those
+> are objective and need no reviewer. What remains open is the harder half: a claim that is
+> internally consistent and simply wrong about the world. Executable assertions cover that for a
+> fixed set of facts (twelve, in the project this came from), not for the whole page. **An
+> independent reviewer is still the right answer for the rest.**
+>
+> **Gap 3 is unchanged and now the most valuable.** Every miss so far — three of them — was caught
+> by the human reading the page, not by the tooling. There is still no way for them to mark a
+> claim as disputed and have the gate hold it open.
+>
+> **Gap 1 and Gap 4 are unchanged.**
+
+
+
 plan-layer was built to solve one problem: **a coding agent's memory ends with its context
 window, and a human's memory of what the agent did ends sooner.** State lives in a file both
 sides read, and the reading is automatic.
