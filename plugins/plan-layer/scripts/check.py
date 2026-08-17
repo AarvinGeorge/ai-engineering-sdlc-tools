@@ -311,6 +311,72 @@ def check_figures(root, d):
     return drifts
 
 
+def check_dependencies(d):
+    """"This waits on that" must be data, not prose.
+
+    A dependency written only in a plan document, or only in the agent's
+    reasoning, cannot be checked by anything. That is exactly how an item stayed
+    marked 'active' for three days while the work it depended on sat unstarted
+    at the bottom of the queue -- the human caught it, the gate could not,
+    because the file had nowhere to record the link.
+
+    An item may declare `blocked_by: ["name of another item"]`.
+    """
+    fails, drifts = [], []
+    plans = d.get("plans") or {}
+    by_name = {}
+    for bucket in ("now", "next", "done"):
+        for p in plans.get(bucket) or []:
+            if p.get("name"):
+                by_name[p["name"]] = (bucket, p)
+
+    for bucket in ("now", "next"):
+        for p in plans.get(bucket) or []:
+            who = p.get("name") or "item"
+            for dep in p.get("blocked_by") or []:
+                if dep not in by_name:
+                    fails.append("item %r says it waits on %r, which is not on the plan at all"
+                                 % (who, dep))
+                    continue
+                dep_bucket, dep_item = by_name[dep]
+                if dep_bucket == "done":
+                    drifts.append("item %r still says it waits on %r, which is finished"
+                                  % (who, dep))
+                    continue
+                # The thing it waits on must not look less real than it does.
+                if bucket == "now" and dep_bucket == "next":
+                    unfinished = [t for t in (p.get("tasks") or [])
+                                  if t.get("state") in ("active", "todo")]
+                    if unfinished:
+                        fails.append(
+                            "item %r is active with work outstanding, but waits on %r which is "
+                            "only queued — one of the two is in the wrong place"
+                            % (who, dep))
+    return fails, drifts
+
+
+def check_stalled(d):
+    """An active item where nothing can actually move.
+
+    If every task that is not done is blocked, the item is not being worked on;
+    it is waiting. Saying 'active' then is how a page looks busy while nothing
+    happens.
+    """
+    drifts = []
+    for p in (d.get("plans") or {}).get("now") or []:
+        tasks = p.get("tasks") or []
+        if not tasks:
+            continue
+        movable = [t for t in tasks if t.get("state") in ("active", "todo")]
+        blocked = [t for t in tasks if t.get("state") == "blocked"]
+        if blocked and not movable:
+            drifts.append(
+                "active item %r has nothing that can move — every unfinished task is blocked. "
+                "Either it is waiting rather than active, or a blocker has cleared"
+                % (p.get("name") or "item"))
+    return drifts
+
+
 def run(root=None):
     fails, drifts = [], []
     P = L.paths(root)
@@ -565,6 +631,10 @@ def run(root=None):
     # Staleness detection (0.8.0). Structure was never the thing that rotted;
     # the page quietly disagreeing with itself was.
     drifts.extend(check_figures(root, d))
+    df, dd = check_dependencies(d)
+    fails.extend(df)
+    drifts.extend(dd)
+    drifts.extend(check_stalled(d))
     fails.extend(check_contradictions(d))
     rf, rd = check_readability(d)
     fails.extend(rf)

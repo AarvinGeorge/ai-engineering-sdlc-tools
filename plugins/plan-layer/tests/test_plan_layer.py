@@ -567,6 +567,53 @@ class TestStaleness(Base):
         for phrase in ("contradicts itself", "shorthand"):
             self.assertNotIn(phrase, out)
 
+
+class TestDependencies(Base):
+    """"This waits on that" has to be data. Written only in prose, nothing can check it —
+    which is how an item stayed active for three days while its blocker sat unstarted."""
+
+    def _pair(self, dep_bucket):
+        d = self.make_plan()
+        dep = {"name": "Do this first", "why": "w", "unblocks": "u", "stage": "planned"}
+        item = {"name": "Do this second", "status": "s", "updated": "2026-01-01",
+                "stage": "building", "plan_file": "p.md",
+                "tasks": [{"name": "A", "state": "active"}],
+                "blocked_by": ["Do this first"]}
+        d["plans"]["now"] = [item]
+        d["plans"].setdefault(dep_bucket, []).insert(0, dep)
+        self.write(d)
+        return d
+
+    def test_active_item_waiting_on_a_merely_queued_item_fails(self):
+        self._pair("next")
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("in the wrong place", r.stdout)
+
+    def test_dependency_that_does_not_exist_fails(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "X", "status": "s", "updated": "2026-01-01",
+                              "stage": "planned", "blocked_by": ["nothing named this"]}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertIn("not on the plan at all", run("check.py", project=self.dir).stdout)
+
+    def test_all_unfinished_tasks_blocked_drifts(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "X", "status": "s", "updated": "2026-01-01",
+                              "stage": "building", "plan_file": "p.md",
+                              "tasks": [{"name": "A", "state": "done"},
+                                        {"name": "B", "state": "blocked"}]}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertIn("nothing that can move", run("check.py", project=self.dir).stdout)
+
+    def test_no_blocked_by_key_is_fine(self):
+        self.make_plan()
+        run("render.py", project=self.dir)
+        self.assertNotIn("waits on", run("check.py", project=self.dir).stdout)
+
 class TestContrast(unittest.TestCase):
     """Every palette token must clear WCAG AA against both grounds it sits on.
 

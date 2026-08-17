@@ -39,6 +39,20 @@ tasks say the work is done, its status must not say it is waiting to start. If a
 works on a capability, that capability cannot read as untouched. The gate **fails** on these,
 so a turn cannot end on a page that contradicts itself.
 
+### Say what waits on what
+
+When one piece of work cannot start until another finishes, record it:
+
+```json
+{ "name": "Screening", "blocked_by": ["Containment"], ... }
+```
+
+**Do not leave it in prose.** A dependency described in a plan document, or explained in
+conversation, exists nowhere a check can see it — and that is exactly how an item stays marked
+active for days while the thing it waits on sits unstarted at the bottom of the queue. The gate
+now fails when an active item waits on something that is only queued, because one of the two is
+in the wrong place.
+
 ## Who the page is for
 
 **A person who has never seen the project, reading it cold, should understand what is

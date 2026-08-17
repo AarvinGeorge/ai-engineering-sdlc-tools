@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0 — %s
+
+**Dependencies between items are now data.** An item may declare
+`blocked_by: ["another item's name"]`.
+
+Prompted by a real miss. An item sat marked *active* for three days while the
+work it depended on sat unstarted at the bottom of the queue. The dependency
+was written in a plan document and stated in conversation, and therefore
+existed nowhere a check could see it. The human caught it; the gate could not.
+
+- **Fails** when an active item with outstanding work waits on something that is
+  only queued — one of the two is in the wrong place.
+- **Fails** when an item waits on something not on the plan at all.
+- **Drifts** when an item still waits on something already finished.
+- **Drifts** when every unfinished task on an active item is blocked, because
+  that item is waiting rather than active.
+
+Proven by replaying the exact state that went unnoticed: with the dependency
+recorded, it fails immediately.
+
 ## 0.8.1 — 2026-08-14
 
 **Figures must not ask for facts that do not exist.** A drawing that reads a
