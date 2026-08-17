@@ -32,6 +32,28 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 
 
+
+# Two kinds of drift, and only one belongs at the end of a turn.
+#
+# WORK-IN-PROGRESS signals fire constantly and correctly while someone is
+# mid-task: files edited but not committed, a commit newer than the plan. They
+# are useful at session start, as a summary of where things were left. Shown
+# after every turn they would be pure noise, and a notice that is always there
+# is one nobody reads.
+#
+# STALENESS signals mean the page has stopped describing reality. Those are the
+# ones that went unnoticed for days at a time, and they are what the human asked
+# to stop experiencing. They surface immediately, without blocking.
+WORK_IN_PROGRESS = (
+    "uncommitted file",
+    "is newer than meta.updated",
+)
+
+
+def _is_staleness(message):
+    return not any(marker in message for marker in WORK_IN_PROGRESS)
+
+
 def _seen_path(session, digest, project):
     """One marker per session + project + set-of-failures.
 
@@ -61,12 +83,23 @@ def main():
 
     try:
         import check
-        fails, _drifts, _summary = check.run()
+        fails, drifts, _summary = check.run()
     except Exception:
         # A broken gate must never trap a session.
         return 0
 
+    stale = [m for _kind, m in drifts if _is_staleness(m)]
+
     if not fails:
+        # Nothing is broken, but the page may have stopped matching reality.
+        # Say so where the human will see it, rather than saving it for the next
+        # session -- which is how the same three things went unnoticed for days.
+        if stale:
+            print(json.dumps({
+                "systemMessage": (
+                    "Plan drift (%d): the page may no longer match reality.\n  "
+                    % len(stale)) + "\n  ".join(stale[:6]),
+            }))
         return 0
 
     messages = [m for _kind, m in fails]
@@ -88,6 +121,10 @@ def main():
             + "\n  ".join(messages)
             + "\n\nFix the plan (and re-render if the page is stale), then finish. "
               "If a failure is wrong, correct the check rather than working around it."
+        ),
+        "systemMessage": (
+            ("Plan gate: %d failure(s)" % len(messages))
+            + (", %d drift signal(s)" % len(stale) if stale else "")
         ),
     }))
     return 0

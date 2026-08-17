@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.1 — %s
+
+**Drift is now shown to the human the moment it appears.** It was collected at
+the end of every turn and thrown away, surfacing only at the next session start
+— so the same staleness went unnoticed for days at a time.
+
+The end-of-turn hook now reports it through `systemMessage`: visible, and still
+non-blocking.
+
+One distinction keeps it from becoming noise. **Work-in-progress** signals
+(uncommitted files, a commit newer than the plan) fire constantly and correctly
+while someone is mid-task; they stay at session start, where they read as "here
+is where you left off". **Staleness** signals — the page no longer matching
+reality — surface immediately.
+
+A notice that is always present is one nobody reads.
+
 ## 0.9.0 — %s
 
 **Dependencies between items are now data.** An item may declare
