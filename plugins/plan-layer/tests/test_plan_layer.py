@@ -872,5 +872,181 @@ class TestManifests(unittest.TestCase):
                                   "module of this plugin" % (f, mod))
 
 
+
+class TestLegend(Base):
+    """The page prints a key, and the key must cover the page.
+
+    Nine status vocabularies were being painted with nothing declaring any of
+    them, which is also how they drifted into each other -- "Planned" and
+    "Done" both green, "at risk" and "broken" identical, "No plan" and "No plan
+    written yet" for one state. The legend is generated from the same maps the
+    sections render from; this test asserts that structural guarantee actually
+    holds in the output, and it is proven able to fail before being trusted.
+    """
+
+    @staticmethod
+    def _labels(fragment, include_spoken=True):
+        """Every state word this fragment paints.
+
+        Pills and stage chips now contain a nested dot span and a spoken label,
+        so the inner markup is removed before the outer text is read.
+        """
+        import re
+        spoken = re.findall(r'<span class="sr-only">(.*?)</span>', fragment)
+        frag = re.sub(r'<span class="sr-only">.*?</span>', "", fragment)
+        frag = re.sub(r'<span class="dot"[^>]*></span>', "", frag)
+        chips = re.findall(r'<span class="(?:pill|stage|lgtxt|lgcard)[^"]*">(.*?)</span>',
+                           frag)
+        words = set(chips) | (set(spoken) if include_spoken else set())
+        return {w.strip().rstrip(":").strip() for w in words if w.strip()}
+
+    @classmethod
+    def _split(cls, page):
+        """The key, and everything that is not the key."""
+        i = page.find('<div class="legend">')
+        if i == -1:
+            return "", page
+        j = page.find("<h2>", i)          # the key runs to the next section
+        return page[i:j], page[:i] + page[j:]
+
+    def _every_state(self):
+        d = self.make_plan()
+        d["capabilities"] = [
+            {"id": 1, "name": "Alpha", "build": "done", "plan": "planned",
+             "evidence": "shipped"},
+            {"id": 2, "name": "Beta", "build": "active", "plan": "partial",
+             "evidence": "under way"},
+            {"id": 3, "name": "Gamma", "build": "partial", "plan": "none",
+             "evidence": "half"},
+            {"id": 4, "name": "Delta", "build": "not-started", "plan": "none"},
+        ]
+        d["plans"] = {
+            "done": [{"name": "Finished", "period": "Jan", "tasks": "2 tasks",
+                      "outcome": "did it", "file": "a.md"}],
+            "now": [{"name": "Doing", "stage": "building", "capability": 2,
+                     "plan_file": "b.md", "status": "under way", "updated": "2026-01-01",
+                     "tasks": [{"name": "one", "state": "done"},
+                               {"name": "two", "state": "active"},
+                               {"name": "three", "state": "blocked"},
+                               {"name": "four", "state": "todo"}]}],
+            "next": [{"name": "Later", "stage": "intent", "capability": 3,
+                      "why": "because"}],
+        }
+        d["edge_cases"] = [
+            {"id": "E1", "case": "a", "surface": "mail", "status": "open",
+             "mitigation": "m"},
+            {"id": "E2", "case": "b", "surface": "mail", "status": "mitigated",
+             "mitigation": "m"},
+            {"id": "E3", "case": "c", "surface": "mail", "status": "accepted",
+             "mitigation": "reasoned"},
+        ]
+        d["invariants"] = [
+            {"rule": "One", "state": "holding", "detail": "d"},
+            {"rule": "Two", "state": "at risk", "detail": "d"},
+            {"rule": "Three", "state": "broken", "detail": "d"},
+        ]
+        self.write(d)
+        run("render.py", project=self.dir)
+        return self.page()
+
+    def test_every_state_the_page_paints_is_in_the_key(self):
+        key, body = self._split(self._every_state())
+        self.assertTrue(key, "no legend was rendered")
+        missing = self._labels(body) - self._labels(key)
+        self.assertEqual(missing, set(),
+                         "painted on the page but absent from the key: %s" % sorted(missing))
+
+    def test_the_check_can_fail(self):
+        """A test that cannot fail proves nothing. Plant a state and confirm."""
+        page = self._every_state()
+        planted = page.replace('<h2>Glossary',
+                               '<span class="pill s-gap">Invented state</span><h2>Glossary', 1)
+        if planted == page:                       # no glossary in the template
+            planted = page.replace("</div>",
+                                   '<span class="pill s-gap">Invented state</span></div>', 1)
+        key, body = self._split(planted)
+        self.assertIn("Invented state", self._labels(body) - self._labels(key))
+
+    def test_three_invariant_states_render_three_ways(self):
+        page = self._every_state()
+        for word in ("Holding", "At risk", "Broken"):
+            self.assertIn(">%s</span>" % word, page)
+        # the old code painted anything that was not holding in one colour
+        self.assertNotIn("inv--warn", page)
+
+    def test_planned_is_not_painted_as_done(self):
+        page = self._every_state()
+        self.assertIn('class="pill s-plan"', page)
+        self.assertNotIn('<span class="pill s-done">Planned</span>', page)
+
+    def test_the_live_dot_marks_only_work_in_progress(self):
+        page = self._every_state()
+        import re
+        # a dot may only appear inside something that also says it is live
+        for m in re.finditer(r'<span class="(?:pill|stage)([^"]*)">'
+                             r'<span class="dot"[^>]*></span>(.*?)</span>', page):
+            self.assertIn(m.group(2).strip(), ("In progress", "Building"),
+                          "a live dot on %r, which does not mean work in flight"
+                          % m.group(2))
+        self.assertIn('<span class="dot"', page)
+
+    def test_reduced_motion_keeps_the_dot_and_drops_the_ring(self):
+        page = self._every_state()
+        self.assertIn("prefers-reduced-motion:reduce", page)
+        i = page.find("prefers-reduced-motion:reduce")
+        block = page[i:i + 120]
+        self.assertIn(".dot::after", block)
+        self.assertIn("animation:none", block)
+
+    def test_no_key_when_there_is_nothing_to_key(self):
+        d = self.make_plan()
+        for k in ("capabilities", "edge_cases", "invariants", "plans", "cycle"):
+            d.pop(k, None)
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertNotIn('<div class="legend">', self.page())
+
+
+class TestDonePlanShapes(Base):
+    """A finished plan is MOVED, not rewritten, so it arrives in either shape.
+
+    Rendering only one of them printed a Python repr of a list of task dicts --
+    roughly 1,100 characters -- onto the page, and silently dropped the item's
+    link and its entire explanation.
+    """
+
+    def _done(self, item):
+        d = self.make_plan()
+        d["plans"] = {"done": [item], "now": [], "next": []}
+        self.write(d)
+        run("render.py", project=self.dir)
+        return self.page()
+
+    def test_a_moved_item_does_not_print_a_python_repr(self):
+        page = self._done({"name": "Run", "status": "stopped at 8 of 12",
+                           "plan_file": "35.md",
+                           "tasks": [{"name": "case one", "state": "done"},
+                                     {"name": "case two", "state": "todo"}]})
+        self.assertNotIn("'state':", page)
+        self.assertNotIn("[{", page)
+        self.assertIn("1 of 2 done", page)
+        self.assertIn("case one", page)
+
+    def test_a_moved_item_keeps_its_link_and_its_explanation(self):
+        page = self._done({"name": "Run", "status": "stopped at 8 of 12",
+                           "plan_file": "35.md", "tasks": []})
+        self.assertIn("35.md", page)
+        self.assertIn("stopped at 8 of 12", page)
+
+    def test_the_original_shape_is_unchanged(self):
+        page = self._done({"name": "Run", "period": "Jan 2026", "tasks": "4 tasks",
+                           "outcome": "it worked", "notable": "lesson", "file": "a.md"})
+        self.assertIn("Jan 2026 · 4 tasks", page)
+        self.assertIn("it worked", page)
+        self.assertIn("lesson", page)
+        self.assertIn("a.md", page)
+        self.assertNotIn('class="tasks"', page)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

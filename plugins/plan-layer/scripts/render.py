@@ -27,6 +27,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 
+# One vocabulary, declared once.
+#
+# Every status the page can paint lives in one of these maps, and the legend is
+# generated from the same maps -- so a marker cannot appear in the page without
+# appearing in the key, and cannot mean one thing in a table and another in a
+# card. That drift is what these maps exist to stop: "Planned" and "Done" were
+# both green, an at-risk invariant was painted identically to a broken one, and
+# "No plan" and "No plan written yet" were two labels for one state.
 BUILD = {
     "done": ("Done", "s-done"),
     "active": ("In progress", "s-active"),
@@ -34,13 +42,42 @@ BUILD = {
     "not-started": ("Not started", "s-none"),
 }
 PLAN = {
-    "planned": ("Planned", "s-done"),
+    # accent, not green: green is "finished", and a plan existing is not the
+    # work being finished. Accent is also the colour of the `planned` stage
+    # chip, so "planned" is one colour everywhere on the page.
+    "planned": ("Planned", "s-plan"),
     "partial": ("Partial", "s-partial"),
-    "none": ("No plan", "s-gap"),
+    "none": ("No plan yet", "s-gap"),
 }
+TASK = {
+    "done": ("Done", "s-done"),
+    "active": ("In progress", "s-active"),
+    "blocked": ("Blocked", "s-gap"),
+    "todo": ("Not started", "s-none"),
+}
+EDGE = {
+    "open": ("Open", "s-gap"),
+    "mitigated": ("Mitigated", "s-done"),
+    "accepted": ("Accepted", "s-none"),
+}
+INV = {
+    "holding": ("Holding", "s-done"),
+    # Three states, three renderings. "At risk" used to render in the same red
+    # as "broken", which tells a reader the same thing about two situations
+    # that need different responses.
+    "at risk": ("At risk", "s-active"),
+    "broken": ("Broken", "s-gap"),
+}
+CARD = [("plan--active", "Active now"), ("plan--next", "Next"),
+        ("plan--done", "Completed"), ("plan--idle", "Nothing active")]
+
+# The states that mean "somebody is working on this right now". These are the
+# only places the live dot appears, so it means exactly one thing.
+LIVE = {"active", "building"}
 # Defaults are overridable per project via meta.headings, because "systems"
 # means something different in every codebase.
 HEADINGS = {
+    "legend": ("Key", "every status label on this page, and what it means"),
     "figures": ("The plan in pictures", "the shape of the work, before the detail"),
     "systems": ("Systems", "where we came from, where we are, where we are going"),
     "capabilities": ("Capabilities", "what exists — and whether a plan covers it"),
@@ -79,9 +116,22 @@ def is_stale(src, out):
         return True
 
 
+def dot():
+    """The one marker that means "in progress, right now".
+
+    A soft radial pulse rather than a static amber circle, because the page is
+    long and the reader is looking for the one thing currently moving. It is
+    never the only cue: every dot sits beside a text label, and the ones that
+    replace a glyph carry a screen-reader label of their own. Reduced motion
+    leaves the dot in place and stops the ring.
+    """
+    return '<span class="dot" aria-hidden="true"></span>'
+
+
 def pill(mapping, key):
     label, cls = mapping.get(key, (key, "s-none"))
-    return '<span class="pill %s">%s</span>' % (cls, e(label))
+    return '<span class="pill %s">%s%s</span>' % (
+        cls, dot() if key in LIVE else "", e(label))
 
 
 def h2(d, key):
@@ -177,7 +227,8 @@ def stagechip(d, p):
     sid = p.get("stage")
     if not sid:
         return ""
-    return '<span class="stage stage--%s">%s</span>' % (e(sid), e(names.get(sid, sid)))
+    return '<span class="stage stage--%s">%s%s</span>' % (
+        e(sid), dot() if sid in LIVE else "", e(names.get(sid, sid)))
 
 
 def capchip(d, p):
@@ -198,7 +249,17 @@ def capchip(d, p):
 
 TASK_STATE = {"done": "t--done", "active": "t--active",
               "blocked": "t--blocked", "todo": "t--todo"}
-TASK_MARK = {"done": "&#10003;", "active": "&#9679;", "blocked": "!", "todo": ""}
+# "todo" had no glyph at all, so its state was carried by nothing a screen
+# reader could reach. Every state now has a mark and a spoken label.
+TASK_MARK = {"done": "&#10003;", "active": None, "blocked": "!", "todo": "&#183;"}
+
+
+def taskmark(state):
+    """The glyph, plus the state in words for anyone not seeing the colour."""
+    glyph = TASK_MARK.get(state, "&#183;")
+    label = TASK.get(state, (state, ""))[0]
+    return '<span class="tmark">%s<span class="sr-only">%s</span></span>' % (
+        dot() if glyph is None else glyph, e(label))
 
 
 def tasklist(p):
@@ -209,9 +270,9 @@ def tasklist(p):
         return ""
     n_done = sum(1 for t in items if t.get("state") == "done")
     li = "".join(
-        '<li class="t %s"><span class="tmark">%s</span><span class="tname">%s</span>%s</li>' % (
+        '<li class="t %s">%s<span class="tname">%s</span>%s</li>' % (
             TASK_STATE.get(t.get("state", "todo"), "t--todo"),
-            TASK_MARK.get(t.get("state", "todo"), ""),
+            taskmark(t.get("state", "todo")),
             e(t.get("name", "")),
             '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
         for t in items)
@@ -222,24 +283,46 @@ def tasklist(p):
 def planlink(p):
     """A pointer to the executable plan, or an honest statement that none exists."""
     return ('<code class="planfile">%s</code>' % e(p["plan_file"])) if p.get("plan_file") \
-        else '<span class="pill s-gap">No plan written yet</span>'
+        else pill(PLAN, "none")
+
+
+def done_card(p):
+    """A finished plan, whichever shape it arrived in.
+
+    Items are MOVED from `now` to `done` rather than rewritten -- that is what
+    the skill tells the agent to do -- so a finished item routinely still
+    carries the active shape: `tasks` as a list, `plan_file` instead of `file`,
+    `status` instead of `outcome`. This function reads both, because the
+    alternative is what actually shipped: `str()` on a list of task dicts
+    printed roughly 1,100 characters of Python repr onto the page, while the
+    item's link and its whole explanation were silently dropped.
+    """
+    tasks = p.get("tasks")
+    # A list is rendered as the checklist, which carries its own count; a
+    # string is a hand-written summary like "4 tasks" and belongs in the meta.
+    meta = [str(p["period"])] if p.get("period") else []
+    if isinstance(tasks, str) and tasks:
+        meta.append(tasks)
+    body = tasklist(p) if isinstance(tasks, list) else ""
+    outcome = p.get("outcome") or p.get("status")
+    ref = p.get("file") or p.get("plan_file")
+    return (
+        '<li class="plan plan--done"><div class="planhead"><span class="planname">%s</span>'
+        '<span class="planmeta">%s</span></div>%s%s%s%s</li>' % (
+            e(p.get("name", "")), e(" · ".join(meta)),
+            '<p class="planout">%s</p>' % e(outcome) if outcome else "",
+            '<p class="plannote"><b>What it taught us:</b> %s</p>' % e(p["notable"])
+            if p.get("notable") else "",
+            '<code class="planfile">%s</code>' % e(ref) if ref else "",
+            body))
 
 
 def sec_done(d):
     items = (d.get("plans") or {}).get("done") or []
     if not items:
         return ""
-    li = "".join(
-        '<li class="plan plan--done"><div class="planhead"><span class="planname">%s</span>'
-        '<span class="planmeta">%s</span></div>%s%s%s</li>' % (
-            e(p.get("name", "")),
-            e(" · ".join(str(p[k]) for k in ("period", "tasks") if p.get(k))),
-            '<p class="planout">%s</p>' % e(p["outcome"]) if p.get("outcome") else "",
-            '<p class="plannote"><b>What it taught us:</b> %s</p>' % e(p["notable"])
-            if p.get("notable") else "",
-            '<code class="planfile">%s</code>' % e(p["file"]) if p.get("file") else "")
-        for p in items)
-    return h2(d, "done") + '<ul class="plans">%s</ul>' % li
+    return h2(d, "done") + '<ul class="plans">%s</ul>' % "".join(
+        done_card(p) for p in items)
 
 
 def sec_now(d):
@@ -247,9 +330,10 @@ def sec_now(d):
     if items is None:
         return ""
     li = "".join(
-        '<li class="plan plan--active"><div class="planhead"><span class="planname">%s</span>'
+        '<li class="plan plan--active"><div class="planhead">%s'
+        '<span class="sr-only">Active now: </span><span class="planname">%s</span>'
         '%s%s%s%s</div>%s</li>' % (
-            e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
+            dot(), e(p.get("name", "")), stagechip(d, p), capchip(d, p), planlink(p),
             '<span class="planmeta">updated %s</span>' % e(p["updated"]) if p.get("updated") else "",
             ('<p class="planout">%s</p>' % e(p["status"]) if p.get("status") else "")
             + tasklist(p))
@@ -297,11 +381,14 @@ def sec_edge_cases(d):
     if not items:
         return ""
     li = "".join(
+        # `.surface` rather than `.trigger`: the parked list uses `.trigger` for
+        # WHEN a question must be answered, and rendering WHICH PART OF THE
+        # SYSTEM identically in the same slot teaches a reader the wrong thing.
         '<li class="edge edge--%s"><div class="pk"><code>%s</code>'
-        '<span class="trigger">%s</span><span class="edgestate">%s</span></div>'
+        '<span class="surface">%s</span><span class="edgestate">%s</span></div>'
         '<p class="pq">%s</p>%s</li>' % (
             e(c.get("status", "open")), e(c.get("id", "")), e(c.get("surface", "")),
-            e(c.get("status", "open")), e(c.get("case", "")),
+            pill(EDGE, c.get("status", "open")), e(c.get("case", "")),
             '<p class="pn">%s</p>' % e(c["mitigation"]) if c.get("mitigation") else "")
         for c in items)
     return h2(d, "edge_cases") + '<ul class="parked">%s</ul>' % li
@@ -312,15 +399,83 @@ def sec_invariants(d):
     if not items:
         return ""
     li = "".join(
+        # An invariant that is not holding must not render in the same green as
+        # one that is -- a green "at risk" is a quiet lie. Nor may "at risk" and
+        # "broken" render identically, which is the quieter version of the same
+        # lie: they call for different responses. Three states, three pills, in
+        # the same shape as every other status on the page.
         '<li class="inv"><span class="invrule">%s</span>'
-        '<span class="invstate inv--%s">%s</span><span class="invdetail">%s</span></li>' % (
-            e(i.get("rule", "")),
-            # An invariant that is not holding must not render in the same green
-            # as one that is. A green "at risk" is a quiet lie.
-            "ok" if i.get("state") == "holding" else "warn",
-            e(i.get("state", "")), e(i.get("detail", "")))
+        '<span class="invstate">%s</span><span class="invdetail">%s</span></li>' % (
+            e(i.get("rule", "")), pill(INV, i.get("state", "")),
+            e(i.get("detail", "")))
         for i in items)
     return h2(d, "invariants") + '<ul class="invs">%s</ul>' % li
+
+
+def sec_legend(d):
+    """The key. Generated from the same maps the page renders from.
+
+    Nine separate status vocabularies were being painted with nothing on the
+    page declaring any of them, and a reader had to reverse-engineer all nine.
+    That absence is also what let them drift into each other: the same red meant
+    "no plan", "open hazard", "broken invariant" AND "this is queued next".
+
+    Only families the plan actually uses appear, so a project with no edge cases
+    gets no edge-case key, and a key never promises something the page has not
+    shown. Because the samples are produced by the same functions the sections
+    use, a marker cannot render one way here and another way there.
+    """
+    plans = d.get("plans") or {}
+    fams = []
+
+    if d.get("capabilities"):
+        fams.append(("Built", "how far a capability has actually got",
+                     [pill(BUILD, k) for k in ("done", "active", "partial", "not-started")]))
+        fams.append(("Planned", "whether a written plan covers that capability",
+                     [pill(PLAN, k) for k in ("planned", "partial", "none")]))
+
+    stages = (d.get("cycle") or L.DEFAULT_CYCLE).get("stages") or []
+    if stages and (plans.get("now") or plans.get("next")):
+        fams.append(("Stage", "where a piece of work has got to in the cycle",
+                     [stagechip(d, {"stage": st.get("id")}) for st in stages]))
+
+    if any(isinstance(p.get("tasks"), list) and p["tasks"]
+           for key in ("now", "next", "done") for p in (plans.get(key) or [])):
+        fams.append(("Step", "one line of a plan's checklist",
+                     ['<span class="lgtask">%s<span class="lgtxt">%s</span></span>'
+                      % (taskmark(k), e(TASK[k][0])) for k in TASK]))
+
+    if plans.get("now") is not None or plans.get("next") or plans.get("done"):
+        fams.append(("Card", "the colour down the left edge of a plan",
+                     ['<span class="lgcard %s">%s</span>' % (cls, e(lbl))
+                      for cls, lbl in CARD]))
+
+    if d.get("capabilities") and any(
+            p.get("capability") is not None
+            for key in ("now", "next") for p in (plans.get(key) or [])):
+        fams.append(("Serves", "which capability a piece of work is for",
+                     ['<span class="capref">%s %s</span>' % (
+                         e(d["capabilities"][0].get("id", "")),
+                         e(d["capabilities"][0].get("name", "")))]))
+
+    if d.get("edge_cases"):
+        fams.append(("Hazard", "a risk found along the way",
+                     [pill(EDGE, k) for k in EDGE]))
+
+    if d.get("invariants"):
+        fams.append(("Invariant", "something that must stay true",
+                     [pill(INV, k) for k in INV]))
+
+    if not fams:
+        return ""
+    rows = "".join(
+        '<div class="lgfam"><b>%s</b><span class="lghint">%s</span>'
+        '<div class="lgrow">%s</div></div>' % (e(name), e(hint), "".join(samples))
+        for name, hint, samples in fams)
+    return h2(d, "legend") + (
+        '<div class="legend"><p class="lgnote">A pulsing dot marks the one thing being '
+        'worked on right now. Amber means unfinished or needing attention, green means '
+        'settled, red means a gap or a hazard, and grey means untouched.</p>%s</div>' % rows)
 
 
 def sec_glossary(d):
@@ -473,7 +628,37 @@ CSS = """
   .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;
     white-space:nowrap;border:1px solid currentColor}
   .s-done{color:var(--done)}.s-active{color:var(--active)}.s-partial{color:var(--partial)}
-  .s-gap{color:var(--gap)}.s-none{color:var(--muted)}
+  .s-gap{color:var(--gap)}.s-none{color:var(--muted)}.s-plan{color:var(--accent)}
+  .pill .dot,.stage .dot{margin-right:5px}
+  /* The one "happening right now" marker, used everywhere the page means it:
+     the active plan card, an active step, the `building` stage chip and the
+     "In progress" build pill. Never the only cue -- a label always sits beside
+     it, and where it replaces a glyph the state is also spoken. */
+  .dot{position:relative;display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--active);flex:none;vertical-align:middle}
+  .dot::after{content:"";position:absolute;inset:0;border-radius:50%;
+    background:var(--active);opacity:.5;
+    animation:pl-pulse 2.2s cubic-bezier(.22,.61,.36,1) infinite}
+  @keyframes pl-pulse{0%{transform:scale(1);opacity:.5}
+    70%{transform:scale(2.9);opacity:0}100%{transform:scale(2.9);opacity:0}}
+  /* Reduced motion keeps the dot and its colour and drops only the ring, so no
+     information is carried by the animation alone. */
+  @media(prefers-reduced-motion:reduce){.dot::after{animation:none;opacity:0}}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .legend{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px 16px}
+  .lgnote{margin:0 0 12px;font-size:12.5px;color:var(--ink-2)}
+  .legend>.lgfam{display:grid;grid-template-columns:88px minmax(0,254px) 1fr;gap:3px 16px;
+    align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+  .lgfam>b{font-size:12.5px}
+  .lghint{font-size:12px;color:var(--muted)}
+  .lgrow{display:flex;flex-wrap:wrap;gap:7px 12px;align-items:center}
+  .lgtask{display:inline-flex;align-items:center;gap:5px}
+  .lgtask .tmark{width:auto;font-weight:700;font-size:11px}
+  .lgtxt{font-size:11.5px;color:var(--ink-2)}
+  .lgcard{font-size:11.5px;color:var(--ink-2);padding-left:8px;
+    border-left:3px solid var(--muted)}
   .cyintro{margin:0 0 12px;font-size:13px;color:var(--ink-2)}
   .cycle{list-style:none;margin:0;padding:0;display:grid;
     grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
@@ -502,10 +687,13 @@ CSS = """
   ul.plans{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
   .plan{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:14px 16px;border-left:3px solid var(--muted)}
-  .plan--done{border-left-color:var(--done)}
-  .plan--active{border-left-color:var(--active)}
-  .plan--next{border-left-color:var(--gap)}
-  .plan--idle{border-left-color:var(--line)}
+  .plan--done,.lgcard.plan--done{border-left-color:var(--done)}
+  .plan--active,.lgcard.plan--active{border-left-color:var(--active)}
+  /* Not red. Red is reserved for a gap or a hazard; work that is agreed and
+     queued is neither, and eleven red-edged cards under a heading called
+     "Next" read as eleven problems. */
+  .plan--next,.lgcard.plan--next{border-left-color:var(--partial)}
+  .plan--idle,.lgcard.plan--idle{border-left-color:var(--line)}
   .planhead{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
   .planname{font-weight:600;font-size:14px}
   .planmeta{font-size:11.5px;color:var(--muted);font-family:ui-monospace,monospace}
@@ -516,12 +704,18 @@ CSS = """
     margin-bottom:6px}
   ol.tlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;
     counter-reset:t}
-  .t{display:flex;align-items:baseline;gap:9px;font-size:12.5px;color:var(--ink-2)}
+  /* wrap, with a floor on both columns: without one the note takes the width it
+     wants and squeezes the task name into a three-line column, which is what
+     happens as soon as a checklist carries real evidence in its notes. */
+  .t{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 9px;font-size:12.5px;
+    color:var(--ink-2)}
   .t::before{counter-increment:t;content:counter(t);font-variant-numeric:tabular-nums;
     font-size:10.5px;color:var(--muted);min-width:13px}
-  .tmark{width:13px;flex:none;font-weight:700;font-size:11px}
-  .tname{flex:1 1 auto;min-width:0}
-  .tnote{font-size:11.5px;color:var(--muted)}
+  .tmark{width:13px;flex:none;font-weight:700;font-size:11px;
+    display:inline-flex;align-items:center}
+  .t--todo .tmark{color:var(--muted)}
+  .tname{flex:1 1 300px;min-width:0}
+  .tnote{flex:1 1 300px;min-width:0;font-size:11.5px;color:var(--muted)}
   .t--done .tmark{color:var(--done)}
   .t--done .tname{color:var(--muted);text-decoration:line-through;
     text-decoration-color:var(--line)}
@@ -540,19 +734,16 @@ CSS = """
   .trigger{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .pq{margin:5px 0 0;font-size:13.5px;font-weight:500}
   .pn{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
-  .edgestate{font-size:10px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.06em;margin-left:auto}
-  .edge--open .edgestate{color:var(--gap)}
-  .edge--mitigated .edgestate{color:var(--done)}
-  .edge--accepted .edgestate{color:var(--muted)}
+  .edgestate{margin-left:auto}
+  /* The area of the system a hazard belongs to. Deliberately not `.trigger`:
+     that slot means "when this must be answered" in the parked list. */
+  .surface{font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-2);background:var(--ground);border-radius:4px;padding:1px 7px}
   ul.invs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
   .inv{display:grid;grid-template-columns:250px 78px 1fr;gap:12px;align-items:baseline;
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:11px 15px}
   .invrule{font-size:13px;font-weight:600}
-  .invstate{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-  .inv--ok{color:var(--done)}
-  .inv--warn{color:var(--gap)}
   .invdetail{font-size:12.5px;color:var(--muted)}
   .gloss{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px;margin:0}
   .gterm dt{font-size:12.5px;font-weight:600;color:var(--accent)}
@@ -563,7 +754,8 @@ CSS = """
   footer li{margin-bottom:3px}
   .clmore{list-style:none;margin-left:-17px;font-style:italic}
   @media(max-width:760px){.metrics{margin-left:0;width:100%}
-    .inv{grid-template-columns:1fr;gap:3px}}
+    .inv{grid-template-columns:1fr;gap:3px}
+    .legend>.lgfam{grid-template-columns:1fr;align-items:start}}
 """
 
 
@@ -579,6 +771,9 @@ def build(d, root, fp):
         sec_orientation(d),
         sec_contract(d),
         sec_northstar(d),
+        # The key comes before the first section that uses it. A reader meeting
+        # an amber chip on the active item should already know what amber means.
+        sec_legend(d),
         sec_now(d),
         figures_html,
         sec_systems(d),

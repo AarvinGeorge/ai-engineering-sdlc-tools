@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.10.0 — 2026-09-03
+
+**One vocabulary, declared once — and a raw Python repr taken off the page.**
+
+The page was painting nine separate status vocabularies and explaining none of
+them, so a reader had to reverse-engineer all nine. That absence is also how
+they drifted into each other, one section at a time.
+
+- **The page now prints a key**, generated from the same tables the sections
+  render from. A marker cannot appear on the page without appearing in the key,
+  and cannot mean one thing in a table and another in a card. Only the families
+  a plan actually uses appear, so a project with no edge cases gets no
+  edge-case row. A test asserts the coverage and was proven able to fail by
+  planting a state the key does not list.
+- **Three invariant states now render three ways.** `holding`, `at risk` and
+  `broken` had two renderings between them: anything that was not holding was
+  painted the same red. "At risk" and "broken" call for different responses.
+- **`Planned` is no longer the same green as `Done`.** It takes the accent
+  colour, which is already the colour of the `planned` stage chip — so
+  "planned" is one colour everywhere on the page.
+- **"Next" cards are no longer red.** Red is a gap or a hazard. Eleven
+  red-edged cards under a heading called "Next" read as eleven problems; they
+  are now the neutral in-between colour.
+- **One label per state.** The capabilities table said "No plan" and the plan
+  cards said "No plan written yet" for the same thing.
+- **Edge-case and invariant states are pills**, like every other status on the
+  page, and Title-case like every other label. An edge case's *surface* stopped
+  borrowing `.trigger`, which means "when this must be answered" in the parked
+  list — the same rendering in the same slot for two unrelated things.
+
+**A pulsing dot marks work in flight** — the active plan card, an active step,
+the `building` stage chip and the `In progress` build pill, and nowhere else. A
+soft radial ring over 2.2s, one accent colour, no bounce. It is never the only
+cue: a text label always sits beside it, and where it replaces a glyph the state
+is also spoken, so the four step states are all reachable without seeing colour.
+`prefers-reduced-motion` keeps the dot and its colour and drops only the ring.
+
+**`sec_done` printed a Python repr on the page.** Items are MOVED from `now` to
+`done` rather than rewritten — which is what the skill tells the agent to do —
+so a finished item routinely still carries the active shape. `str()` on a list
+of task dicts put roughly 1,100 characters of `[{'name': ..., 'state': ...}]`
+onto a real page, while the same shape mismatch silently dropped the item's link
+(`plan_file`, not `file`) and its entire explanation (`status`, not `outcome`).
+All three shapes are now read. The original shape renders exactly as before.
+
+Also: a checklist row wraps with a floor on both columns. Without one, a note
+carrying real evidence took the width it wanted and squeezed the task name into
+a three-line column.
+
+No new palette tokens, so the WCAG AA contrast tests still cover everything the
+page paints. No plan-file schema change: a plan with no `tasks`, `edge_cases`,
+`invariants` or `figures` renders as it did before.
+
 ## 0.9.2 — 2026-08-17
 
 **Packaging caught up with the code.** Six releases shipped in a week and the

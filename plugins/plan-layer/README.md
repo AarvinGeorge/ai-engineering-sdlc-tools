@@ -42,7 +42,11 @@ your-project/
   it locally, host it anywhere, or publish it so the human can read it without a terminal.
   It carries a fingerprint of the JSON, so a stale page says so instead of quietly showing
   old data. Light and dark both meet **WCAG AA** on every text token, asserted by a test
-  rather than judged by eye.
+  rather than judged by eye. It opens with a **key** listing every status label it uses,
+  generated from the same tables the sections render from — so a marker cannot appear on the
+  page without appearing in the key, and cannot mean one thing in a table and another in a
+  card. A pulsing dot marks whatever is in progress right now, and stops pulsing (keeping its
+  colour) when the reader prefers reduced motion.
 
 ## The cycle
 
