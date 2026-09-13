@@ -141,6 +141,31 @@ unstarted at the bottom of the queue.
 - **Drifts** when every unfinished task on an active item is blocked — that item is waiting, not
   active.
 
+## The conventions the page depends on
+
+Three of them, each now checked, because each is what lets a reader answer a question in one
+glance rather than by comparing candidates.
+
+**One item under Active at a time**, with its checklist. A second one **fails** unless the
+plan declares `meta.allow_multiple_active: true`.
+
+**A finished item is moved to `done` and gains a `period` and an `outcome`.** Moved, not
+rewritten: the page reads a carried-over `status` in the outcome slot and `plan_file` in the
+`file` slot, so nothing is lost on the way across. A finished plan missing either **drifts**.
+
+**Long sections get archived, not truncated.** Keep the recent entries in full, condense the
+rest to a line each, move their full text to a markdown file beside `plan.json`, and say so
+in that section's heading hint. Headings are data:
+
+```json
+"headings": {
+  "done": ["Plans completed", "the six most recent in full; the older ones are in plan/completed_archive.md"]
+}
+```
+
+A reader then knows the history exists and where it went, and the page carries state rather
+than an archive.
+
 ## The gate
 
 ```bash
@@ -150,11 +175,12 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py"
 Two kinds of finding, kept separate on purpose:
 
 - **FAIL** — structural. A capability claiming progress with no evidence. An item past
-  *planned* with no plan document. An invariant in an unknown state. The page out of sync
-  with the JSON. Exit code 1.
+  *planned* with no plan document. A second item under Active. An invariant in an unknown
+  state. A parked question with no trigger. The page out of sync with the JSON. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched. The last substantive commit newer than the plan's timestamp. A plan nobody has
-  touched in a fortnight. Exit 0 unless `--strict`.
+  touched in a fortnight. A finished plan with no period or no outcome. A legacy
+  `meta.version` disagreeing with `plan_version`. Exit 0 unless `--strict`.
 
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays a human and agent job.
@@ -239,6 +265,24 @@ work in light and dark automatically.
 The renderer picks the module up automatically, and skips the section if it is missing or
 raises — a broken figure never costs you the page.
 
+Then look at what you drew:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"
+```
+
+It writes every figure to `plan/.figures/` as its own standalone page, screenshots each with
+whatever headless browser is on the machine, and **exits 1** on a label that crosses the right
+edge of the drawing or two labels printing over each other on one baseline. A label that may
+spill its own box is printed as a note rather than a failure, since a label deliberately placed
+beside a box trips the same estimate. Font sizes are read from the page's own stylesheet, so
+restyling a figure cannot leave the checker measuring a drawing nobody has. No browser found is
+not a failure: the geometry checks still run.
+
+Whether the figure tells the truth about the system is the part no script can do. Open the
+screenshots. Reasoning about coordinates is not looking, and both of the faults above have
+shipped in a figure that had already been read carefully.
+
 ## Facts quoted in more than one place
 
 Numbers that appear in both the prose and a figure belong in `facts`, once:
@@ -248,7 +292,8 @@ Numbers that appear in both the prose and a figure belong in `facts`, once:
 ```
 
 Figures receive the whole plan, so they read `data["facts"]` rather than restating the
-number. A figure that hardcodes a fact will eventually disagree with the table above it —
+number, and they take any status they show from the capability, invariant or item it belongs
+to rather than hardcoding it. A figure that hardcodes a fact will eventually disagree with the table above it —
 this removes the possibility rather than checking for it afterwards.
 
 ## Configuration

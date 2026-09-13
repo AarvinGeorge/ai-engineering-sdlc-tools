@@ -53,6 +53,55 @@ active for days while the thing it waits on sits unstarted at the bottom of the 
 now fails when an active item waits on something that is only queued, because one of the two is
 in the wrong place.
 
+## The conventions that keep it readable
+
+These are not style preferences. Each one is what a reader needs in order to answer a
+question in a single glance, and most are now checked.
+
+**One item in `plans.now` at a time.** Its `tasks` list is the visible checklist, and that
+pair answers "what is happening right now" without the reader choosing between candidates.
+The gate **fails** on a second active item. A project that genuinely runs several streams
+says so with `meta.allow_multiple_active: true` rather than by accident.
+
+**A finished item leaves `now` for `done`, and gains two fields.** A `period` saying when the
+work ran, and an `outcome` saying what it produced. Move the item rather than rewriting it;
+the page reads the carried-over `status` in the outcome slot and `plan_file` in the `file`
+slot, so nothing is lost on the way. Both missing fields **drift**.
+
+**Archive rather than accumulate.** When completed plans or closed edge cases get long, keep
+the recent ones in full, condense the rest to a line each, and move their full text to a
+sibling markdown file next to `plan.json`. Say where it went in that section's heading hint,
+so a reader who wants the history knows it exists:
+
+```json
+"headings": {
+  "done": ["Plans completed", "the six most recent in full; the older ones are in plan/completed_archive.md"]
+}
+```
+
+**Section headings are data.** `meta.headings` overrides any section's title and hint. The
+hint is the right place to say what a section is carrying today, which is how a long page
+stays honest about what it is showing and what it is holding back.
+
+**Figures derive everything from the plan.** Numbers come from `facts`, and a status shown in
+a drawing comes from the capability, invariant or item it describes. A figure that hardcodes
+either will disagree with the table above it, and the drawing is the half nobody re-reads.
+
+**Look at a figure you changed.**
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"
+```
+
+It writes each figure to `plan/.figures/` as its own page and screenshots it, and **fails** on
+a label that crosses the right edge or two labels printing over each other. Then open the
+screenshots and read them. Reasoning about coordinates is not looking, and both of those
+faults have shipped in a figure that had already been read carefully.
+
+**The page prints a key.** Every status label on it is generated from the same tables the
+sections render from, so a marker cannot appear in one place and mean something else in
+another. Nothing to maintain; worth knowing it is there before inventing a new vocabulary.
+
 ## Who the page is for
 
 **A person who has never seen the project, reading it cold, should understand what is
@@ -88,6 +137,7 @@ nothing installed.
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py"          # write the page
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" --check  # is the page stale?
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py"           # the gate
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"        # look at the figures
 ```
 
 ## init
@@ -152,11 +202,17 @@ it must be answered.
 `check.py` separates two kinds of problem:
 
 - **FAIL** — structural. A capability claiming progress with no evidence; an item past
-  `planned` with no `plan_file`; an invariant in an unknown state; the page out of sync with
-  the JSON; `plan_version` disagreeing with the newest changelog entry. Exit code 1.
+  `planned` with no `plan_file`; a task state outside the four; an invariant in an unknown
+  state; a parked question with no trigger; an `accepted` edge case with no reasoning; two
+  items claiming one plan document; duplicate capability ids; a second item in `plans.now`;
+  `meta.updated` in the future; the page out of sync with the JSON; `plan_version`
+  disagreeing with the newest changelog entry. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched; the last substantive commit newer than `meta.updated`; a plan older than
-  fourteen days. Exit 0 unless `--strict`.
+  fourteen days; a finished plan with no period or no outcome; `meta.version` disagreeing
+  with `plan_version`; an item naming no capability; assertions declared but never verified,
+  or verified over a week ago; a figure reading a fact the plan does not define; an active
+  item where every unfinished task is blocked. Exit 0 unless `--strict`.
 
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays with the `grounded` and `verified` stages.
