@@ -436,6 +436,15 @@ def run(root=None):
                           "either it is finished, or the task list is behind"
                           % (who, p.get("stage")))
 
+    # One thing in flight, with its own checklist, is what lets the page answer
+    # "what is happening right now" in a glance. A project that genuinely runs
+    # several streams says so in the file rather than by accident.
+    if len(plans.get("now", [])) > 1 and not d.get("meta", {}).get("allow_multiple_active"):
+        fails.append("plans.now holds more than one item (%s) — a reader cannot tell which "
+                     "one is the work. Move the others to plans.next, or set "
+                     "meta.allow_multiple_active" % ", ".join(
+                         repr(p.get("name")) for p in plans.get("now", [])))
+
     for p in plans.get("next", []):
         who = p.get("name") or "queued item"
         for field in ("name", "why", "unblocks"):
@@ -552,6 +561,29 @@ def run(root=None):
             drifts.append("invariant %r is %r, but its detail overlaps completed work (%s) — "
                           "check whether the reason still stands"
                           % (i.get("rule"), i.get("state"), ", ".join(sorted(shared)[:4])))
+
+    # A finished plan is the historical record, and an entry with no dates and
+    # no result is a name in a list. Both are drift rather than failure: an item
+    # is MOVED into done and condensed afterwards, so the gap is usually minutes
+    # old, and a hard failure there would block the very turn that moved it.
+    for p in plans.get("done", []):
+        who = p.get("name") or "a finished plan"
+        if not str(p.get("period") or "").strip():
+            drifts.append("finished plan %r has no period — an undated record cannot be "
+                          "read in order" % who)
+        # `status` is the field name an item arrives with; the page renders it in
+        # the same slot as `outcome`, so it counts.
+        if not str(p.get("outcome") or p.get("status") or "").strip():
+            drifts.append("finished plan %r says nothing about what it produced — add an "
+                          "outcome" % who)
+
+    # Two version fields that disagree mean one of them is wrong, and only one
+    # of them is read anywhere.
+    legacy = d.get("meta", {}).get("version")
+    if legacy and legacy != d.get("meta", {}).get("plan_version"):
+        drifts.append("meta.version is %s but plan_version is %s — meta.version is legacy and "
+                      "nothing reads it; delete it or keep the two the same"
+                      % (legacy, d.get("meta", {}).get("plan_version")))
 
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):

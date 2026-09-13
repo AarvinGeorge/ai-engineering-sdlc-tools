@@ -632,6 +632,93 @@ class TestStaleness(Base):
             self.assertNotIn(phrase, out)
 
 
+class TestOneThingAtATime(Base):
+    """The page answers "what is happening right now" in one glance, or it does not."""
+
+    def two_active(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [
+            {"name": "First", "status": "going", "updated": "2026-01-01", "stage": "planned"},
+            {"name": "Second", "status": "also going", "updated": "2026-01-01",
+             "stage": "planned"},
+        ]
+        return d
+
+    def test_a_second_active_item_fails(self):
+        self.write(self.two_active())
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("more than one item", r.stdout)
+
+    def test_a_project_may_declare_that_it_runs_several(self):
+        d = self.two_active()
+        d["meta"]["allow_multiple_active"] = True
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotIn("more than one item", r.stdout)
+
+    def test_one_active_item_is_quiet(self):
+        d = self.make_plan()
+        d["plans"]["now"] = [{"name": "First", "status": "going",
+                              "updated": "2026-01-01", "stage": "planned"}]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertNotIn("more than one item", run("check.py", project=self.dir).stdout)
+
+
+class TestFinishedPlans(Base):
+    """A finished plan nobody can date or read the result of is a name in a list."""
+
+    def done_entry(self, **entry):
+        d = self.make_plan()
+        d["plans"]["done"] = [entry]
+        self.write(d)
+        run("render.py", project=self.dir)
+        return run("check.py", project=self.dir)
+
+    def test_a_finished_plan_with_no_period_drifts(self):
+        r = self.done_entry(name="Staging", outcome="It runs.")
+        self.assertEqual(r.returncode, 0, "an undated record is drift, not a failure")
+        self.assertIn("no period", r.stdout)
+
+    def test_a_finished_plan_with_no_outcome_drifts(self):
+        r = self.done_entry(name="Staging", period="28 Jul to 2 Aug")
+        self.assertIn("says nothing about what it produced", r.stdout)
+
+    def test_a_carried_over_status_counts_as_the_outcome(self):
+        """Items are moved rather than rewritten, so the active field name
+        arrives with them and the page already reads it in that slot."""
+        r = self.done_entry(name="Staging", period="28 Jul to 2 Aug",
+                            status="Container answers on 18889.")
+        self.assertNotIn("says nothing about what it produced", r.stdout)
+
+    def test_a_complete_entry_is_quiet(self):
+        r = self.done_entry(name="Staging", period="28 Jul to 2 Aug", outcome="It runs.")
+        self.assertNotIn("no period", r.stdout)
+        self.assertNotIn("says nothing about what it produced", r.stdout)
+
+
+class TestTwoVersionFields(Base):
+    def test_a_legacy_version_that_disagrees_drifts(self):
+        d = self.make_plan()
+        d["meta"]["version"] = "0.0.9"
+        self.write(d)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 0, "a legacy field is drift, not a failure")
+        self.assertIn("meta.version", r.stdout)
+
+    def test_a_legacy_version_that_agrees_is_quiet(self):
+        d = self.make_plan()
+        d["meta"]["version"] = d["meta"]["plan_version"]
+        self.write(d)
+        run("render.py", project=self.dir)
+        self.assertNotIn("meta.version", run("check.py", project=self.dir).stdout)
+
+
 class TestDependencies(Base):
     """"This waits on that" has to be data. Written only in prose, nothing can check it —
     which is how an item stayed active for three days while its blocker sat unstarted."""
