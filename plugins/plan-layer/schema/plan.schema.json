@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/AarvinGeorge/ai-engineering-sdlc-tools/plan-layer/plan.schema.json",
   "title": "plan-layer plan file",
-  "description": "Shared state between a human developer and a coding agent. Every section is optional: the page renders only what is present, so a project can start with `plans` alone and grow into the rest.",
+  "description": "Shared state between a human developer and a coding agent. Every section is optional: the page renders only what is present, so a project can start with `plans` alone and grow into the rest. Fields not listed here are preserved in the file and ignored by the renderer and the gate, so a project can carry its own notes; a field that renders nowhere is still a field nobody reads.",
   "type": "object",
   "properties": {
     "meta": {
@@ -16,14 +16,15 @@
         },
         "plan_version": {
           "type": "string",
-          "description": "Bumped whenever the plan changes materially. Must match the newest changelog entry."
+          "description": "Bumped whenever the plan changes materially. Must match the newest changelog entry, and the gate fails when it does not. This is the version field; see `version` for the legacy duplicate."
         },
         "updated": {
           "type": "string",
           "description": "ISO-8601 UTC. Read from a clock, never from memory."
         },
         "north_star": {
-          "type": "string"
+          "type": "string",
+          "description": "The goal the whole plan serves, rendered above the key. One sentence, changed rarely and deliberately."
         },
         "north_star_owner": {
           "type": "string",
@@ -31,7 +32,7 @@
         },
         "headings": {
           "type": "object",
-          "description": "Override any section heading: { \"systems\": [\"Environments\", \"hint text\"] }",
+          "description": "Override any section heading and its hint text: { \"systems\": [\"Environments\", \"hint text\"] }. Keys are the section names the renderer uses: legend, figures, systems, capabilities, cycle, now, done, next, parked, edge_cases, invariants, glossary. The hint is the natural place to say what a section is carrying today, including a pointer to an archive file for the entries that were moved out of it.",
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -62,12 +63,28 @@
               "note"
             ]
           }
+        },
+        "version": {
+          "type": "string",
+          "description": "LEGACY. An older name for the same number, kept because early plans wrote both. Nothing reads it. If it is present the gate drifts when it disagrees with plan_version, because two versions that differ mean one of them is wrong. Prefer plan_version alone."
+        },
+        "north_star_frozen": {
+          "type": "boolean",
+          "description": "A marker for readers of the file. Nothing reads it: the lock shown on the page comes from north_star_owner being present, not from this flag."
+        },
+        "assertions_verified": {
+          "type": "string",
+          "description": "ISO-8601 UTC stamp of the last `check.py --verify` run, written by hand after running it. Assertions declared but never recorded as run drift, and so does a stamp older than seven days, because a verified page that was verified a month ago is a claim about the past."
+        },
+        "allow_multiple_active": {
+          "type": "boolean",
+          "description": "Set true to allow more than one item in plans.now. The gate fails on a second active item otherwise: one thing in flight with its own checklist is what makes the page answer 'what is happening right now' in one glance."
         }
       }
     },
     "contract": {
       "type": "object",
-      "description": "The obligation each side accepts. Stating it in the data beats a convention someone has to remember.",
+      "description": "The obligation each side accepts. Stating it in the data beats a convention someone has to remember. Any key starting with `for_` is rendered, with a label derived from the name, so a project can address a named person as well as the agent and the human.",
       "properties": {
         "for_agent": {
           "type": "string"
@@ -80,6 +97,11 @@
           "items": {
             "type": "object"
           }
+        }
+      },
+      "patternProperties": {
+        "^for_[a-z0-9_]+$": {
+          "type": "string"
         }
       }
     },
@@ -136,6 +158,17 @@
             ]
           }
         }
+      }
+    },
+    "facts": {
+      "type": "object",
+      "description": "Numbers quoted in more than one place, written once. Figures receive the whole plan and read data[\"facts\"] instead of restating a value that also appears in the prose, so a picture cannot disagree with the table above it. The gate drifts when a figure asks for a fact that is not here, because the figure would draw a question mark that nobody re-reads.",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer",
+          "number"
+        ]
       }
     },
     "systems": {
@@ -215,6 +248,10 @@
           "evidence": {
             "type": "string",
             "description": "Required once build is anything but not-started. Progress claimed without evidence is the shape of a comfortable lie."
+          },
+          "short": {
+            "type": "string",
+            "description": "A shorter label for figures. A name that reads well in a table row overflows a diagram box, and abbreviating inside the renderer is the renderer guessing at wording it does not own."
           }
         },
         "required": [
@@ -229,8 +266,68 @@
       "properties": {
         "done": {
           "type": "array",
+          "description": "Finished plans, oldest first. Two shapes are read, because an item is MOVED here rather than rewritten and is usually condensed later: the carried-over active shape (status, plan_file, tasks as a list) and the condensed archive shape (outcome, file, period, tasks as a summary string). The page prefers outcome over status and file over plan_file, so both render. Condense old entries into the archive shape and keep their full text in a sibling markdown file, named in the section's heading hint.",
           "items": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "period": {
+                "type": "string",
+                "description": "When the work ran, for example \"28 Jul to 2 Aug\". The gate drifts when a finished plan has none, because an undated record cannot be read in order."
+              },
+              "outcome": {
+                "type": "string",
+                "description": "What it produced, in one or two sentences. `status` is read in its place when the item still carries the active shape."
+              },
+              "file": {
+                "type": "string",
+                "description": "The plan document. `plan_file` is read in its place."
+              },
+              "notable": {
+                "type": "string",
+                "description": "What it taught us. Rendered under its own label, because the lesson outlives the task."
+              },
+              "tasks": {
+                "type": [
+                  "array",
+                  "string"
+                ],
+                "description": "The checklist as it stood, or a summary string like \"11 tasks\" once condensed."
+              },
+              "capability": {
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "description": "Which capability it served. A capability with finished work filed against it cannot read as not-started."
+              },
+              "status": {
+                "type": "string"
+              },
+              "plan_file": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stage": {
+                "type": "string"
+              },
+              "updated": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              },
+              "unblocks": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
           }
         },
         "now": {
@@ -242,7 +339,8 @@
                 "type": "string"
               },
               "status": {
-                "type": "string"
+                "type": "string",
+                "description": "Where the work actually stands, in prose. The page shows this under the item's name; the checklist shows the shape."
               },
               "updated": {
                 "type": "string"
@@ -297,6 +395,14 @@
                   "type": "string"
                 },
                 "description": "Names of other plan items this one waits on. Written here rather than in prose, because a dependency described only in a document cannot be checked — and that is how an item stayed active while its blocker sat unstarted."
+              },
+              "why": {
+                "type": "string",
+                "description": "Why this work, now. Carried when the item is promoted from next."
+              },
+              "unblocks": {
+                "type": "string",
+                "description": "What finishing it makes possible."
               }
             },
             "required": [
@@ -371,6 +477,14 @@
                   "type": "string"
                 },
                 "description": "Names of other plan items this one waits on. Written here rather than in prose, because a dependency described only in a document cannot be checked — and that is how an item stayed active while its blocker sat unstarted."
+              },
+              "status": {
+                "type": "string",
+                "description": "Not rendered on a queued item; the page shows why and unblocks. Written here it is invisible."
+              },
+              "updated": {
+                "type": "string",
+                "description": "Not rendered on a queued item. Kept when an item is demoted from now."
               }
             },
             "required": [
@@ -493,16 +607,31 @@
         "type": "object",
         "properties": {
           "claim": {
-            "type": "string"
+            "type": "string",
+            "description": "The sentence on the page this command checks."
           },
           "run": {
-            "type": "string"
+            "type": "string",
+            "description": "Shell command. Keep it trivial and read from $PLAN_FACTS; match locally."
           },
           "expect": {
-            "type": "string"
+            "type": "string",
+            "description": "The exact stdout expected, or a regular expression when match is \"regex\"."
           },
           "refs": {
-            "type": "string"
+            "type": "string",
+            "description": "Where the claim appears, so a mismatch can be traced back to the sentence it disproves."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "regex"
+            ],
+            "description": "Set to \"regex\" to search `expect` in the output instead of comparing the whole string."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Seconds before the command is given up on. Default 60."
           }
         },
         "required": [
