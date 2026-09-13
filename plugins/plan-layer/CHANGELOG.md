@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.11.0 — 2026-09-13
+
+**The plugin catches up with the plan it renders.**
+
+The first real consumer had grown a shape the plugin never described, so a
+second project starting from `init` would have had to rediscover all of it.
+
+- **The schema documents every field that plan actually uses**: the top-level
+  `facts` block, `capabilities[].short`, the whole finished-plan shape
+  (`period`, `outcome`, `file`, `notable`, and `tasks` as a summary string once
+  condensed), arbitrary `for_` keys in the contract, the `assertions_verified`
+  stamp the gate reads, `assertions[].match` and `timeout`, and the legacy
+  `meta.version` duplicate. Two fields written on a queued item that render
+  nowhere are now named as such, so nobody assumes they appear.
+- **The template ships the sections a plan grows into**: north star and owner,
+  an empty `facts`, `systems`, `edge_cases` and `assertions`, and a `headings`
+  map. All empty or one placeholder line, and the gate stays green on it.
+- **The conventions are written down** in the skill and the README: one active
+  item at a time with its checklist, a finished item moved to `done` with a
+  period and an outcome, older entries archived to a sibling markdown file with
+  a pointer in the heading hint, headings as data, figures deriving everything
+  from the plan.
+- **The gate holds three of them.** A second item in `plans.now` **fails**
+  unless `meta.allow_multiple_active` says the project runs several streams on
+  purpose. A finished plan with no `period`, or with nothing recorded about
+  what it produced, **drifts**; a carried-over `status` counts as the outcome,
+  because the page already renders it in that slot. A `meta.version` that
+  disagrees with `plan_version` **drifts**, since one of the two is wrong and
+  only one is read.
+- **The figure check ships with the plugin.** `scripts/figcheck.py` extracts
+  every figure into its own page, screenshots it with whatever headless browser
+  is on the machine, and fails on a label crossing the right edge or two labels
+  printing over each other on one baseline. Font sizes are read from the page's
+  own stylesheet rather than carried in the checker, which is what makes it
+  generic. It had been living in the consumer's own repository for a week.
+- **The gate lists in both documents** were several releases behind what
+  `check.py` reports.
+
+Nothing in the renderer changed: the consumer's page re-renders byte for byte
+identical through 0.11.0.
+
 ## 0.10.0 — 2026-09-03
 
 **One vocabulary, declared once — and a raw Python repr taken off the page.**
