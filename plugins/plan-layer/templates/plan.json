@@ -4,6 +4,9 @@
     "subtitle": "One line on what this project is",
     "plan_version": "0.1.0",
     "updated": "REPLACE WITH ISO-8601 UTC READ FROM A CLOCK",
+    "north_star": "The outcome this whole plan serves. One sentence. Delete if you have none yet.",
+    "north_star_owner": "WHO MAY CHANGE IT. Naming an owner is what freezes it.",
+    "headings": {},
     "changelog": [
       { "version": "0.1.0", "date": "REPLACE", "note": "Plan created." }
     ]
@@ -18,10 +21,13 @@
     "shape": "How the work is organised.",
     "how_to_read": "Start with what is active now, then what is next."
   },
+  "facts": {},
+  "systems": [],
   "capabilities": [
     {
       "id": 1,
       "name": "First capability",
+      "short": "First",
       "what": "What it does, in one line.",
       "build": "not-started",
       "plan": "none",
@@ -44,5 +50,7 @@
   },
   "parked": [],
   "invariants": [],
+  "edge_cases": [],
+  "assertions": [],
   "glossary": []
 }
