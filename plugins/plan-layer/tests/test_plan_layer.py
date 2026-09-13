@@ -190,6 +190,70 @@ class TestFigures(Base):
         self.assertTrue(os.path.exists(os.path.join(self.dir, "plan", "index.html")))
 
 
+class TestFigCheck(Base):
+    """The two ways a figure goes wrong that are invisible in the source."""
+
+    def write_figures(self, svg, size="12.5"):
+        src = ('CSS = "\\n  .dg-lbl{font-size:%spx;fill:#000}\\n"\n'
+               'def build(data):\n'
+               '    return %%r\n' % size) % (
+            '<figure aria-label="a figure">%s</figure>' % svg)
+        with open(os.path.join(self.dir, "plan", "figures.py"), "w") as fh:
+            fh.write(src)
+
+    def figures(self, svg, size="12.5"):
+        self.make_plan()
+        self.write_figures(svg, size)
+        r = run("render.py", project=self.dir)
+        self.assertNotIn("failed to load", r.stdout, "the fixture is not valid Python")
+        self.assertIn("aria-label", self.page(), "the fixture figure never rendered")
+        return run("figcheck.py", "--no-shots", project=self.dir)
+
+    def test_a_clean_figure_passes(self):
+        r = self.figures('<svg viewBox="0 0 400 100">'
+                         '<rect x="10" y="10" width="300" height="40"/>'
+                         '<text x="20" y="35" class="dg-lbl" text-anchor="start">Short</text>'
+                         '</svg>')
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("1 figures checked, 0 problems", r.stdout)
+
+    def test_text_crossing_the_page_edge_fails(self):
+        r = self.figures('<svg viewBox="0 0 100 100">'
+                         '<text x="10" y="35" class="dg-lbl" text-anchor="start">'
+                         'a label far longer than this drawing is wide</text></svg>')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("crosses the page edge", r.stdout)
+
+    def test_two_labels_on_one_baseline_fail(self):
+        r = self.figures('<svg viewBox="0 0 400 100">'
+                         '<text x="20" y="35" class="dg-lbl" text-anchor="start">'
+                         'first label here</text>'
+                         '<text x="30" y="35" class="dg-lbl" text-anchor="start">'
+                         'second label</text></svg>')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("overlapping text", r.stdout)
+
+    def test_silent_where_there_is_no_plan(self):
+        r = run("figcheck.py", "--no-shots", project=self.dir)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("no plan", r.stdout)
+
+    def test_font_size_is_read_from_the_page_not_carried_in_the_checker(self):
+        """The same label passes at 12.5px and crosses the edge at 40px.
+
+        A checker holding its own copy of the sizes goes stale the first time a
+        figure is restyled, and then reports on a drawing nobody has.
+        """
+        svg = ('<svg viewBox="0 0 200 100"><text x="10" y="35" class="dg-lbl" '
+               'text-anchor="start">a modest label</text></svg>')
+        self.assertEqual(self.figures(svg).returncode, 0)
+        self.write_figures(svg, size="40")
+        run("render.py", project=self.dir)
+        r = run("figcheck.py", "--no-shots", project=self.dir)
+        self.assertEqual(r.returncode, 1, "the size change was not noticed")
+        self.assertIn("crosses the page edge", r.stdout)
+
+
 class TestGate(Base):
     def test_clean_plan_passes(self):
         self.make_plan()
