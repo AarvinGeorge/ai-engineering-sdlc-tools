@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.13.0 — 2026-09-14
+
+**How a step turned out, and a note that reads as points.**
+
+A checklist rendered as a table showed where each step sat in the run and not
+how it went, which is the thing a run exists to establish.
+
+- **A task may carry `result`**, free text. `pass`, `fail`, `covered` and
+  `blocked` are styled; any other word renders as written. Where any step in an
+  item carries one, the table gains a leading `Result` column, to the left of
+  the step, so the eye meets the outcome first.
+- **Each outcome carries a word and a mark**, never colour alone, so the four
+  stay separable on a phone and in either theme. Only `fail` is given a box: a
+  run is read to find what went wrong.
+- **The step keeps its own state marker.** Position in the run and outcome
+  answer different questions, and a step can be `done` and have failed.
+- **A note may be a list of strings**, rendered as bullets, in the table's
+  continuation row and in the plain checklist alike. A string renders exactly
+  the markup it always did, asserted by a test rather than trusted.
+- **The gate fails** on a result that is not a word, and on a note that is
+  neither prose nor a list of points. Both run on finished items too, because a
+  finished item keeps the checklist it was moved with.
+
 ## 0.12.0 — 2026-09-14
 
 **A checklist someone has to execute is a table, not prose.**
