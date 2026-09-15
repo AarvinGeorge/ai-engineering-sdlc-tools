@@ -74,7 +74,7 @@ def column_faults(who, p):
         if not label:
             out.append("%s has no label" % where)
         if key in RESERVED_TASK_KEYS:
-            out.append("%s uses %r, which is a reserved task key (%s) -- its value "
+            out.append("%s uses %r, which is a reserved task key (%s). Its value "
                        "would be read as the step's own %s"
                        % (where, key, ", ".join(RESERVED_TASK_KEYS), key))
         elif key in seen:
@@ -103,7 +103,7 @@ def empty_cells(who, p):
             continue
         missing = [k for k in keys if not str(t.get(k) or "").strip()]
         if missing:
-            out.append("%r: step %r leaves %s empty -- the step cannot be run "
+            out.append("%r: step %r leaves %s empty, so the step cannot be run "
                        "from the page"
                        % (who, t.get("name", "?"), ", ".join(repr(k) for k in missing)))
     return out

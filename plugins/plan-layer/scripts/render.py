@@ -264,7 +264,7 @@ def taskmark(state):
 
 # The three keys a task already owns. A declared column may not take one of
 # them, because the column value would then be read as the step's own name,
-# state or note -- the gate refuses the collision rather than letting the page
+# state or note. The gate refuses the collision rather than letting the page
 # quietly show the wrong thing.
 RESERVED_TASK_KEYS = ("name", "state", "note")
 
