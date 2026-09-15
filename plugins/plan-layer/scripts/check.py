@@ -39,9 +39,74 @@ VALID_BUILD = {"done", "active", "partial", "not-started"}
 VALID_PLAN = {"planned", "partial", "none"}
 VALID_INV = {"holding", "at risk", "broken"}
 VALID_TASK = {"done", "active", "todo", "blocked"}
+# The keys a task already owns. A declared column may not take one of them:
+# the column value would land on the step's own name, state or note.
+RESERVED_TASK_KEYS = ("name", "state", "note")
 
 
 
+
+
+
+def column_faults(who, p):
+    """A malformed `task_columns` block, in words.
+
+    A checklist rendered as a table is only readable if the columns are, so a
+    declaration that cannot produce a table is a hard failure rather than a
+    silently narrower table.
+    """
+    cols = p.get("task_columns")
+    if cols is None:
+        return []
+    out = []
+    if not isinstance(cols, list):
+        return ["%r: task_columns must be a list of {key, label}, not %s"
+                % (who, type(cols).__name__)]
+    seen = set()
+    for i, c in enumerate(cols, 1):
+        where = "%r: task_columns[%d]" % (who, i)
+        if not isinstance(c, dict):
+            out.append("%s is not an object with key and label" % where)
+            continue
+        key, label = c.get("key"), c.get("label")
+        if not key:
+            out.append("%s has no key" % where)
+        if not label:
+            out.append("%s has no label" % where)
+        if key in RESERVED_TASK_KEYS:
+            out.append("%s uses %r, which is a reserved task key (%s) -- its value "
+                       "would be read as the step's own %s"
+                       % (where, key, ", ".join(RESERVED_TASK_KEYS), key))
+        elif key in seen:
+            out.append("%s repeats the duplicate key %r" % (where, key))
+        if key:
+            seen.add(key)
+    return out
+
+
+def empty_cells(who, p):
+    """Declared columns an unfinished step never filled in.
+
+    The columns exist so somebody can execute the step from the page. A blank
+    cell on a step still to run means the page cannot be worked from, which is
+    the whole reason for declaring them. A finished step is exempt: once it has
+    passed, its instructions are history.
+    """
+    cols = p.get("task_columns")
+    if not isinstance(cols, list):
+        return []
+    keys = [c.get("key") for c in cols
+            if isinstance(c, dict) and c.get("key") and c.get("key") not in RESERVED_TASK_KEYS]
+    out = []
+    for t in p.get("tasks") or []:
+        if t.get("state") not in ("active", "todo"):
+            continue
+        missing = [k for k in keys if not str(t.get(k) or "").strip()]
+        if missing:
+            out.append("%r: step %r leaves %s empty -- the step cannot be run "
+                       "from the page"
+                       % (who, t.get("name", "?"), ", ".join(repr(k) for k in missing)))
+    return out
 
 
 def parse_iso(s):
@@ -430,6 +495,8 @@ def run(root=None):
                 fails.append("active item %r: task %r has state=%r, not one of %s"
                              % (who, t.get("name", "?"), t.get("state"),
                                 ", ".join(sorted(VALID_TASK))))
+        fails.extend(column_faults(who, p))
+        drifts.extend(empty_cells(who, p))
         if tasks and all(t.get("state") == "done" for t in tasks) \
                 and p.get("stage") not in {"verified", "recorded"}:
             drifts.append("active item %r has every task done but sits at stage %r — "
@@ -452,6 +519,8 @@ def run(root=None):
                 fails.append("queued item %r: missing %s" % (who, field))
         if p.get("stage") not in stage_ids:
             fails.append("queued item %r: stage=%r is not a cycle stage" % (who, p.get("stage")))
+        fails.extend(column_faults(who, p))
+        drifts.extend(empty_cells(who, p))
 
     # A plan item may name the capability it serves. If it does, that capability
     # must exist -- a dangling reference is how the two halves of the page drift

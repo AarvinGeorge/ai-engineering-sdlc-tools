@@ -262,6 +262,66 @@ def taskmark(state):
         dot() if glyph is None else glyph, e(label))
 
 
+# The three keys a task already owns. A declared column may not take one of
+# them, because the column value would then be read as the step's own name,
+# state or note -- the gate refuses the collision rather than letting the page
+# quietly show the wrong thing.
+RESERVED_TASK_KEYS = ("name", "state", "note")
+
+
+def taskcolumns(p):
+    """The columns this item declares, or none.
+
+    Anything malformed is ignored here and reported by the gate. The renderer
+    never refuses to draw a page: a plan that will not render is a plan nobody
+    reads, and the failure is already visible where failures belong.
+    """
+    cols = p.get("task_columns")
+    if not isinstance(cols, list):
+        return []
+    out, seen = [], set()
+    for c in cols:
+        if not isinstance(c, dict):
+            continue
+        key, label = c.get("key"), c.get("label")
+        if not key or not label or key in RESERVED_TASK_KEYS or key in seen:
+            continue
+        seen.add(key)
+        out.append((key, label))
+    return out
+
+
+def tasktable(items, cols):
+    """A checklist someone has to EXECUTE, one row per step.
+
+    Five fields per step rendered as a name with a paragraph under it cannot be
+    scanned, and the person running a manual pass then abandons the page for the
+    plan document. The step column keeps the same mark, name and state colour
+    the list uses, so nothing about reading a state changes.
+    """
+    head = "".join("<th>%s</th>" % e(lbl) for _, lbl in cols)
+    rows = []
+    for i, t in enumerate(items, 1):
+        state = t.get("state", "todo")
+        cls = TASK_STATE.get(state, "t--todo")
+        cells = "".join("<td>%s</td>" % e(str(t[k])) if t.get(k) not in (None, "")
+                        else "<td></td>" for k, _ in cols)
+        rows.append(
+            '<tr class="t %s"><td class="tstep"><span class="tnum">%d</span>%s'
+            '<span class="tname">%s</span></td>%s</tr>' % (
+                cls, i, taskmark(state), e(t.get("name", "")), cells))
+        # The note is a full-width continuation of its own row rather than a
+        # column: it is usually the evidence a step passed, and it is longer
+        # than every other cell put together.
+        if t.get("note"):
+            rows.append('<tr class="tnoterow %s"><td colspan="%d">'
+                        '<span class="tnote">%s</span></td></tr>' % (
+                            cls, len(cols) + 1, e(t["note"])))
+    return ('<div class="tablewrap ttablewrap"><table class="ttable"><thead><tr>'
+            '<th>Step</th>%s</tr></thead><tbody>%s</tbody></table></div>' % (
+                head, "".join(rows)))
+
+
 def tasklist(p):
     """The plan's shape, inline. Without this the page names a file nobody
     reading it can open, which is worse than saying nothing."""
@@ -269,15 +329,19 @@ def tasklist(p):
     if not items:
         return ""
     n_done = sum(1 for t in items if t.get("state") == "done")
-    li = "".join(
-        '<li class="t %s">%s<span class="tname">%s</span>%s</li>' % (
-            TASK_STATE.get(t.get("state", "todo"), "t--todo"),
-            taskmark(t.get("state", "todo")),
-            e(t.get("name", "")),
-            '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
-        for t in items)
-    return ('<div class="tasks"><div class="tcount">%d of %d done</div>'
-            '<ol class="tlist">%s</ol></div>' % (n_done, len(items), li))
+    cols = taskcolumns(p)
+    if cols:
+        body = tasktable(items, cols)
+    else:
+        body = '<ol class="tlist">%s</ol>' % "".join(
+            '<li class="t %s">%s<span class="tname">%s</span>%s</li>' % (
+                TASK_STATE.get(t.get("state", "todo"), "t--todo"),
+                taskmark(t.get("state", "todo")),
+                e(t.get("name", "")),
+                '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
+            for t in items)
+    return ('<div class="tasks"><div class="tcount">%d of %d done</div>%s</div>'
+            % (n_done, len(items), body))
 
 
 def planlink(p):
@@ -724,6 +788,28 @@ CSS = """
   .t--blocked .tmark{color:var(--gap)}
   .t--blocked .tname{color:var(--gap)}
   .t--todo .tname{color:var(--ink-2)}
+  /* A checklist that someone has to execute, one row per step. It uses the
+     page's one wide-content pattern: the table scrolls inside its own box, so
+     the page body never scrolls sideways on a phone. `.t` is a flex row in the
+     list, which would collapse a table row, so the display is restored here
+     and the list's CSS counter is switched off in favour of a printed number. */
+  .ttablewrap{margin-top:2px}
+  table.ttable{min-width:760px}
+  .ttable th{padding:8px 11px}
+  .ttable td{padding:9px 11px;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
+  .ttable tr.t{display:table-row}
+  .ttable tr.t::before{content:none;counter-increment:none}
+  /* A floor under the step, so a long sentence in a later column cannot squeeze
+     the step name into a one-word column. */
+  .ttable .tstep{min-width:210px}
+  .ttable .tstep .tname{display:inline}
+  .ttable .tnum{font-variant-numeric:tabular-nums;font-size:10.5px;color:var(--muted);
+    margin-right:6px}
+  .ttable .tmark{margin-right:5px;vertical-align:baseline}
+  /* The note belongs to the row above it, so it carries no top border and the
+     two read as one block. */
+  .tnoterow td{padding-top:0}
+  .tnoterow .tnote{display:block}
   .plannote,.unblocks{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
   .plannote b,.unblocks b{color:var(--ink-2)}
   ul.parked{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}

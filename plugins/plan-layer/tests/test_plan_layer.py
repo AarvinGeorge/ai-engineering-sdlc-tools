@@ -9,6 +9,7 @@ that tested nothing, and losing a project's own contract keys.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -50,6 +51,11 @@ class Base(unittest.TestCase):
     def page(self):
         with open(os.path.join(self.dir, "plan", "index.html")) as fh:
             return fh.read()
+
+    def body(self):
+        """The page without its stylesheet. A test asking whether a class was
+        USED must not match the rule that merely defines it."""
+        return self.page().split('<div class="wrap"', 1)[-1]
 
     def write(self, d):
         with open(os.path.join(self.dir, "plan", "plan.json"), "w") as fh:
@@ -568,6 +574,180 @@ class TestTasks(Base):
         self.write(d)
         run("render.py", project=self.dir)
         self.assertNotIn('class="tasks"', self.page())
+
+
+class TestTaskColumns(Base):
+    """A checklist someone has to EXECUTE is not prose. Five steps with five
+    fields each, rendered as a name and a paragraph, cannot be scanned; the
+    person running a manual pass reads one row per step or gives up on the
+    page and works from the plan document instead."""
+
+    COLS = [{"key": "tests", "label": "What we are testing for"},
+            {"key": "from", "label": "From"},
+            {"key": "send", "label": "Send"},
+            {"key": "pass", "label": "Pass when"},
+            {"key": "how", "label": "How to do it"}]
+
+    def _with_columns(self, tasks, columns=None, stage="building"):
+        d = self.make_plan()
+        item = {"name": "Run the pass", "status": "under way", "updated": "2026-01-01",
+                "stage": stage, "plan_file": "p.md", "tasks": tasks}
+        if columns is not None:
+            item["task_columns"] = columns
+        d["plans"]["now"] = [item]
+        self.write(d)
+        return d
+
+    def _full_task(self, name="1 book two named people", state="active", **over):
+        t = {"name": name, "state": state, "tests": "guests resolve by name",
+             "from": "the developer seat", "send": "book a call with Alex and Priya",
+             "pass": "both guests on the event", "how": "reply in the same thread"}
+        t.update(over)
+        return t
+
+    def test_columns_render_as_a_table_with_the_declared_headers_in_order(self):
+        self._with_columns([self._full_task()], self.COLS)
+        run("render.py", project=self.dir)
+        page = self.page()
+        body = self.body()
+        self.assertIn("ttable", body)
+        heads = re.findall(r"<th>(.*?)</th>",
+                           body[body.index('<table class="ttable"'):])
+        self.assertEqual(heads[:6],
+                         ["Step", "What we are testing for", "From", "Send",
+                          "Pass when", "How to do it"])
+
+    def test_cells_land_in_their_declared_columns(self):
+        self._with_columns([self._full_task()], self.COLS)
+        run("render.py", project=self.dir)
+        page = self.body()
+        row = re.search(r'<tr class="t t--active">(.*?)</tr>', page, re.S).group(1)
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        self.assertEqual(len(cells), 6)
+        self.assertIn("book two named people", cells[0])
+        self.assertIn("guests resolve by name", cells[1])
+        self.assertIn("the developer seat", cells[2])
+        self.assertIn("book a call with Alex and Priya", cells[3])
+        self.assertIn("both guests on the event", cells[4])
+        self.assertIn("reply in the same thread", cells[5])
+
+    def test_a_missing_key_is_an_empty_cell_never_the_word_none(self):
+        t = self._full_task()
+        del t["how"]
+        self._with_columns([t], self.COLS)
+        run("render.py", project=self.dir)
+        row = re.search(r'<tr class="t t--active">(.*?)</tr>', self.body(), re.S).group(1)
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        self.assertEqual(cells[5].strip(), "")
+        self.assertNotIn("None", row)
+
+    def test_a_note_still_renders_under_its_row(self):
+        self._with_columns([self._full_task(note="PASS 13 Sep, the event carried both")],
+                           self.COLS)
+        run("render.py", project=self.dir)
+        page = self.body()
+        self.assertIn("PASS 13 Sep, the event carried both", page)
+        note_row = re.search(r'<tr class="tnoterow[^"]*">(.*?)</tr>', page, re.S).group(1)
+        self.assertIn('colspan="6"', note_row)
+        self.assertIn("PASS 13 Sep", note_row)
+        self.assertLess(page.index('class="t t--active"'), page.index("tnoterow"))
+
+    def test_the_done_count_survives(self):
+        self._with_columns([self._full_task(state="done"),
+                            self._full_task(name="2 move it", state="todo")], self.COLS)
+        run("render.py", project=self.dir)
+        self.assertIn("1 of 2 done", self.page())
+
+    def test_each_state_is_still_distinguishable(self):
+        self._with_columns([self._full_task(name="a", state="done"),
+                            self._full_task(name="b", state="active"),
+                            self._full_task(name="c", state="todo")], self.COLS)
+        run("render.py", project=self.dir)
+        page = self.body()
+        for cls in ("t--done", "t--active", "t--todo"):
+            self.assertIn('<tr class="t %s">' % cls, page)
+
+    def test_the_table_sits_in_a_container_that_scrolls_sideways(self):
+        self._with_columns([self._full_task()], self.COLS)
+        run("render.py", project=self.dir)
+        page = self.page()
+        self.assertRegex(self.body(), r'<div class="tablewrap[^"]*"><table class="ttable"')
+
+    def test_without_columns_the_checklist_is_the_list_it_has_always_been(self):
+        self._with_columns([{"name": "Alpha", "state": "done"},
+                            {"name": "Beta", "state": "todo", "note": "waiting"}])
+        run("render.py", project=self.dir)
+        body = self.body()
+        self.assertIn('<ol class="tlist">', body)
+        self.assertNotIn("ttable", body)
+        self.assertIn("waiting", body)
+
+    def test_the_no_columns_markup_is_exactly_what_it_always_was(self):
+        """Byte for byte, not merely similar. This capability is worth nothing
+        if it moves a single character of the checklist every other plan uses."""
+        self._with_columns([{"name": "Alpha", "state": "done", "note": "evidence"},
+                            {"name": "Beta", "state": "todo"}])
+        run("render.py", project=self.dir)
+        block = re.search(r'<div class="tasks">.*?</ol></div>', self.body(), re.S).group(0)
+        self.assertEqual(
+            block,
+            '<div class="tasks"><div class="tcount">1 of 2 done</div>'
+            '<ol class="tlist">'
+            '<li class="t t--done"><span class="tmark">&#10003;'
+            '<span class="sr-only">Done</span></span>'
+            '<span class="tname">Alpha</span><span class="tnote">evidence</span></li>'
+            '<li class="t t--todo"><span class="tmark">&#183;'
+            '<span class="sr-only">Not started</span></span>'
+            '<span class="tname">Beta</span></li></ol></div>')
+
+    def test_columns_that_are_not_a_list_fail(self):
+        self._with_columns([self._full_task()], {"key": "tests"})
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("task_columns", r.stdout)
+
+    def test_a_column_missing_key_or_label_fails(self):
+        for bad in ({"label": "No key"}, {"key": "nolabel"}):
+            self._with_columns([self._full_task()], [bad])
+            run("render.py", project=self.dir)
+            r = run("check.py", project=self.dir)
+            self.assertEqual(r.returncode, 1, bad)
+            self.assertIn("task_columns", r.stdout)
+
+    def test_a_duplicate_column_key_fails(self):
+        self._with_columns([self._full_task()],
+                           [{"key": "tests", "label": "One"}, {"key": "tests", "label": "Two"}])
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("duplicate", r.stdout)
+
+    def test_a_column_key_colliding_with_a_reserved_task_key_fails(self):
+        for key in ("name", "state", "note"):
+            self._with_columns([self._full_task()], [{"key": key, "label": "Clash"}])
+            run("render.py", project=self.dir)
+            r = run("check.py", project=self.dir)
+            self.assertEqual(r.returncode, 1, key)
+            self.assertIn(key, r.stdout)
+
+    def test_an_unfinished_step_missing_a_declared_column_drifts(self):
+        t = self._full_task(name="7 book two named people at once")
+        del t["pass"]
+        self._with_columns([t], self.COLS)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertIn("7 book two named people at once", r.stdout)
+        self.assertIn("pass", r.stdout)
+
+    def test_a_done_step_missing_a_column_is_exempt(self):
+        t = self._full_task(state="done")
+        del t["how"]
+        self._with_columns([t], self.COLS, stage="verified")
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertNotIn("carries no", r.stdout.replace("carries no evidence", ""))
+        self.assertEqual(r.returncode, 0)
 
 
 class TestStaleness(Base):
