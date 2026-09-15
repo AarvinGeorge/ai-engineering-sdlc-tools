@@ -290,6 +290,20 @@ def resultchip(value):
         e(str(value).strip().lower()), mark, e(word))
 
 
+def tasknote(t):
+    """The note under a step, as prose or as points.
+
+    A run's evidence is usually the time it ran and then what happened, which
+    reads faster as two short points than as one dense sentence. A string keeps
+    the exact markup it has always had.
+    """
+    note = t.get("note")
+    if not note:
+        return ""
+    if isinstance(note, list):
+        return '<ul class="tnote tnotes">%s</ul>' % "".join(
+            "<li>%s</li>" % e(str(n)) for n in note if str(n).strip())
+    return '<span class="tnote">%s</span>' % e(str(note))
 
 
 def taskcolumns(p):
@@ -344,10 +358,10 @@ def tasktable(items, cols):
         # The note is a full-width continuation of its own row rather than a
         # column: it is usually the evidence a step passed, and it is longer
         # than every other cell put together.
-        if t.get("note"):
-            rows.append('<tr class="tnoterow %s"><td colspan="%d">'
-                        '<span class="tnote">%s</span></td></tr>' % (
-                            cls, width, e(t["note"])))
+        note = tasknote(t)
+        if note:
+            rows.append('<tr class="tnoterow %s"><td colspan="%d">%s</td></tr>' % (
+                cls, width, note))
     return ('<div class="tablewrap ttablewrap"><table class="ttable"><thead><tr>'
             '%s</tr></thead><tbody>%s</tbody></table></div>' % (head, "".join(rows)))
 
@@ -369,7 +383,7 @@ def tasklist(p):
                 taskmark(t.get("state", "todo")),
                 resultchip(t.get("result")),
                 e(t.get("name", "")),
-                '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
+                tasknote(t))
             for t in items)
     return ('<div class="tasks"><div class="tcount">%d of %d done</div>%s</div>'
             % (n_done, len(items), body))
@@ -855,6 +869,11 @@ CSS = """
     padding:1px 7px}
   .ttable .tres{width:1%;white-space:nowrap;padding-right:6px}
   ol.tlist .res{margin-right:7px}
+  /* A note written as points. Tight, because it sits under its own step and is
+     read as a continuation of it, not as a section. */
+  ul.tnotes{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted)}
+  ul.tnotes li{margin:1px 0}
+  ol.tlist ul.tnotes{flex:1 1 300px;min-width:0}
   .plannote,.unblocks{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
   .plannote b,.unblocks b{color:var(--ink-2)}
   ul.parked{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}

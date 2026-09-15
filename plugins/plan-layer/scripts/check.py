@@ -87,8 +87,9 @@ def column_faults(who, p):
 def task_shape_faults(who, p):
     """Values the page cannot draw.
 
-    A result that is not a word renders as whatever str() makes of it, which is
-    how a Python repr once reached a published page. Refused here instead.
+    A note that is neither prose nor a list of points, and a result that is not
+    a word, both render as whatever str() makes of them, which is how a Python
+    repr once reached a published page. Refused here instead.
     """
     out = []
     tasks = p.get("tasks")
@@ -98,6 +99,11 @@ def task_shape_faults(who, p):
         if not isinstance(t, dict):
             continue
         name = t.get("name", "?")
+        note = t.get("note")
+        if note is not None and not isinstance(note, str):
+            if not isinstance(note, list) or not all(isinstance(n, str) for n in note):
+                out.append("%r: step %r has a note that is neither prose nor a list of "
+                           "points" % (who, name))
         result = t.get("result")
         if result is not None and not isinstance(result, str):
             out.append("%r: step %r has result=%r, which is not a word"

@@ -851,6 +851,73 @@ class TestTaskResults(Base):
         self.assertIn("result", r.stdout)
 
 
+class TestNoteShapes(Base):
+    """A result's story is usually the time it ran and then what happened. Two
+    short points read faster than one dense paragraph, so a note may be a
+    list."""
+
+    def _item(self, tasks, columns=None):
+        d = self.make_plan()
+        item = {"name": "Run the pass", "status": "under way", "updated": "2026-01-01",
+                "stage": "building", "plan_file": "p.md", "tasks": tasks}
+        if columns is not None:
+            item["task_columns"] = columns
+        d["plans"]["now"] = [item]
+        self.write(d)
+        return d
+
+    COLS = [{"key": "send", "label": "Send"}]
+
+    def test_a_list_note_renders_as_bullets_in_the_table(self):
+        self._item([{"name": "a", "state": "done", "send": "x",
+                     "note": ["PASS 13 Sep 16:51 UTC", "both guests landed on the event"]}],
+                   self.COLS)
+        run("render.py", project=self.dir)
+        note = re.search(r'<tr class="tnoterow[^"]*">(.*?)</tr>', self.body(), re.S).group(1)
+        self.assertIn("<ul", note)
+        self.assertEqual(note.count("<li>"), 2)
+        self.assertIn("PASS 13 Sep 16:51 UTC", note)
+        self.assertIn("both guests landed on the event", note)
+
+    def test_a_list_note_renders_as_bullets_in_the_plain_list(self):
+        self._item([{"name": "a", "state": "done",
+                     "note": ["ran at 16:51", "the event carried both"]}])
+        run("render.py", project=self.dir)
+        block = re.search(r'<div class="tasks">.*?</ol></div>', self.body(), re.S).group(0)
+        self.assertIn("<ul", block)
+        self.assertEqual(block.count("<li>"), 2)
+        self.assertIn("the event carried both", block)
+
+    def test_a_string_note_is_byte_for_byte_what_it_always_was(self):
+        self._item([{"name": "Alpha", "state": "done", "note": "evidence"},
+                    {"name": "Beta", "state": "todo"}])
+        run("render.py", project=self.dir)
+        block = re.search(r'<div class="tasks">.*?</ol></div>', self.body(), re.S).group(0)
+        self.assertEqual(
+            block,
+            '<div class="tasks"><div class="tcount">1 of 2 done</div>'
+            '<ol class="tlist">'
+            '<li class="t t--done"><span class="tmark">&#10003;'
+            '<span class="sr-only">Done</span></span>'
+            '<span class="tname">Alpha</span><span class="tnote">evidence</span></li>'
+            '<li class="t t--todo"><span class="tmark">&#183;'
+            '<span class="sr-only">Not started</span></span>'
+            '<span class="tname">Beta</span></li></ol></div>')
+
+    def test_a_note_that_is_neither_a_string_nor_a_list_of_strings_fails(self):
+        for bad in (7, {"a": 1}, ["fine", 9]):
+            self._item([{"name": "a", "state": "done", "note": bad}])
+            run("render.py", project=self.dir)
+            r = run("check.py", project=self.dir)
+            self.assertEqual(r.returncode, 1, bad)
+            self.assertIn("note", r.stdout)
+
+    def test_a_string_note_still_passes_the_gate(self):
+        self._item([{"name": "a", "state": "done", "note": "plain prose"}])
+        run("render.py", project=self.dir)
+        self.assertNotIn("note must", run("check.py", project=self.dir).stdout)
+
+
 class TestStaleness(Base):
     """The page disagreeing with ITSELF is detectable, and it is what actually
     rotted. Structure was never the problem."""
