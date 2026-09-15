@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.12.0 — 2026-09-14
+
+**A checklist someone has to execute is a table, not prose.**
+
+The first consumer was about to run a manual acceptance pass of ninety four
+steps, each with five fields: what it tests, which seat it is sent from, what to
+send, what counts as a pass, and how to do it. Rendered as a name with a
+paragraph under it, that cannot be scanned, and the person running the pass
+works from the plan document instead and stops updating the page.
+
+- **An item may declare `task_columns`**, a list of `{key, label}`. Each task
+  then carries those keys alongside `name`, `state` and `note`, and the
+  checklist renders as one row per step: the step with its mark and name first,
+  then the declared columns in order. A task missing a key gets an empty cell.
+- **`note` keeps its job.** It renders as a full-width line under its own row,
+  which is where the evidence that a step passed belongs.
+- **Nothing changes without columns.** The list markup is byte for byte what it
+  was, and a test asserts the exact string rather than trusting it.
+- **The table sits in the page's existing scrolling container**, so it scrolls
+  sideways inside its own box on a phone and the page body never does.
+- **The gate fails** on a declaration that cannot produce a readable table: not
+  a list, a column with no key or no label, a duplicate key, or a key colliding
+  with `name`, `state` or `note`, where the value would land on the step's own
+  name, state or note. **It drifts** when a step still to run leaves a declared
+  column empty, naming the step and the column, because that step cannot be run
+  from the page. A done step is exempt: once it has passed, its instructions are
+  history.
+
 ## 0.11.0 — 2026-09-13
 
 **The plugin catches up with the plan it renders.**

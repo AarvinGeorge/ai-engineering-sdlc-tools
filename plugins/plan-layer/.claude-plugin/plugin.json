@@ -1,7 +1,7 @@
 {
   "name": "plan-layer",
   "description": "A shared planning surface between a human developer and a coding agent. plan.json is the state, a self-contained HTML page is the view, a gate catches drift, and session hooks brief the agent before the first word is typed.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "author": {
     "name": "Aarvin George Poozhikala",
     "url": "https://github.com/AarvinGeorge"
