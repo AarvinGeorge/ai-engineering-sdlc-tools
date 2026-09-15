@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.1 — 2026-09-14
+
+**No auto index in a columned table.** Read off the page rather than the
+markup, a step cell showed the row position and then the step's own number:
+`1 ✓ 1 the person who asks is a guest`, and further down `9 ✓ 8 invite whoever
+is copied`, where the two disagree because a specified checklist is ordered by
+the order the steps will be run rather than by number. The person running the
+pass refers to a step by the number in its name, so the position index is
+dropped when `task_columns` is declared. The plain list, whose steps are
+usually unnumbered prose, keeps the CSS counter it has always had, byte for
+byte.
+
 ## 0.13.0 — 2026-09-14
 
 **How a step turned out, and a note that reads as points.**

@@ -700,6 +700,27 @@ class TestTaskColumns(Base):
             '<span class="sr-only">Not started</span></span>'
             '<span class="tname">Beta</span></li></ol></div>')
 
+    def test_a_columned_table_prints_no_auto_index(self):
+        """A specified checklist's steps carry their own numbers, and its rows
+        are listed in the order they will be run rather than in numeric order,
+        so an auto index beside the name shows two numbers that disagree."""
+        self._with_columns([self._full_task(name="1 the person who asks is a guest"),
+                            self._full_task(name="8 invite whoever is copied", state="todo")],
+                           self.COLS)
+        run("render.py", project=self.dir)
+        table = re.search(r'<table class="ttable">.*?</table>', self.body(), re.S).group(0)
+        self.assertNotIn("tnum", table)
+        self.assertIn("1 the person who asks is a guest", table)
+        self.assertIn("8 invite whoever is copied", table)
+
+    def test_the_plain_list_keeps_its_numbering(self):
+        self._with_columns([{"name": "Alpha", "state": "done"},
+                            {"name": "Beta", "state": "todo"}])
+        run("render.py", project=self.dir)
+        page = self.page()
+        self.assertIn('<ol class="tlist">', self.body())
+        self.assertIn("counter-increment:t", page)
+
     def test_columns_that_are_not_a_list_fail(self):
         self._with_columns([self._full_task()], {"key": "tests"})
         run("render.py", project=self.dir)

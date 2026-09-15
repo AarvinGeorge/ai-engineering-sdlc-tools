@@ -339,22 +339,27 @@ def tasktable(items, cols):
     Where any step carries an outcome, that column leads: the run exists to
     establish how the steps turned out, so the eye should land on it first.
     """
+    # No auto index. A specified checklist's steps carry their own numbers, and
+    # its rows are ordered by the order they will be run rather than by number,
+    # so a position index beside the name shows the reader two numbers that
+    # disagree. The plain list, whose steps are usually unnumbered prose, keeps
+    # the CSS counter it has always had.
     results = any(t.get("result") for t in items)
     head = ("<th>Result</th>" if results else "") + "<th>Step</th>" + "".join(
         "<th>%s</th>" % e(lbl) for _, lbl in cols)
     width = len(cols) + 1 + (1 if results else 0)
     rows = []
-    for i, t in enumerate(items, 1):
+    for t in items:
         state = t.get("state", "todo")
         cls = TASK_STATE.get(state, "t--todo")
         cells = "".join("<td>%s</td>" % e(str(t[k])) if t.get(k) not in (None, "")
                         else "<td></td>" for k, _ in cols)
         rows.append(
-            '<tr class="t %s">%s<td class="tstep"><span class="tnum">%d</span>%s'
+            '<tr class="t %s">%s<td class="tstep">%s'
             '<span class="tname">%s</span></td>%s</tr>' % (
                 cls,
                 ('<td class="tres">%s</td>' % resultchip(t.get("result"))) if results else "",
-                i, taskmark(state), e(t.get("name", "")), cells))
+                taskmark(state), e(t.get("name", "")), cells))
         # The note is a full-width continuation of its own row rather than a
         # column: it is usually the evidence a step passed, and it is longer
         # than every other cell put together.
@@ -848,8 +853,6 @@ CSS = """
      the step name into a one-word column. */
   .ttable .tstep{min-width:210px}
   .ttable .tstep .tname{display:inline}
-  .ttable .tnum{font-variant-numeric:tabular-nums;font-size:10.5px;color:var(--muted);
-    margin-right:6px}
   .ttable .tmark{margin-right:5px;vertical-align:baseline}
   /* The note belongs to the row above it, so it carries no top border and the
      two read as one block. */
