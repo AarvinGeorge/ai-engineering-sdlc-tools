@@ -63,6 +63,35 @@ pair answers "what is happening right now" without the reader choosing between c
 The gate **fails** on a second active item. A project that genuinely runs several streams
 says so with `meta.allow_multiple_active: true` rather than by accident.
 
+**A checklist someone has to EXECUTE declares columns.** A manual pass, an acceptance run, a
+migration rehearsal: steps like these carry instructions, not just a name. Put them in
+`task_columns` on the item and the same keys on each task, and the page renders one row per
+step instead of a name with a paragraph under it, which is the difference between a page
+somebody works from and a page they abandon for the plan document.
+
+```json
+"task_columns": [
+  { "key": "tests", "label": "What we are testing for" },
+  { "key": "from",  "label": "From" },
+  { "key": "send",  "label": "Send" },
+  { "key": "pass",  "label": "Pass when" },
+  { "key": "how",   "label": "How to do it" }
+],
+"tasks": [
+  { "name": "7 book two named people at once", "state": "todo",
+    "tests": "two names resolve in one request", "from": "the executive seat",
+    "send": "Book a call with Alex and Priya on Tuesday",
+    "pass": "both guests are on the event", "how": "reply in the same thread" }
+]
+```
+
+A key may not be `name`, `state` or `note`, and may not repeat; the gate **fails** on either,
+and on a column with no key or no label. A step still to run that leaves a declared column
+empty **drifts**, because it cannot be executed from the page. A done step is exempt. `note`
+keeps working and renders as a full-width line under its own row, which is where the evidence
+that a step passed belongs. Leave `task_columns` off for an ordinary checklist: without it the
+list is exactly what it has always been.
+
 **A finished item leaves `now` for `done`, and gains two fields.** A `period` saying when the
 work ran, and an `outcome` saying what it produced. Move the item rather than rewriting it;
 the page reads the carried-over `status` in the outcome slot and `plan_file` in the `file`

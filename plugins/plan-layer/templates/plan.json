@@ -8,7 +8,11 @@
     "north_star_owner": "WHO MAY CHANGE IT. Naming an owner is what freezes it.",
     "headings": {},
     "changelog": [
-      { "version": "0.1.0", "date": "REPLACE", "note": "Plan created." }
+      {
+        "version": "0.1.0",
+        "date": "REPLACE",
+        "note": "Plan created."
+      }
     ]
   },
   "contract": {
@@ -44,7 +48,8 @@
         "why": "Why this one first.",
         "unblocks": "What it makes possible.",
         "stage": "intent",
-        "plan_file": null
+        "plan_file": null,
+        "_task_columns_example": "Delete this line. If this item's checklist is one a person has to EXECUTE, add \"task_columns\": [{\"key\": \"send\", \"label\": \"Send\"}, {\"key\": \"pass\", \"label\": \"Pass when\"}] and give each task those keys. The page then renders one row per step instead of a paragraph under a name."
       }
     ]
   },

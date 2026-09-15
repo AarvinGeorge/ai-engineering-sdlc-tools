@@ -323,6 +323,27 @@
               },
               "unblocks": {
                 "type": "string"
+              },
+              "task_columns": {
+                "type": "array",
+                "description": "Carried over when a finished item was rendered as a table. Same shape as on an active item.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "The field read off each task. Not name, state or note."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "The column heading, in the reader's words."
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "label"
+                  ]
+                }
               }
             },
             "required": [
@@ -379,7 +400,9 @@
                   "required": [
                     "name",
                     "state"
-                  ]
+                  ],
+                  "description": "A step. Beyond name, state and note it may carry one key per declared task_columns entry, whose value fills that column's cell.",
+                  "additionalProperties": true
                 }
               },
               "capability": {
@@ -403,6 +426,27 @@
               "unblocks": {
                 "type": "string",
                 "description": "What finishing it makes possible."
+              },
+              "task_columns": {
+                "type": "array",
+                "description": "Columns for the task checklist. Declare them when the checklist is something a person has to EXECUTE rather than read: the page then renders one row per step instead of a name with a paragraph under it. Each task may then carry these keys alongside name, state and note. A key may not be name, state or note, and may not repeat.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "The field read off each task. Not name, state or note."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "The column heading, in the reader's words."
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "label"
+                  ]
+                }
               }
             },
             "required": [
@@ -461,7 +505,9 @@
                   "required": [
                     "name",
                     "state"
-                  ]
+                  ],
+                  "description": "A step. Beyond name, state and note it may carry one key per declared task_columns entry, whose value fills that column's cell.",
+                  "additionalProperties": true
                 }
               },
               "capability": {
@@ -485,6 +531,27 @@
               "updated": {
                 "type": "string",
                 "description": "Not rendered on a queued item. Kept when an item is demoted from now."
+              },
+              "task_columns": {
+                "type": "array",
+                "description": "Columns for the task checklist. Declare them when the checklist is something a person has to EXECUTE rather than read: the page then renders one row per step instead of a name with a paragraph under it. Each task may then carry these keys alongside name, state and note. A key may not be name, state or note, and may not repeat.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "The field read off each task. Not name, state or note."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "The column heading, in the reader's words."
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "label"
+                  ]
+                }
               }
             },
             "required": [

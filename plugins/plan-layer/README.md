@@ -103,6 +103,13 @@ sits before `verified`, that **drifts**: either it is finished, or the checklist
 Keep the list flat. Individual steps belong in the plan document; the page carries the shape of
 the work and where it has got to.
 
+When the checklist is one somebody has to **execute** rather than read, declare `task_columns`
+on the item as a list of `{key, label}` and give each task those keys: the page then renders
+one row per step, in a container that scrolls sideways so the page body never does. The gate
+fails on a column with no key or label, a duplicate key, or a key colliding with `name`,
+`state` or `note`, and drifts when a step still to run leaves a declared column empty. Without
+`task_columns` the checklist is byte for byte the list it has always been.
+
 ## Catching the page going stale
 
 Structure was never what rotted. What rotted was a page that quietly stopped being true while
