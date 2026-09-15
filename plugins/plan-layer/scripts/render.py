@@ -268,6 +268,29 @@ def taskmark(state):
 # quietly show the wrong thing.
 RESERVED_TASK_KEYS = ("name", "state", "note")
 
+# How a step TURNED OUT, which is not where it sits in the run: a step can be
+# done and have failed. Each outcome carries a word and a mark, so the four are
+# separable without colour, on a phone and in either theme. Anything else is
+# somebody's own word and renders as written.
+RESULT = {"pass": ("&#10003;", "Pass"),
+          "fail": ("&#10007;", "Fail"),
+          "covered": ("&#8776;", "Covered"),
+          "blocked": ("!", "Blocked")}
+
+
+def resultchip(value):
+    """The outcome, or nothing at all."""
+    if not value:
+        return ""
+    known = RESULT.get(str(value).strip().lower())
+    if not known:
+        return '<span class="res res--other">%s</span>' % e(str(value))
+    mark, word = known
+    return '<span class="res res--%s">%s %s</span>' % (
+        e(str(value).strip().lower()), mark, e(word))
+
+
+
 
 def taskcolumns(p):
     """The columns this item declares, or none.
@@ -298,8 +321,14 @@ def tasktable(items, cols):
     scanned, and the person running a manual pass then abandons the page for the
     plan document. The step column keeps the same mark, name and state colour
     the list uses, so nothing about reading a state changes.
+
+    Where any step carries an outcome, that column leads: the run exists to
+    establish how the steps turned out, so the eye should land on it first.
     """
-    head = "".join("<th>%s</th>" % e(lbl) for _, lbl in cols)
+    results = any(t.get("result") for t in items)
+    head = ("<th>Result</th>" if results else "") + "<th>Step</th>" + "".join(
+        "<th>%s</th>" % e(lbl) for _, lbl in cols)
+    width = len(cols) + 1 + (1 if results else 0)
     rows = []
     for i, t in enumerate(items, 1):
         state = t.get("state", "todo")
@@ -307,19 +336,20 @@ def tasktable(items, cols):
         cells = "".join("<td>%s</td>" % e(str(t[k])) if t.get(k) not in (None, "")
                         else "<td></td>" for k, _ in cols)
         rows.append(
-            '<tr class="t %s"><td class="tstep"><span class="tnum">%d</span>%s'
+            '<tr class="t %s">%s<td class="tstep"><span class="tnum">%d</span>%s'
             '<span class="tname">%s</span></td>%s</tr>' % (
-                cls, i, taskmark(state), e(t.get("name", "")), cells))
+                cls,
+                ('<td class="tres">%s</td>' % resultchip(t.get("result"))) if results else "",
+                i, taskmark(state), e(t.get("name", "")), cells))
         # The note is a full-width continuation of its own row rather than a
         # column: it is usually the evidence a step passed, and it is longer
         # than every other cell put together.
         if t.get("note"):
             rows.append('<tr class="tnoterow %s"><td colspan="%d">'
                         '<span class="tnote">%s</span></td></tr>' % (
-                            cls, len(cols) + 1, e(t["note"])))
+                            cls, width, e(t["note"])))
     return ('<div class="tablewrap ttablewrap"><table class="ttable"><thead><tr>'
-            '<th>Step</th>%s</tr></thead><tbody>%s</tbody></table></div>' % (
-                head, "".join(rows)))
+            '%s</tr></thead><tbody>%s</tbody></table></div>' % (head, "".join(rows)))
 
 
 def tasklist(p):
@@ -334,9 +364,10 @@ def tasklist(p):
         body = tasktable(items, cols)
     else:
         body = '<ol class="tlist">%s</ol>' % "".join(
-            '<li class="t %s">%s<span class="tname">%s</span>%s</li>' % (
+            '<li class="t %s">%s%s<span class="tname">%s</span>%s</li>' % (
                 TASK_STATE.get(t.get("state", "todo"), "t--todo"),
                 taskmark(t.get("state", "todo")),
+                resultchip(t.get("result")),
                 e(t.get("name", "")),
                 '<span class="tnote">%s</span>' % e(t["note"]) if t.get("note") else "")
             for t in items)
@@ -810,6 +841,20 @@ CSS = """
      two read as one block. */
   .tnoterow td{padding-top:0}
   .tnoterow .tnote{display:block}
+  /* How a step turned out, which is not where it sits in the run. A word and a
+     mark carry it, never colour alone, and `fail` is the only one given a box:
+     a run is read to find what went wrong, so that is what the eye should meet
+     first. */
+  .res{display:inline-block;font-size:11px;font-weight:600;white-space:nowrap;
+    letter-spacing:.02em}
+  .res--pass{color:var(--done)}
+  .res--covered{color:var(--muted)}
+  .res--blocked{color:var(--gap)}
+  .res--other{color:var(--ink-2);font-weight:500}
+  .res--fail{color:var(--gap);font-weight:700;border:1px solid currentColor;border-radius:4px;
+    padding:1px 7px}
+  .ttable .tres{width:1%;white-space:nowrap;padding-right:6px}
+  ol.tlist .res{margin-right:7px}
   .plannote,.unblocks{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
   .plannote b,.unblocks b{color:var(--ink-2)}
   ul.parked{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}

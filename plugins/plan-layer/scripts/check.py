@@ -84,6 +84,27 @@ def column_faults(who, p):
     return out
 
 
+def task_shape_faults(who, p):
+    """Values the page cannot draw.
+
+    A result that is not a word renders as whatever str() makes of it, which is
+    how a Python repr once reached a published page. Refused here instead.
+    """
+    out = []
+    tasks = p.get("tasks")
+    if not isinstance(tasks, list):
+        return out
+    for t in tasks:
+        if not isinstance(t, dict):
+            continue
+        name = t.get("name", "?")
+        result = t.get("result")
+        if result is not None and not isinstance(result, str):
+            out.append("%r: step %r has result=%r, which is not a word"
+                       % (who, name, result))
+    return out
+
+
 def empty_cells(who, p):
     """Declared columns an unfinished step never filled in.
 
@@ -496,6 +517,7 @@ def run(root=None):
                              % (who, t.get("name", "?"), t.get("state"),
                                 ", ".join(sorted(VALID_TASK))))
         fails.extend(column_faults(who, p))
+        fails.extend(task_shape_faults(who, p))
         drifts.extend(empty_cells(who, p))
         if tasks and all(t.get("state") == "done" for t in tasks) \
                 and p.get("stage") not in {"verified", "recorded"}:
@@ -520,6 +542,7 @@ def run(root=None):
         if p.get("stage") not in stage_ids:
             fails.append("queued item %r: stage=%r is not a cycle stage" % (who, p.get("stage")))
         fails.extend(column_faults(who, p))
+        fails.extend(task_shape_faults(who, p))
         drifts.extend(empty_cells(who, p))
 
     # A plan item may name the capability it serves. If it does, that capability
@@ -637,6 +660,9 @@ def run(root=None):
     # old, and a hard failure there would block the very turn that moved it.
     for p in plans.get("done", []):
         who = p.get("name") or "a finished plan"
+        # A finished item keeps the checklist it was moved with, so a value the
+        # page cannot draw is refused here too.
+        fails.extend(task_shape_faults(who, p))
         if not str(p.get("period") or "").strip():
             drifts.append("finished plan %r has no period — an undated record cannot be "
                           "read in order" % who)

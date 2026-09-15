@@ -750,6 +750,107 @@ class TestTaskColumns(Base):
         self.assertEqual(r.returncode, 0)
 
 
+class TestTaskResults(Base):
+    """`state` says where a step is in the run. `result` says how it turned
+    out. A step can be done and have failed, and a page that shows only the
+    first cannot be read for the thing the run exists to establish."""
+
+    COLS = [{"key": "send", "label": "Send"}, {"key": "pass", "label": "Pass when"}]
+
+    def _item(self, tasks, columns=None, stage="building"):
+        d = self.make_plan()
+        item = {"name": "Run the pass", "status": "under way", "updated": "2026-01-01",
+                "stage": stage, "plan_file": "p.md", "tasks": tasks}
+        if columns is not None:
+            item["task_columns"] = columns
+        d["plans"]["now"] = [item]
+        self.write(d)
+        return d
+
+    def _t(self, name="1 book by name", state="done", **over):
+        t = {"name": name, "state": state, "send": "book a call", "pass": "both guests on it"}
+        t.update(over)
+        return t
+
+    def test_a_result_adds_a_leading_column_headed_result(self):
+        self._item([self._t(result="pass")], self.COLS)
+        run("render.py", project=self.dir)
+        body = self.body()
+        table = re.search(r'<table class="ttable">.*?</table>', body, re.S).group(0)
+        self.assertEqual(re.findall(r"<th>(.*?)</th>", table),
+                         ["Result", "Step", "Send", "Pass when"])
+
+    def test_the_result_cell_comes_before_the_step(self):
+        self._item([self._t(result="fail")], self.COLS)
+        run("render.py", project=self.dir)
+        row = re.search(r'<tr class="t t--done">(.*?)</tr>', self.body(), re.S).group(1)
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        self.assertEqual(len(cells), 4)
+        self.assertIn("Fail", cells[0])
+        self.assertIn("1 book by name", cells[1])
+
+    def test_no_result_anywhere_leaves_the_table_as_it_was(self):
+        self._item([self._t()], self.COLS)
+        run("render.py", project=self.dir)
+        body = self.body()
+        table = re.search(r'<table class="ttable">.*?</table>', body, re.S).group(0)
+        self.assertEqual(re.findall(r"<th>(.*?)</th>", table),
+                         ["Step", "Send", "Pass when"])
+
+    def test_a_task_without_a_result_gets_an_empty_cell(self):
+        self._item([self._t(name="a", result="pass"), self._t(name="b")], self.COLS)
+        run("render.py", project=self.dir)
+        row = re.search(r'<tr class="t t--done"><td[^>]*></td><td class="tstep">'
+                        r'.*?b</span>', self.body(), re.S)
+        self.assertIsNotNone(row, "the resultless step did not get an empty leading cell")
+        self.assertNotIn("None", self.body())
+
+    def test_the_four_outcomes_carry_a_word_and_a_mark(self):
+        self._item([self._t(name="a", result="pass"), self._t(name="b", result="fail"),
+                    self._t(name="c", result="covered"),
+                    self._t(name="d", result="blocked", state="blocked")], self.COLS)
+        run("render.py", project=self.dir)
+        body = self.body()
+        for value, word in (("pass", "Pass"), ("fail", "Fail"),
+                            ("covered", "Covered"), ("blocked", "Blocked")):
+            m = re.search(r'<span class="res res--%s">(.*?)</span></td>' % value, body)
+            self.assertIsNotNone(m, value)
+            inner = m.group(1)
+            self.assertIn(word, inner)
+            mark = inner.replace(word, "").strip()
+            self.assertTrue(mark, "%s carries no mark, only colour and a word" % value)
+
+    def test_an_unknown_result_renders_plainly_rather_than_disappearing(self):
+        self._item([self._t(result="needs a second run")], self.COLS)
+        run("render.py", project=self.dir)
+        self.assertIn("needs a second run", self.body())
+
+    def test_the_step_keeps_its_own_state_marker(self):
+        self._item([self._t(result="fail")], self.COLS)
+        run("render.py", project=self.dir)
+        step = re.search(r'<td class="tstep">(.*?)</td>', self.body(), re.S).group(1)
+        self.assertIn('class="tmark"', step)
+
+    def test_the_note_row_spans_the_result_column_too(self):
+        self._item([self._t(result="pass", note="ran at 16:51")], self.COLS)
+        run("render.py", project=self.dir)
+        self.assertIn('colspan="4"', self.body())
+
+    def test_a_result_shows_in_the_plain_list_as_well(self):
+        self._item([self._t(result="fail")])
+        run("render.py", project=self.dir)
+        body = self.body()
+        self.assertIn('<ol class="tlist">', body)
+        self.assertIn('res res--fail', body)
+
+    def test_a_result_that_is_not_a_string_fails(self):
+        self._item([self._t(result=["pass"])], self.COLS)
+        run("render.py", project=self.dir)
+        r = run("check.py", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("result", r.stdout)
+
+
 class TestStaleness(Base):
     """The page disagreeing with ITSELF is detectable, and it is what actually
     rotted. Structure was never the problem."""
