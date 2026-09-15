@@ -394,7 +394,18 @@
                       ]
                     },
                     "note": {
-                      "type": "string"
+                      "type": [
+                        "string",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Prose, or a list of points rendered as bullets under the step. A result's story is usually the time it ran and then what happened, which reads faster as points."
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "How the step turned out, which is not the same as where it sits in the run: a step can be done and have failed. pass, fail, covered and blocked are styled; any other word renders as written. Where any step in the item carries one, the table gains a leading Result column."
                     }
                   },
                   "required": [
@@ -499,7 +510,18 @@
                       ]
                     },
                     "note": {
-                      "type": "string"
+                      "type": [
+                        "string",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Prose, or a list of points rendered as bullets under the step. A result's story is usually the time it ran and then what happened, which reads faster as points."
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "How the step turned out, which is not the same as where it sits in the run: a step can be done and have failed. pass, fail, covered and blocked are styled; any other word renders as written. Where any step in the item carries one, the table gains a leading Result column."
                     }
                   },
                   "required": [

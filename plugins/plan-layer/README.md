@@ -110,6 +110,13 @@ fails on a column with no key or label, a duplicate key, or a key colliding with
 `state` or `note`, and drifts when a step still to run leaves a declared column empty. Without
 `task_columns` the checklist is byte for byte the list it has always been.
 
+A task may also carry `result`, which is how it turned out rather than where it sits in the
+run: a step can be `done` and have failed. Where any step carries one, the table gains a
+leading `Result` column; `pass`, `fail`, `covered` and `blocked` each get a word and a mark so
+they are separable without colour. And `note` may be a list of strings, rendered as bullets in
+the table's continuation row and in the plain checklist alike. The gate fails on a result that
+is not a word, and on a note that is neither prose nor a list of points.
+
 ## Catching the page going stale
 
 Structure was never what rotted. What rotted was a page that quietly stopped being true while

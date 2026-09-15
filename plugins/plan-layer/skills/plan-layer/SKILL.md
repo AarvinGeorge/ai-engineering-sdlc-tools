@@ -92,6 +92,22 @@ keeps working and renders as a full-width line under its own row, which is where
 that a step passed belongs. Leave `task_columns` off for an ordinary checklist: without it the
 list is exactly what it has always been.
 
+**Say how a step turned out, not only where it is.** `state` is position in the run; `result`
+is the outcome, and a step can be `done` and have failed. Where any step in an item carries
+`result`, the table gains a leading `Result` column, because a run is read to find out how it
+went. `pass`, `fail`, `covered` and `blocked` are styled, each with a word and a mark so they
+stay separable on a phone and in either theme; any other word renders as written. The gate
+**fails** on a result that is not a word.
+
+**A note may be a list.** Written as points it reads faster than one dense sentence, typically
+the time the step ran and then what happened. A string still renders exactly as it always did.
+The gate **fails** on a note that is neither prose nor a list of points.
+
+```json
+{ "name": "2 move it, in the same thread", "state": "done", "result": "pass",
+  "note": ["PASS 13 Sep 17:04 UTC", "the right meeting moved and nothing was asked"] }
+```
+
 **A finished item leaves `now` for `done`, and gains two fields.** A `period` saying when the
 work ran, and an `outcome` saying what it produced. Move the item rather than rewriting it;
 the page reads the carried-over `status` in the outcome slot and `plan_file` in the `file`
