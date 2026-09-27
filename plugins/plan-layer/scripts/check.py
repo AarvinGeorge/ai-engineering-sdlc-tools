@@ -740,6 +740,24 @@ def run(root=None):
         if age > 14:
             drifts.append("plan.json last updated %d days ago" % age)
 
+    # Rolling (0.14.0): the page shows this month. History that has outgrown
+    # the keep rules is a drift signal, not a failure: the plan is still true,
+    # it is just carrying more than a cold reader can use. Same rules as
+    # roll.py, read from one place, so the two cannot disagree.
+    r = L.rollable(d, L.roll_config(root))
+    due = len(r["done"]) + len(r["changelog"]) + len(r["next"])
+    if due:
+        drifts.append("%d record(s) have aged off the front page (done %d, changelog %d, queued %d) — "
+                      "run scripts/roll.py to move them into %sarchive/ in full"
+                      % (due, len(r["done"]), len(r["changelog"]), len(r["next"]), plan_dir))
+    try:
+        kb = os.path.getsize(SRC) // 1024
+        if kb > 200:
+            drifts.append("plan.json is %d KB — too large to hand to any agent whole; "
+                          "roll history off, or prune content" % kb)
+    except OSError:
+        pass
+
     # Work in flight with no written plan is how scope creeps.
     for p in plans.get("now", []):
         if p.get("stage") == "grounded" and not p.get("plan_file"):

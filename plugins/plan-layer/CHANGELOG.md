@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.14.0 — 2026-09-27
+
+**The front page shows this month.** A planning page that carries every completed item
+and every changelog entry since the project began stops being read; on the first project
+using this layer the live file had reached 248 KB, 40 percent of it completed-plan history.
+`scripts/roll.py` moves aged records into `plan/archive/*.json` in full — the last 8 done
+items, the last 10 changelog entries and the first 8 queued items stay, plus the earliest
+queued item of any capability that would otherwise have nothing queued, because the gate
+reads "blocked with nothing queued" as drift and a roll must never manufacture it (it did,
+on the first run, before that rule existed). Nothing is deleted; archives are append-only
+and de-duplicated, so running twice is safe. Overrides per project under `roll` in
+`.plan-layer.json`. The rules live once, in `plan_lib.rollable`, so the gate and the roll
+cannot disagree.
+
+**The gate says when.** Two new DRIFT signals: records have aged off the front page (with
+the counts and the command), and the plan file is over 200 KB. Neither blocks.
+
+**The page counts what left, from the file.** The Done and Next headings gain "N older in
+archive/done.json" / "N more in archive/backlog.json", derived from the archive files at
+render time, never typed into heading text where they would go stale.
+
+**A map for the agent.** `templates/MAP.md`, copied on init: what lives where, the commands
+after any change, and the reading rules that keep token use down (edit by key, read a figure
+by function, never hand the file to a subagent).
+
+**figcheck records the rule it serves.** One sentence in its docstring: every figure must be
+easy to read, never cluttered, and must show the system as measured.
+
+Tests: 10 added (rules, dry run, full move, idempotence, config, silence without a plan,
+the gate signal appearing and clearing, the page hint from the file and its absence).
+
 ## 0.13.1 — 2026-09-14
 
 **No auto index in a columned table.** Read off the page rather than the

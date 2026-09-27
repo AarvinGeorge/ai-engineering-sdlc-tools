@@ -283,6 +283,7 @@ Then look at what you drew:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/roll.py"       # when the gate says records have aged off the front page
 ```
 
 It writes every figure to `plan/.figures/` as its own standalone page, screenshots each with

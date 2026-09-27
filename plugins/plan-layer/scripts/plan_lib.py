@@ -182,3 +182,60 @@ DEFAULT_CYCLE = {
          "skipped_looks_like": "The next session re-derives what this one already learned."},
     ],
 }
+
+# --------------------------------------------------------------------------
+# Rolling (0.14.0). The live plan shows this month; older records move, in
+# full, into <plan_dir>/archive/*.json. The RULES live here so roll.py (which
+# moves) and check.py (which says when moving is due) can never disagree.
+# --------------------------------------------------------------------------
+ARCHIVE_DIRNAME = "archive"
+ROLL_DEFAULTS = {"keep_done": 8, "keep_log": 10, "keep_next": 8}
+
+
+def roll_config(root=None):
+    """Per-project overrides under "roll" in .plan-layer.json; absent is normal."""
+    cfg = dict(ROLL_DEFAULTS)
+    cfg.update((config(root or project_root()).get("roll") or {}))
+    return cfg
+
+
+def rollable(d, cfg):
+    """What roll.py would move, as three lists. Pure: reads d, writes nothing.
+
+    The queue keeps its first keep_next items PLUS the earliest queued item of
+    any capability that would otherwise have nothing queued -- the gate reads
+    "blocked with nothing queued" as drift, and a rolled-off item must never
+    manufacture that signal.
+    """
+    plans = d.get("plans") or {}
+    done = plans.get("done") or []
+    log = (d.get("meta") or {}).get("changelog") or []
+    nxt = plans.get("next") or []
+    keep, seen = [], set()
+    for i, it in enumerate(nxt):
+        cap = str(it.get("capability"))
+        if i < cfg["keep_next"] or cap not in seen:
+            keep.append(it)
+            seen.add(cap)
+    return {
+        "done": done[:-cfg["keep_done"]] if len(done) > cfg["keep_done"] else [],
+        "changelog": log[:-cfg["keep_log"]] if len(log) > cfg["keep_log"] else [],
+        # By identity, not equality: two queued items that happen to be equal
+        # dicts are two items, and the second must still roll off.
+        "next": [it for it in nxt if not any(it is k for k in keep)],
+        "keep_next": keep,
+    }
+
+
+def archive_counts(root=None):
+    """How many records sit in each archive file, for the page's section hints."""
+    pdir = paths(root)["dir"]
+    out = {}
+    for name in ("done", "changelog", "backlog"):
+        f = os.path.join(pdir, ARCHIVE_DIRNAME, name + ".json")
+        if os.path.isfile(f):
+            try:
+                out[name] = len(json.load(open(f, encoding="utf-8")))
+            except Exception:
+                out[name] = None
+    return out

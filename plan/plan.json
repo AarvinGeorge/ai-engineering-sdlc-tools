@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "project": "ai-engineering-sdlc-tools",
+    "subtitle": "the plan-layer plugin, planned with itself (ROADMAP gap 4, open since 10 Aug 2026, closed today)",
+    "plan_version": "0.1.0",
+    "updated": "2026-09-27T20:21:10Z",
+    "north_star": "The outcome this whole plan serves. One sentence. Delete if you have none yet.",
+    "north_star_owner": "WHO MAY CHANGE IT. Naming an owner is what freezes it.",
+    "headings": {},
+    "changelog": [
+      {
+        "version": "0.1.0",
+        "date": "2026-09-27",
+        "note": "First plan for the plugin itself, on the day plan-layer 0.14.0 added rolling, the roll-due gate signal, archive hints and the MAP template."
+      }
+    ]
+  },
+  "contract": {
+    "for_agent": "Read this file at the START of every session, before touching anything. It is the current state: what is built, what is planned, what is active right now. Update it as work progresses, not at the end, then re-render the page. If this file and the repository disagree about status, this file is wrong — fix it.",
+    "for_human": "This is the canonical view. Status lives here; task-level detail lives in the linked plan documents. If this page and reality disagree, the page is wrong — say so."
+  },
+  "orientation": {
+    "what": "What this plan covers.",
+    "why": "Why this work matters.",
+    "shape": "How the work is organised.",
+    "how_to_read": "Start with what is active now, then what is next."
+  },
+  "facts": {},
+  "systems": [],
+  "capabilities": [
+    {
+      "id": 1,
+      "name": "One file is the state, a page is the view",
+      "build": "done",
+      "evidence": "plan_lib, render.py, check.py, brief.py; 24 tests before today; used daily on the Karou harness workstream since 9 Aug 2026",
+      "short": "state + view",
+      "plan": "planned"
+    },
+    {
+      "id": 2,
+      "name": "The gate catches drift and contradiction",
+      "build": "done",
+      "evidence": "check.py FAIL and DRIFT signals; Stop hook blocks a turn on FAIL (0.4.0); contradiction and readability checks (0.8.0)",
+      "short": "gate",
+      "plan": "planned"
+    },
+    {
+      "id": 3,
+      "name": "History rolls off the front page",
+      "build": "done",
+      "evidence": "roll.py, rollable() rules shared with the gate, archive hints on the page, 10 tests (0.14.0)",
+      "short": "rolling",
+      "plan": "planned"
+    },
+    {
+      "id": 4,
+      "name": "A reviewer that is not the author",
+      "build": "not-started",
+      "short": "reviewer",
+      "plan": "none"
+    },
+    {
+      "id": 5,
+      "name": "The human can dispute a claim",
+      "build": "not-started",
+      "short": "disputed flag",
+      "plan": "none"
+    }
+  ],
+  "plans": {
+    "done": [
+      {
+        "name": "Rolling, the roll-due signal, archive hints, the MAP template",
+        "period": "2026-09-27",
+        "outcome": "plan-layer 0.14.0. Built on the Karou workstream as project scripts first, then promoted here with tests the same day, so the plugin and the project cannot drift apart on this feature."
+      }
+    ],
+    "now": [],
+    "next": [
+      {
+        "name": "A read-only reviewer subagent reports where the plan and the repository disagree",
+        "stage": "intent",
+        "capability": 4,
+        "why": "The gate catches a page that contradicts itself; it cannot catch a page that is consistent and wrong about the world. On the first project a wrong transcript count survived every check for weeks and was found by a human reading (ROADMAP gap 2).",
+        "unblocks": "trust in the page without a human audit"
+      },
+      {
+        "name": "A disputed flag the agent may never clear on its own",
+        "stage": "intent",
+        "capability": 5,
+        "why": "Today the human's only way to contest a claim is to tell the agent; the gate should fail on a hand-set flag until the agent has answered it (ROADMAP gap 3).",
+        "unblocks": "two-directional correction"
+      },
+      {
+        "name": "An archive index the page can render",
+        "stage": "intent",
+        "capability": 3,
+        "why": "Rolled records are JSON with no reader; the day someone asks what was finished in August they should not have to read raw JSON.",
+        "unblocks": "history that is readable, not only kept"
+      }
+    ]
+  },
+  "parked": [
+    {
+      "id": "P1",
+      "q": "Does the reviewer ship inside plan-layer or as a sibling plugin?",
+      "trigger": "when capability 4 starts",
+      "note": "Leaning inside: it is worthless without the schema."
+    }
+  ],
+  "invariants": [
+    {
+      "rule": "every script is standard-library only",
+      "state": "holding",
+      "detail": "asserted by a test; a missing dependency turns a briefing into a stack trace"
+    },
+    {
+      "rule": "silent where uninvited",
+      "state": "holding",
+      "detail": "a project with no plan/plan.json hears nothing from any hook or script"
+    }
+  ],
+  "edge_cases": [],
+  "assertions": [],
+  "glossary": []
+}

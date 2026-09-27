@@ -134,8 +134,20 @@ def pill(mapping, key):
         cls, dot() if key in LIVE else "", e(label))
 
 
+ARCHIVE = {}  # filled by build(); {"done": n, "changelog": n, "backlog": n}
+_ARCHIVE_HINT = {"done": ("done", "%d older in archive/done.json"),
+                 "next": ("backlog", "%d more in archive/backlog.json")}
+
+
 def h2(d, key):
     title, hint = d.get("meta", {}).get("headings", {}).get(key) or HEADINGS[key]
+    # Rolling (0.14.0): the count of what left the page is derived from the
+    # archive file, never typed into the heading, so it cannot go stale.
+    if key in _ARCHIVE_HINT:
+        name, fmt = _ARCHIVE_HINT[key]
+        n = ARCHIVE.get(name)
+        if n:
+            hint = (hint + " · " if hint else "") + fmt % n
     return '<h2>%s%s</h2>' % (
         e(title), ' <span class="hint">%s</span>' % e(hint) if hint else "")
 
@@ -978,6 +990,7 @@ def main():
 
     d = L.load()
     fp = fingerprint(p["src"])
+    ARCHIVE.update(L.archive_counts(p["root"]))
     doc = build(d, p["root"], fp)
     # Atomic: a reader (check.py, a browser, another session) sees the old page
     # or the new one, never a half-written one.

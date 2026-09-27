@@ -173,6 +173,7 @@ That property decays every time someone who knows the context writes a sentence.
 | `/plan-layer status` | Print the current state — active item, stage, next up |
 | `/plan-layer check` | Run the gate: structural failures and drift signals |
 | `/plan-layer render` | Regenerate the page from the JSON |
+| `/plan-layer roll` | Move aged records off the live plan into `plan/archive/` in full (the gate says when) |
 | `/plan-layer help` | This document |
 
 Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/`. Run them with `python3`; they need
@@ -196,6 +197,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"        # look at the figures
 5. Render, then run the gate.
 6. Add `plan/index.html` to the repository — a generated file that is committed on purpose,
    so anyone can open the page without running anything.
+7. Copy `${CLAUDE_PLUGIN_ROOT}/templates/MAP.md` to `plan/MAP.md`: the map a fresh session
+   reads first — what lives where, the commands after any change, and the reading rules that
+   keep token use down.
 
 ## The cycle
 
@@ -238,6 +242,12 @@ and the gate checks it. Capabilities may carry a `short` label for figures.
 
 **Numbers quoted in two places belong in `facts`.** Figures read `data["facts"]` instead of
 restating a value that also appears in the prose.
+
+**The front page shows this month.** When the gate reports records aged off the front page,
+run `roll.py`: it moves older done items, old changelog entries and the queue beyond the
+first eight into `plan/archive/*.json` in full (nothing deleted), keeping one queued item per
+capability. The page then says "N older in archive/…" from the file itself, never from typed
+text. Never load `plan.json` whole into context and never hand it to a subagent; edit by key.
 
 **Parked is not dropped.** A question deferred goes in `parked` with a `trigger` naming when
 it must be answered.
