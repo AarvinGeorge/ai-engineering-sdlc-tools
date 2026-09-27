@@ -34,6 +34,8 @@ your-project/
     plan.json      the state — you and the agent both edit this
     index.html     the view — generated, committed, never hand-edited
     figures.py     optional: your own diagrams
+    MAP.md         the map a fresh session reads first: what lives where, the commands, the reading rules
+    archive/       history in full, machine-readable: older done items, old changelog, the queue beyond the front page
 ```
 
 - **`plan.json`** holds what is built, what is planned, what is active right now, the
@@ -47,6 +49,17 @@ your-project/
   page without appearing in the key, and cannot mean one thing in a table and another in a
   card. A pulsing dot marks whatever is in progress right now, and stops pulsing (keeping its
   colour) when the reader prefers reduced motion.
+- **The front page shows this month.** (0.14.0) A page that carries every completed item and
+  every changelog entry since the project began stops being read. `scripts/roll.py` moves
+  older records into `plan/archive/*.json` **in full** — the last 8 done items, the last 10
+  changelog entries and the first 8 queued items stay, plus one queued item per capability so
+  the gate never reads "blocked with nothing queued" because of a roll. Nothing is deleted;
+  running it twice is safe. The gate says when it is due, and the Done and Next headings gain
+  "N older in archive/…" counted from the archive file, never typed. Keep-counts are
+  overridable per project under `roll` in `.plan-layer.json`.
+- **`MAP.md`** is copied on init: a one-page map of the folder for the agent, with the
+  reading rules that keep token use down — edit `plan.json` by key with a script, read one
+  figure by function name, never hand the file to a subagent.
 
 ## The cycle
 
@@ -167,18 +180,13 @@ plan declares `meta.allow_multiple_active: true`.
 rewritten: the page reads a carried-over `status` in the outcome slot and `plan_file` in the
 `file` slot, so nothing is lost on the way across. A finished plan missing either **drifts**.
 
-**Long sections get archived, not truncated.** Keep the recent entries in full, condense the
-rest to a line each, move their full text to a markdown file beside `plan.json`, and say so
-in that section's heading hint. Headings are data:
-
-```json
-"headings": {
-  "done": ["Plans completed", "the six most recent in full; the older ones are in plan/completed_archive.md"]
-}
-```
-
-A reader then knows the history exists and where it went, and the page carries state rather
-than an archive.
+**Long sections get rolled, not truncated.** Run `scripts/roll.py` when the gate reports that
+records have aged off the front page. It moves them, in full, into `plan/archive/done.json`,
+`archive/changelog.json` and `archive/backlog.json`, and the Done and Next headings then read
+"N older in archive/done.json" from the file itself. Before 0.14.0 this was done by hand into
+a markdown file with the count typed into the heading hint; that count went stale within days,
+which is why it is derived now. Headings remain data (`meta.headings`) for the title and the
+hint text; the archive count is appended by the renderer.
 
 ## The gate
 
@@ -327,10 +335,12 @@ nothing looks broken.
 
 ## Known gaps
 
-Three things this deliberately does not do yet — no history, no independent reviewer, no way
-for a human to dispute a claim in the file itself — plus the fact that it does not yet plan
-with itself. Each is written up with the evidence that revealed it and a sketch of the fix in
-[ROADMAP.md](ROADMAP.md), along with the reason none of them is being worked on.
+Two things this deliberately does not do yet — no independent reviewer, and no way for a human
+to dispute a claim in the file itself. History is now **kept** (0.14.0 rolls it into
+`plan/archive/` in full) but not yet **readable** from the page; an archive index is queued.
+Since 0.14.0 the plugin plans with itself: its own `plan/plan.json` sits at the root of the
+marketplace repository. Each gap is written up with the evidence that revealed it and a sketch
+of the fix in [ROADMAP.md](ROADMAP.md).
 
 ## Durability
 

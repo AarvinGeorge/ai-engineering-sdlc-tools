@@ -40,6 +40,12 @@ is which is the point of writing them down.
 
 ## Gap 1 — no history
 
+> **Partly closed, 0.14.0 (27 Sep 2026).** History is now KEPT: `roll.py` moves aged records into
+> `plan/archive/*.json` in full and the page counts them. It is not yet READABLE from the page —
+> there is no view over the archive and no record of transitions (when an invariant broke). An
+> archive index is queued on the plugin's own plan; transitions remain open as written below.
+
+
 `plan.json` is a **snapshot**. It says an invariant is at risk; it cannot say *when it broke*
 or *what changed the day it did*. Answering that means reading git log by hand, which is
 exactly the manual archaeology this tool exists to remove.
@@ -130,6 +136,10 @@ dispute anything, but does not remove the need for the channel.
 ---
 
 ## Gap 4 — the plugin does not use itself
+
+> **Closed, 0.14.0 (27 Sep 2026).** `plan/plan.json` at the root of this repository is the plugin's
+> own plan, rendered and gated by its own scripts. The three open gaps above are its queued items.
+
 
 `ai-engineering-sdlc-tools` has no `plan/plan.json` of its own. A planning tool that does not
 plan with itself has not met its own users. Doing so would have surfaced Gaps 1–3 sooner, and

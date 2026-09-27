@@ -10,7 +10,7 @@ somewhere both sides can read, and make the reading automatic.
 
 | Plugin | What it does |
 |---|---|
-| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift, and session hooks brief the agent before the first word is typed. |
+| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.14.0. |
 
 ## Install
 
@@ -49,10 +49,17 @@ plugins/<name>/                    one directory per plugin
   hooks/hooks.json                 session-lifecycle hooks
   scripts/                         executables the hooks and skills call
   skills/<name>/SKILL.md           what the agent reads
+  templates/                       what init copies into a project (plan.json, MAP.md)
+  tests/                           run with: python3 -m unittest tests/*.py
+plan/                              this repository's OWN plan, kept with plan-layer itself
 ```
 
 Adding a plugin means adding a directory under `plugins/` and one entry to
 `marketplace.json`. Nothing else moves.
+
+This repository plans with itself: `plan/plan.json` at the root is plan-layer's own plan,
+rendered to `plan/index.html` by the same scripts it ships. If the tool is not good enough to
+run on its own roadmap, it is not good enough to publish.
 
 ## Where each tool is honest about its limits
 
