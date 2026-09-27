@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1 — 2026-09-27
+
+Documentation only: both READMEs and the ROADMAP now describe 0.14.0 (rolling, the archive,
+MAP.md, the gate signal; ROADMAP gap 4 closed, gap 1 partly). Bumped so the installed copy
+picks the text up: `claude plugin update` refreshes only on a version change.
+
 ## 0.14.0 — 2026-09-27
 
 **The front page shows this month.** A planning page that carries every completed item
