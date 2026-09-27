@@ -456,6 +456,23 @@ class TestAssertions(Base):
         self.assertFalse(os.path.exists(sentinel),
                          "an assertion executed without --verify")
 
+    def test_clean_verify_stamps_the_time_and_a_failed_one_does_not(self):
+        d = self.make_plan()
+        d["assertions_setup"] = "echo ok"
+        d["assertions"] = [{"claim": "x", "run": "echo ok", "expect": "ok"}]
+        self.write(d)
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        stamp = json.load(open(os.path.join(self.dir, "plan", "plan.json")))["meta"].get("assertions_verified")
+        self.assertTrue(stamp and stamp.endswith("Z") and stamp.startswith("20"), stamp)
+        d["assertions"] = [{"claim": "x", "run": "echo no", "expect": "ok"}]
+        d["meta"]["assertions_verified"] = "2020-01-01T00:00:00Z"
+        self.write(d)
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(json.load(open(os.path.join(self.dir, "plan", "plan.json")))["meta"]["assertions_verified"],
+                         "2020-01-01T00:00:00Z", "a failed run must not move the stamp")
+
     def test_declared_but_never_verified_drifts(self):
         d = self.make_plan()
         d["assertions"] = [{"claim": "x", "run": "true", "expect": ""}]

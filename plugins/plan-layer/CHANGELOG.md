@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2 — 2026-09-27
+
+**A clean `--verify` stamps `meta.assertions_verified`.** Nothing wrote it before, so the gate's
+"assertions last verified N days ago" stayed on after a 12/12 run until someone edited the JSON by
+hand. A failed run leaves the stamp alone. 1 test.
+
 ## 0.15.1 — 2026-09-27
 
 **The drawings loop, made reusable.** `sync.py --live-revision <sha>` records the commit that is

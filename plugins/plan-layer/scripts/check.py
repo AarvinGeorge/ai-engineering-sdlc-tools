@@ -827,6 +827,17 @@ def main():
     if "--verify" in sys.argv:
         # Explicit only. Never wired to a hook: see verify()'s docstring.
         _, bad = verify()
+        if not bad:
+            # A clean run is the only thing that may move the stamp the gate
+            # ages against. Before 0.15.2 nothing wrote it, so "assertions last
+            # verified N days ago" stayed on after a 12/12 run until a person
+            # edited the JSON by hand -- a stale alarm teaches people to ignore
+            # alarms. Read from the clock, never from memory.
+            d = L.load()
+            d.setdefault("meta", {})["assertions_verified"] = \
+                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            L.save(d)
+            print("  assertions_verified stamped %s" % d["meta"]["assertions_verified"])
         return 1 if bad else 0
 
     fails, drifts, summary = run()
