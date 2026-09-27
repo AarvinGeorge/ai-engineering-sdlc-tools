@@ -173,6 +173,7 @@ That property decays every time someone who knows the context writes a sentence.
 | `/plan-layer status` | Print the current state — active item, stage, next up |
 | `/plan-layer check` | Run the gate: structural failures and drift signals |
 | `/plan-layer render` | Regenerate the page from the JSON |
+| `/plan-layer sync` | After ANY change: refresh view facts from disk, render, run the gate — the one command |
 | `/plan-layer roll` | Move aged records off the live plan into `plan/archive/` in full (the gate says when) |
 | `/plan-layer help` | This document |
 

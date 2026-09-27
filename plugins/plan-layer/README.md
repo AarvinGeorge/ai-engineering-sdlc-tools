@@ -57,6 +57,12 @@ your-project/
   running it twice is safe. The gate says when it is due, and the Done and Next headings gain
   "N older in archive/…" counted from the archive file, never typed. Keep-counts are
   overridable per project under `roll` in `.plan-layer.json`.
+- **Views** (0.15.0) are drawings that live beside the page rather than on it — the first kind is
+  Archify, whose exported SVG carries its own 132 KB stylesheet and font. `plan.json` `views[]`
+  lists each one: the spec in the repository (the truth), the published URL (the pointer), and two
+  facts written only by `scripts/sync.py`, never typed: the spec's SHA-256 and the commit it was
+  measured at (`meta.repository.revision`). The gate says when a drawing has gone stale: the spec
+  changed since delivery, the live revision moved past it, or the spec is missing.
 - **`MAP.md`** is copied on init: a one-page map of the folder for the agent, with the
   reading rules that keep token use down — edit `plan.json` by key with a script, read one
   figure by function name, never hand the file to a subagent.
@@ -292,6 +298,7 @@ Then look at what you drew:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/roll.py"       # when the gate says records have aged off the front page
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sync.py"       # after ANY change: refresh view facts, render, gate — the one command
 ```
 
 It writes every figure to `plan/.figures/` as its own standalone page, screenshots each with

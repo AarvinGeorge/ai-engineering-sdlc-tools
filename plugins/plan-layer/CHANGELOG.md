@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.0 — 2026-09-27
+
+**Views: drawings published beside the page, kept honest by the files.** A project may keep
+drawings that cannot live on the page itself (the first one is Archify, whose export carries its own
+132 KB stylesheet). `plan.json` gains `views[]`: a spec file in the repository (the truth), a
+published URL (the pointer), and two facts that are never typed — the spec's SHA-256 and the
+revision it declares it was measured at (`meta.repository.revision`, an Archify primitive) — written
+only by `scripts/sync.py`. The gate raises DRIFT when the spec has changed since it was delivered
+(re-deliver, republish, re-sync), when the project's recorded live revision (`facts.live_revision`,
+written by the deploy) has moved past a drawing's revision (re-check it), and when a linked spec is
+missing from disk (a page must never link a drawing nobody can regenerate).
+
+**`sync.py`: the one command after any change.** Refreshes the views' facts from disk, renders,
+runs the gate. Exit 2 on a missing spec. Deterministic: the same files give the same facts.
+
+Tests: 8 added (144 total).
+
 ## 0.14.1 — 2026-09-27
 
 Documentation only: both READMEs and the ROADMAP now describe 0.14.0 (rolling, the archive,

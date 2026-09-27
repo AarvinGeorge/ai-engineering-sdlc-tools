@@ -758,6 +758,31 @@ def run(root=None):
     except OSError:
         pass
 
+    # Views (0.15.0): a published drawing can go stale two ways, and both are
+    # visible from the files. (1) The spec changed since it was delivered and
+    # published: its sha no longer matches the one recorded at delivery.
+    # (2) The system moved past the commit the drawing was measured at: the
+    # project's recorded live revision (facts.live_revision, written by the
+    # deploy) differs from the spec's meta.repository.revision.
+    live_rev = str((d.get("facts") or {}).get("live_revision") or "")
+    for v in d.get("views") or []:
+        name = v.get("label") or v.get("spec") or "view"
+        now_ = L.view_facts(root, v)
+        if not now_:
+            drifts.append("view %r: its spec %r is not on disk — the page links a drawing nobody can regenerate"
+                          % (name, v.get("spec")))
+            continue
+        rec = v.get("spec_sha256")
+        if rec and now_["spec_sha256"] != rec:
+            drifts.append("view %r: the spec changed since it was delivered (recorded %s…, now %s…) — "
+                          "re-deliver, republish to the same URL, then record the new sha"
+                          % (name, rec[:12], now_["spec_sha256"][:12]))
+        rev = now_.get("revision") or v.get("revision")
+        if live_rev and rev and not (live_rev.startswith(rev) or rev.startswith(live_rev)):
+            drifts.append("view %r was measured at %s but the live revision is %s — re-check the drawing "
+                          "against the system and re-deliver if the shape changed"
+                          % (name, rev[:12], live_rev[:12]))
+
     # Work in flight with no written plan is how scope creeps.
     for p in plans.get("now", []):
         if p.get("stage") == "grounded" and not p.get("plan_file"):

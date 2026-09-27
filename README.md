@@ -10,7 +10,7 @@ somewhere both sides can read, and make the reading automatic.
 
 | Plugin | What it does |
 |---|---|
-| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.14.1. |
+| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.0. |
 
 ## Install
 

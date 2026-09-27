@@ -239,3 +239,40 @@ def archive_counts(root=None):
             except Exception:
                 out[name] = None
     return out
+
+# --------------------------------------------------------------------------
+# Views (0.15.0): drawings published beside the page. A view is a spec file in
+# the repository (the truth), a published URL (the pointer), and two facts read
+# from the spec and from the delivery -- never typed: the revision the drawing
+# was measured at (meta.repository.revision, an Archify primitive) and the
+# SHA-256 of the spec bytes that were delivered. The gate compares both.
+# --------------------------------------------------------------------------
+import hashlib as _hashlib
+
+
+def sha256_file(path):
+    h = _hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def view_facts(root, view):
+    """What the spec on disk says now: its sha256 and its declared revision.
+    Returns {} when the spec is absent, so a caller can tell 'unknown' from 'differs'."""
+    spec = view.get("spec")
+    if not spec:
+        return {}
+    path = spec if os.path.isabs(spec) else os.path.join(root, spec)
+    if not os.path.isfile(path):
+        return {}
+    out = {"spec_sha256": sha256_file(path)}
+    try:
+        meta = json.load(open(path, encoding="utf-8")).get("meta") or {}
+        rev = (meta.get("repository") or {}).get("revision")
+        if rev:
+            out["revision"] = rev
+    except Exception:
+        pass
+    return out
