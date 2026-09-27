@@ -81,3 +81,17 @@ class TestGate(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLiveRevision(Base):
+    def test_live_revision_is_recorded_then_idempotent(self):
+        r = run("sync.py", "--live-revision", "c" * 40, project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.read()["facts"]["live_revision"], "c" * 40)
+        r = run("sync.py", "--live-revision", "c" * 40, project=self.dir)
+        self.assertIn("already", r.stdout)
+
+    def test_live_revision_refuses_a_non_commit(self):
+        r = run("sync.py", "--live-revision", "not-a-sha", project=self.dir)
+        self.assertEqual(r.returncode, 2)
+        self.assertNotIn("live_revision", json.dumps(self.read().get("facts", {})))

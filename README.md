@@ -10,7 +10,7 @@ somewhere both sides can read, and make the reading automatic.
 
 | Plugin | What it does |
 |---|---|
-| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.0. |
+| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.1. |
 
 ## Install
 
@@ -60,6 +60,13 @@ Adding a plugin means adding a directory under `plugins/` and one entry to
 This repository plans with itself: `plan/plan.json` at the root is plan-layer's own plan,
 rendered to `plan/index.html` by the same scripts it ships. If the tool is not good enough to
 run on its own roadmap, it is not good enough to publish.
+
+## Works with
+
+- **Archify** (`npx skills add tt-a1i/archify -g`, MIT, maintained separately) for drawings that live
+  beside a planning page: plan-layer's `views` keep them honest (spec sha, measured revision, the
+  gate's drift signals) and use Archify's own evidence primitives rather than reinventing them. Never
+  bundled here: it updates from its author.
 
 ## Where each tool is honest about its limits
 

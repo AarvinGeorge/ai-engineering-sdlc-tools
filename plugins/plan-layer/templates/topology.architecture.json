@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PROJECT NAME, as it runs today",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "https://github.com/OWNER/REPO",
+      "revision": "0000000000000000000000000000000000000000"
+    }
+  },
+  "components": [
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "the service",
+      "sublabel": "what it does, in five words",
+      "pos": [
+        300,
+        200
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "path/to/its/definition",
+          "line": 1,
+          "end_line": 1,
+          "label": "where it is defined"
+        }
+      ]
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "the store",
+      "sublabel": "what it holds",
+      "pos": [
+        300,
+        400
+      ],
+      "size": [
+        180,
+        62
+      ],
+      "sources": [
+        {
+          "path": "path/to/its/definition",
+          "line": 1,
+          "end_line": 1,
+          "label": "where it is defined"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "where it runs",
+      "wraps": [
+        "service",
+        "store"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "from": "service",
+      "to": "store",
+      "label": "reads and writes",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One thing a cold reader should know",
+      "items": [
+        "Replace these three lines",
+        "with facts read off the system",
+        "never with descriptions"
+      ]
+    }
+  ]
+}

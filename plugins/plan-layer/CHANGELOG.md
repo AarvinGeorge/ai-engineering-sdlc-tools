@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.1 — 2026-09-27
+
+**The drawings loop, made reusable.** `sync.py --live-revision <sha>` records the commit that is
+running (for a deploy script's last step; the value is read off the running system, never recalled)
+and refuses anything that is not a hex commit. `init` gains an optional step that creates
+`plan/archify/` from a starter spec carrying the two Archify evidence fields. The skill documents the
+views recipe and names Archify as the tested companion, installed from its author and never bundled
+(this plugin stays standard-library only). Both READMEs gain a "works with" note. 2 tests added.
+
 ## 0.15.0 — 2026-09-27
 
 **Views: drawings published beside the page, kept honest by the files.** A project may keep

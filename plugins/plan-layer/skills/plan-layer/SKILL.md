@@ -173,7 +173,7 @@ That property decays every time someone who knows the context writes a sentence.
 | `/plan-layer status` | Print the current state — active item, stage, next up |
 | `/plan-layer check` | Run the gate: structural failures and drift signals |
 | `/plan-layer render` | Regenerate the page from the JSON |
-| `/plan-layer sync` | After ANY change: refresh view facts from disk, render, run the gate — the one command |
+| `/plan-layer sync` | After ANY change: refresh view facts from disk, render, run the gate — the one command. `--live-revision <sha>` at the end of a deploy |
 | `/plan-layer roll` | Move aged records off the live plan into `plan/archive/` in full (the gate says when) |
 | `/plan-layer help` | This document |
 
@@ -201,6 +201,10 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"        # look at the figures
 7. Copy `${CLAUDE_PLUGIN_ROOT}/templates/MAP.md` to `plan/MAP.md`: the map a fresh session
    reads first — what lives where, the commands after any change, and the reading rules that
    keep token use down.
+8. Optional, if the project keeps drawings beside the page: create `plan/archify/` and copy
+   `${CLAUDE_PLUGIN_ROOT}/templates/topology.architecture.json` as the first spec, filling in
+   `meta.repository.url` and `revision` from the project's own repository. See "Drawings beside
+   the page" below.
 
 ## The cycle
 
@@ -249,6 +253,23 @@ run `roll.py`: it moves older done items, old changelog entries and the queue be
 first eight into `plan/archive/*.json` in full (nothing deleted), keeping one queued item per
 capability. The page then says "N older in archive/…" from the file itself, never from typed
 text. Never load `plan.json` whole into context and never hand it to a subagent; edit by key.
+
+**Drawings beside the page (views).** Some drawings cannot live on the page — an interactive one
+with its own scripts and stylesheet. Keep them beside it and let the gate keep them honest:
+
+1. The spec is the truth and is committed (`plan/archify/<name>.<type>.json`); the delivered HTML
+   is regenerable and ignored; the published URL is the durable pointer.
+2. `plan.json` `views[]` lists each: `figure` (which page figure it belongs under), `label`,
+   `spec`, `url`. Never type `spec_sha256` or `revision`; `sync.py` writes them from the files.
+3. Every deploy ends with `sync.py --live-revision <sha read off the running system>`. The gate
+   then reports a drawing measured at an older commit as DRIFT until it is re-checked.
+4. The tested companion is **Archify** (`npx skills add tt-a1i/archify -g`, MIT). Use ITS
+   primitives, do not reinvent them: `meta.repository.revision` + `components[].sources` for
+   "measured, not described" (verified with `validate --repo-root`), `compare` for a before/after
+   in a plan document, the delivery receipt's SHA-256 for "which spec produced this page". It is
+   installed separately so it updates on its own; this plugin never bundles it. Its exported SVG
+   carries its own stylesheet and font (tested 27 Sep 2026), so the page LINKS a view, never
+   embeds it.
 
 **Parked is not dropped.** A question deferred goes in `parked` with a `trigger` naming when
 it must be answered.

@@ -62,7 +62,10 @@ your-project/
   lists each one: the spec in the repository (the truth), the published URL (the pointer), and two
   facts written only by `scripts/sync.py`, never typed: the spec's SHA-256 and the commit it was
   measured at (`meta.repository.revision`). The gate says when a drawing has gone stale: the spec
-  changed since delivery, the live revision moved past it, or the spec is missing.
+  changed since delivery, the live revision moved past it, or the spec is missing. A deploy's last
+  step is `sync.py --live-revision <sha read off the running system>`. `init` can copy a starter
+  spec (`templates/topology.architecture.json`); the tested companion is Archify, installed from its
+  author, never bundled.
 - **`MAP.md`** is copied on init: a one-page map of the folder for the agent, with the
   reading rules that keep token use down — edit `plan.json` by key with a script, read one
   figure by function name, never hand the file to a subagent.

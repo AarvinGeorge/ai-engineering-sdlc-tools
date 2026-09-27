@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """The one command after any change: record what the drawings are, render, gate.
 
-  sync.py            # refresh views' recorded facts from disk, render the page, run the gate
-  sync.py --no-views # render and gate only
+  sync.py                          # refresh views' recorded facts from disk, render the page, run the gate
+  sync.py --no-views               # render and gate only
+  sync.py --live-revision <sha>    # ALSO record the commit that is running (facts.live_revision), then the above.
+                                   # For a deploy script's last step: the value should be read off the running
+                                   # system (a build stamp, an image label), never recalled.
 
 "Refresh" writes into plan.json, for each view, the spec's current sha256 and
 its declared revision -- the two facts the gate later compares. It is the ONLY
@@ -24,6 +27,19 @@ def main():
     if not L.has_plan():
         return 0
     p = L.paths()
+    if "--live-revision" in sys.argv:
+        i = sys.argv.index("--live-revision")
+        sha = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        if not (7 <= len(sha) <= 40 and all(c in "0123456789abcdef" for c in sha.lower())):
+            print("  sync: --live-revision needs a hex commit (7 to 40 chars), got %r" % sha)
+            return 2
+        d = L.load()
+        if d.setdefault("facts", {}).get("live_revision") != sha:
+            d["facts"]["live_revision"] = sha
+            L.save(d, p["root"])
+            print("  sync: facts.live_revision = %s" % sha)
+        else:
+            print("  sync: facts.live_revision already %s" % sha)
     if "--no-views" not in sys.argv:
         d = L.load()
         changed, missing = 0, []
