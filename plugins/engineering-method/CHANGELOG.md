@@ -2,14 +2,20 @@
 
 ## 0.1.1 — 2026-10-15
 
+- **Live changes, matched to practice (Fable ruling):** back up the state a change touches and read it
+  back; a code-only change records the rollback revision instead. The live-deploy eval no longer
+  judges section order, requires the in-flight check immediately before the restart, and is a
+  **guard, not lift** case: it protects behaviour Opus already shows unaided, so it is excluded from
+  lift reporting.
+
 **Tuning from the first eval run** (Sonnet, one run per arm: the skill fired in 1 of 7 cases).
 
 - **Triggering.** The description now leads with the key use and names the moments that should
   fire it even when the question looks simple: "is it live / passed / zero?", status updates and
   test reports, deploy or restart steps on a live system, choosing or briefing a reviewer model, a
   declined permission, and planning or building code of any size. A `when_to_use` line lists the
-  phrases. Description plus `when_to_use` is 1,253 characters (cap 1,536). A one-run check fired it
-  in 6 of 7 cases.
+  phrases. Description plus `when_to_use` is 1,253 characters (cap 1,536). The final run (Opus, Sonnet judge,
+  3 runs per arm) fired it in 21 of 21.
 - **Tier a is visibly light:** a tier a answer is the thing asked for plus one quick check, with no
   process sections.
 - **Principles sharpened where answers fell short:** a "commit X is live" claim reads the running

@@ -85,7 +85,7 @@ money or touches credentials; the lower one otherwise.
 
 **Live systems and permission**
 13. **Read-only by default on anything real people use.** Ask before mutating; never restart blind
-    (check in-flight work first, and again right before switching); back up and read the backup back
+    (check in-flight work first, and again right before switching); back up the state the change touches and read the backup back (a code-only change records the rollback revision and says so)
     before change; write the rollback commands and the trigger that fires them BEFORE the change;
     after it, read back the running revision and a real health path; prove on a copy before
     production; never run test suites inside the live system. *Test:*
