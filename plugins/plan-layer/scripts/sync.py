@@ -71,6 +71,9 @@ def main():
         if changed:
             L.save(d, p["root"])
         print("  sync: views refreshed (%d field(s) changed)" % changed)
+    # Flush first: when stdout is a pipe, our lines would otherwise print AFTER
+    # the children's, and "rolled ..." would read as happening after the gate.
+    sys.stdout.flush()
     for script in ("render.py", "check.py"):
         r = subprocess.run([sys.executable, os.path.join(HERE, script)])
         if r.returncode not in (0, None) and script == "check.py":

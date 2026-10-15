@@ -76,6 +76,8 @@ class TestSyncRolls(Base):
                          "rolled in full, oldest first")
         self.assertIn("sync: rolled", r.stdout)
         self.assertNotIn("aged off", r.stdout, "the gate after the roll has nothing left to roll")
+        self.assertLess(r.stdout.index("sync: rolled"), r.stdout.index("wrote "),
+                        "the roll line prints before the render and the gate, in the order they ran")
 
     def test_no_roll_leaves_them(self):
         self.history()
