@@ -26,7 +26,7 @@ need is itself a defect (principle 7).
 | Tier | Typical work | What applies |
 |---|---|---|
 | **a. Exploration** | prototype, spike, notebook, throwaway script | Principles 1–4 (evidence, state claims, vendor docs, proven zeros). One review before anyone relies on it. No deploy file, no numbered docs, no ladder unless asked. |
-| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious. |
+| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious; a plan document only when the work spans sessions. |
 | **c. Live** | a system real people use today | Everything: plan reviewed against the running code before building; per-task cross-model review plus a whole-branch pass; a deploy file from a template with a guard test; in-flight check, verified backup, read-backs, rollback, record (references/live-system-changes.md). |
 
 Unsure between two tiers? Take the higher one for anything that writes data, sends messages, spends
@@ -46,9 +46,8 @@ money or touches credentials; the lower one otherwise.
    and cite the page before designing around its behaviour. *Why:* a field read from the system
    confirms or contradicts the docs; it never replaces them. *Test:* every vendor behaviour has a
    citation or is labelled a hypothesis.
-4. **A zero must be proven able to be non-zero.** Before reporting "none found", show the check can
-   find one. *Why:* a green result that tested nothing is the most dangerous kind. *Test:* a positive
-   control, or a deliberately broken input that turns the check red.
+4. **The global measurement rules apply** (proven zeros, fail loudly, dates read in the same pass).
+   This skill adds exit codes, state words and labels (references/measurement-and-state-claims.md).
 
 **Design**
 5. **Recommend the industry practice first, then adapt.** Name the standard way and who does it,
@@ -95,7 +94,7 @@ money or touches credentials; the lower one otherwise.
     indexed the same day; the plan's stage moves when the work moves. *Why:* the next session
     re-derives whatever this one did not write down. *Test:* references/docs-and-decisions.md.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; keep the real technical name
-    and define it once; report multi-step progress as the ladder with measured numbers. *Test:*
+    and define it once; on tier c (or when asked) report progress as the ladder with measured numbers. *Test:*
     references/progress-ladder.md.
 
 ## 3. Which Superpowers skill, when
@@ -104,7 +103,7 @@ money or touches credentials; the lower one otherwise.
 |---|---|---|
 | Intent is fuzzy | `superpowers:brainstorming` | name the stakes tier; principle 5 |
 | Writing the plan | `superpowers:writing-plans` | an out-of-scope list; EXTENDS/NEW per capability; tier c: a fresh reviewer reads it against the running code before building |
-| Building | `superpowers:test-driven-development` | principle 9; implementers do not run the full suite |
+| Building | `superpowers:test-driven-development` | principle 9; implementers run the suite once before committing, never loop on a long run |
 | Many tasks in one session | `superpowers:subagent-driven-development` | principles 10–12 |
 | Independent work at once | `superpowers:dispatching-parallel-agents` | the parallel test in references/parallel-and-worktrees.md |
 | Isolation | `superpowers:using-git-worktrees` | one writer per worktree; reviewers get their own |
@@ -117,7 +116,7 @@ money or touches credentials; the lower one otherwise.
 
 - `references/review-loop.md` — cross-model reviewer, probes, scoped re-review, fix-round escalation
 - `references/model-routing-and-cost.md` — which model for which job, and how agents stay cheap
-- `references/measurement-and-state-claims.md` — proving zeros, state words, timestamps, exit codes
+- `references/measurement-and-state-claims.md` — exit codes, state words, labels (adds to the global measurement rules)
 - `references/progress-ladder.md` — the progress format, with a filled example
 - `references/parallel-and-worktrees.md` — when to fan out, and who may write where
 - `references/live-system-changes.md` — the deploy standard: template, guard test, in-flight, backup, rollback

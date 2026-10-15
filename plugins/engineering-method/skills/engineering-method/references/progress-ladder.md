@@ -1,6 +1,7 @@
 # The progress ladder
 
-The standing way to show progress on any multi-step task, without being asked. It answers in one
+The standing way to show progress on tier c work, without being asked; at any other tier, on
+request. It answers in one
 screen: where the work is, what it cost, what it found, and what is waiting on the person. Prose
 buries all four.
 

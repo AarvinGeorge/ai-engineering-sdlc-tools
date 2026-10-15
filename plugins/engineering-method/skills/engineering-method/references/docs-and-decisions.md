@@ -39,7 +39,8 @@ header describes; it never replaces reading the body when the task depends on th
 
 ## Plans
 
-A numbered plan exists before building on tier b and c work: verifiable steps, an explicit
+Tier b: a short decision note, and a numbered plan only when the work spans sessions. Tier c: a
+numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
 moves, not afterwards.
 

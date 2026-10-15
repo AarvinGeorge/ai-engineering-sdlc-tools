@@ -35,7 +35,8 @@ Legend: **SKILL** = now carried by `engineering-method` (the Karou file can poin
 - The development loop (six stages) — SKILL in part (record as you go, plans before building); the plan-layer machinery and sync.py commands — KAROU (and the plan-layer plugin).
 - Figures on the planning page rule — KAROU (plan-layer specific).
 - Response conventions: header + timestamp — DROP here (global §1 carries it).
-- Simple language, short, bullets, don't ask downstream questions — DROP here (global §4).
+- Simple language, bullets, don't ask downstream questions — DROP here (global §4).
+- Short: the ~250-word default ceiling — MOVE to global §4 (communication); not in the global file today.
 - Take the heavy lifting — KAROU (candidate for global).
 - Wait for the green light — KAROU.
 - Progress ladder — SKILL (progress-ladder.md); KAROU footer names (staging/production) stay as the project's footer lines.

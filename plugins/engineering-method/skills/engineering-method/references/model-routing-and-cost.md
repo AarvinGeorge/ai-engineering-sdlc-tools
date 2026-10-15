@@ -6,9 +6,12 @@ Not "how hard is the task" but **"what does a mistake cost here, and would a tes
 
 | Tier | Use for |
 |---|---|
-| **Strongest** | anything needing a sweep or judgement (find every call site, extend a mechanism across paths); every review that must break something; whole-branch reviews; plans that shape a security decision; research that shapes a decision; any fix round past the third |
-| **Mid** | mechanical work only: transcription where the brief carries the literal code, a single-file rename, following an existing pattern with no discovery; task-level review of a small diff |
-| **Small** | log filtering, grep and summarise, formatting — nothing a person acts on unchecked |
+| **Strongest** | anything needing a sweep or judgement (find every call site, extend a mechanism across paths); every review that must break something; whole-branch reviews; plans that shape a security decision; research that shapes a decision; fix-loop escalation (see below) |
+| **Mid** | the floor for reviewers and for any implementer working from prose rather than code; multi-file integration; task-level review of a small diff |
+| **Cheapest** | transcription where the plan carries the complete code; single-file mechanical fixes; log filtering, grep and summarise, formatting — nothing a person acts on unchecked |
+
+This matches `superpowers:subagent-driven-development` (its model-selection section); it is restated
+here only to add the question above and the rules below.
 
 A history of failed sweeps (one rule needing to hold in six places, found one place per pass) is
 exactly where the stronger model pays for itself.
@@ -17,7 +20,8 @@ exactly where the stronger model pays for itself.
 
 1. **Turn count beats token price.** A cheap model that takes three times the turns costs more and
    pollutes context. Mid tier is the floor for any worker working from prose rather than code.
-2. **Escalate on failure.** Fails twice: a fresh worker one tier up.
+2. **Escalate on failure** by Superpowers' fix rounds (`subagent-driven-development`): early rounds
+   resume the implementer; later rounds go to a fresh implementer at least one tier up.
 3. **The model does not fix independence.** See `review-loop.md`.
 4. **Name the model on every dispatch.** An omitted model inherits the session's and silently
    defeats the routing.
@@ -31,8 +35,9 @@ An agent costs **its context size times its turn count**. So does the controllin
 every request.
 
 - **Brief, never corpus.** Extract the fifty relevant lines; do not hand an agent whole files.
-- **Implementers never run the full suite.** The controller runs it. This removes the spend and the
-  stall: mid-tier implementers waiting on long test runs stalled without committing, repeatedly.
+- **Implementers run the suite once before committing and never loop on a long run; the controller
+  runs it on the merged head.** Implementers that re-ran long suites stalled without committing,
+  repeatedly.
 - **Bounds are enforced, not stated.** Give a tool-call bound; an agent past it is told "stop and
   report", not left to finish. Unenforced bounds were overrun three-fold in practice.
 - **Compact or start fresh before a long mechanical phase** (a deploy, a suite run, a sweep). The

@@ -17,7 +17,7 @@ outage.
 
 ## The deploy standard
 
-One living standard file (`DEPLOYING.md`) and one template (`DEPLOY-TEMPLATE.md`). Every release
+One living standard file (e.g. `DEPLOYING.md`) and one template (e.g. `DEPLOY-TEMPLATE.md`). Every release
 gets its own file copied from the template, every placeholder filled, nothing deleted.
 
 **The guard idea:** the standard carries a machine-readable list of required step ids, and a test in

@@ -49,4 +49,4 @@ claude plugin eval plugins/engineering-method    # spends model calls; run delib
 
 The cases check behaviour, not wording: a prototype must not get live-system ceremony; a test
 report must show the command and its output; the reviewer must be a different model from the
-implementer; a zero must be proven able to be non-zero; a declined permission must stop the action.
+implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled. Each case also carries a skill-fired indicator (not scored).

@@ -18,7 +18,8 @@ review. This file says who reviews, what they must do, and when to stop.
 
 ## What a reviewer must do
 
-- **Execute, not reason from the diff.** Write probe scripts and run them. On the project this came
+- **Execute, not reason from the diff.** Write focused, bounded probes and run them — never the
+  package-wide suite. This adds to the Superpowers reviewer prompt; it does not replace it. On the project this came
   from, every Critical found across five rounds came from a reviewer that ran probes; none from one
   that read carefully. An unreproduced finding is labelled a hypothesis.
 - **Start from what worked yesterday.** Ask first what this change could break that was working;
@@ -34,11 +35,13 @@ review. This file says who reviews, what they must do, and when to stop.
 
 - **One review per task. A scoped re-review only for a Critical, or an Important on a security
   boundary.** Test-only and docs-only fixes are read by the controller from the diff when the
-  implementer's report shows red, then green.
+  implementer's report shows red, then green. **This is a deliberate departure from Superpowers**,
+  which re-reviews every fix round: it trades a small risk on low-stakes fix diffs for cost. On tier c
+  work, or when unsure, follow Superpowers and re-review every round.
 - **A fix that adds a check in one branch is usually the wrong shape.** Ask where the property must
   hold and put it there, once.
-- **Escalate on failure.** A worker that fails twice is replaced by a fresh one a tier up, never the
-  same one retried. Any fix round past the third goes to the strongest model.
+- **Escalate by Superpowers' fix rounds** (`subagent-driven-development`): early rounds resume the
+  implementer; later rounds take a fresh implementer at least one tier up.
 - **Record a residual rather than hiding it.** A known limit, stated, is a decision; a hidden one is
   a defect waiting.
 
