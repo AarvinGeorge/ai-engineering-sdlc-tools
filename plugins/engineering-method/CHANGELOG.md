@@ -22,6 +22,9 @@
   Reviewer: a different model from the same vendor counts as different. The eval sandbox uses its
   own config directory, so a user's global CLAUDE.md is not loaded and the skill must trigger on its
   description alone.
+- **Model routing reference:** two lines added. Read the current usage limits before downgrading a
+  model to save usage (context × turns is the usual driver); an eval that decides a ship runs on the
+  model that will use it, with a mid-tier-or-better judge.
 
 ## 0.1.0 — 2026-10-15
 
