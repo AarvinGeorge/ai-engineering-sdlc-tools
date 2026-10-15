@@ -1,6 +1,6 @@
 ---
 name: plan-layer
-description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init, status, check, render, help.
+description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init [--light], status, check, render, sync, help.
 ---
 
 # plan-layer
@@ -15,6 +15,20 @@ active right now, the deferred questions and the invariants. **A page is the vie
 The problem this solves: an agent's memory ends with its context window, and a human's
 memory of what an agent did ends sooner than that. Written instructions get skipped.
 So the state lives in a file both sides read, and the reading is automatic.
+
+**Works with `engineering-method` (optional).** That sibling plugin carries the engineering
+method; this one only keeps the state. Neither needs the other.
+
+## Light vs full — when
+
+- **Light** (`meta.mode: "light"`, `init --light`): a short project — a one-week take-home, a
+  spike, a small app. You get the state file, the page and the gate's self-consistency FAILs.
+  The gate does not raise views, figures, spec sha, live revision or roll-due signals, and
+  `sync.py` never rolls (there is no archive).
+- **Full** (the default; `meta.mode` absent or `"full"`): a project that runs for weeks, has a
+  deployed system, drawings beside the page, or history worth archiving.
+- Switch by changing the one field. A light plan that outgrows itself becomes full with no
+  migration; every plan written before 0.16.0 is full and unchanged.
 
 ## The standing job — keep it true, every turn
 
@@ -170,11 +184,12 @@ That property decays every time someone who knows the context writes a sentence.
 | Invocation | Does |
 |---|---|
 | `/plan-layer init` | Create `plan/plan.json` from the template and render the first page |
+| `/plan-layer init --light` | The same from the minimal light template (`templates/plan.light.json`) |
 | `/plan-layer status` | Print the current state — active item, stage, next up |
 | `/plan-layer check` | Run the gate: structural failures and drift signals |
 | `/plan-layer render` | Regenerate the page from the JSON |
-| `/plan-layer sync` | After ANY change: refresh view facts from disk, render, run the gate — the one command. `--live-revision <sha>` at the end of a deploy |
-| `/plan-layer roll` | Move aged records off the live plan into `plan/archive/` in full (the gate says when) |
+| `/plan-layer sync` | After ANY change: roll aged records into `plan/archive/` (lossless; `--no-roll` opts out), refresh view facts from disk, render, run the gate — the one command. `--live-revision <sha>` at the end of a deploy |
+| `/plan-layer roll` | Move aged records into `plan/archive/` in full by hand — `sync` already does this; use `roll --dry-run` to preview |
 | `/plan-layer help` | This document |
 
 Scripts live at `${CLAUDE_PLUGIN_ROOT}/scripts/`. Run them with `python3`; they need
@@ -190,7 +205,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"        # look at the figures
 ## init
 
 1. Create `plan/` in the project root.
-2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/plan.json` to `plan/plan.json`.
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/plan.json` to `plan/plan.json` — or, for
+   `init --light`, `templates/plan.light.json` (see "Light vs full"; then skip steps 7 and 8).
 3. Fill in `meta.project`, `meta.subtitle`, and `meta.updated` — **read the clock, do not
    recall a date.**
 4. Replace the placeholder capability and next-item with real ones. Ask the user what the
@@ -248,10 +264,9 @@ and the gate checks it. Capabilities may carry a `short` label for figures.
 **Numbers quoted in two places belong in `facts`.** Figures read `data["facts"]` instead of
 restating a value that also appears in the prose.
 
-**The front page shows this month.** When the gate reports records aged off the front page,
-run `roll.py`: it moves older done items, old changelog entries and the queue beyond the
+**The front page shows this month.** `sync.py` rolls automatically (0.16.0): it moves older done items, old changelog entries and the queue beyond the
 first eight into `plan/archive/*.json` in full (nothing deleted), keeping one queued item per
-capability. The page then says "N older in archive/…" from the file itself, never from typed
+capability, and prints what moved. The page then says "N older in archive/…" from the file itself, never from typed
 text. Never load `plan.json` whole into context and never hand it to a subagent; edit by key.
 
 **Drawings beside the page (views).** Some drawings cannot live on the page — an interactive one
@@ -283,13 +298,17 @@ it must be answered.
   state; a parked question with no trigger; an `accepted` edge case with no reasoning; two
   items claiming one plan document; duplicate capability ids; a second item in `plans.now`;
   `meta.updated` in the future; the page out of sync with the JSON; `plan_version`
-  disagreeing with the newest changelog entry. Exit code 1.
+  disagreeing with the newest changelog entry; an unknown `meta.mode`; a `meta.size_budget_kb`
+  that is not a positive whole number. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched; the last substantive commit newer than `meta.updated`; a plan older than
   fourteen days; a finished plan with no period or no outcome; `meta.version` disagreeing
   with `plan_version`; an item naming no capability; assertions declared but never verified,
   or verified over a week ago; a figure reading a fact the plan does not define; an active
-  item where every unfinished task is blocked. Exit 0 unless `--strict`.
+  item where every unfinished task is blocked; records due to roll; `plan.json` over its size
+  budget (`meta.size_budget_kb`, default 200 KB). Exit 0 unless `--strict`.
+- **Light mode** skips the full-only signals: views, figures, spec sha, live revision and
+  roll-due. Every FAIL above still applies.
 
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays with the `grounded` and `verified` stages.
@@ -343,6 +362,9 @@ Optional `.plan-layer.json` in the project root:
 ```json
 { "plan_dir": "plan", "plan_file": "plan.json", "page_file": "index.html" }
 ```
+
+In `plan.json` itself: `meta.mode` (`"full"` or `"light"`) and `meta.size_budget_kb` (the KB
+size above which the gate drifts; default 200).
 
 ## Publishing the page
 

@@ -44,6 +44,14 @@ is which is the point of writing them down.
 > `plan/archive/*.json` in full and the page counts them. It is not yet READABLE from the page —
 > there is no view over the archive and no record of transitions (when an invariant broke). An
 > archive index is queued on the plugin's own plan; transitions remain open as written below.
+>
+> **Size, partly closed, 0.16.0 (15 Oct 2026).** Kept history only helped if someone ran `roll.py`,
+> and on a two-month project nobody did: `plan.json` reached 212 KB. `sync.py` now rolls on every run
+> (212 → 172 KB measured on a copy) and the budget is `meta.size_budget_kb`. Still open, honestly:
+> rolling moves only history (done, changelog, the queue's tail). Live state — parked questions,
+> edge cases, capabilities, a finished item's long checklist — is not rolled and can still grow past
+> the budget; on that project those four held about 97 KB of the 172 KB after the roll. There is no pruning
+> feature; the gate's DRIFT is the only signal.
 
 
 `plan.json` is a **snapshot**. It says an invariant is at risk; it cannot say *when it broke*
