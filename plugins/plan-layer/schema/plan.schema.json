@@ -79,6 +79,18 @@
         "allow_multiple_active": {
           "type": "boolean",
           "description": "Set true to allow more than one item in plans.now. The gate fails on a second active item otherwise: one thing in flight with its own checklist is what makes the page answer 'what is happening right now' in one glance."
+        },
+        "mode": {
+          "enum": [
+            "full",
+            "light"
+          ],
+          "description": "0.16.0. 'light' is for short projects: the state file and the gate, without views, figures, live revision or rolling. Absent means full."
+        },
+        "size_budget_kb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "0.16.0. The gate drifts when plan.json is larger than this many KB. Absent means 200."
         }
       }
     },

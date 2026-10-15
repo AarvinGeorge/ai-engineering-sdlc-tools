@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "project": "PROJECT NAME",
+    "subtitle": "One line on what this project is",
+    "mode": "light",
+    "plan_version": "0.1.0",
+    "updated": "REPLACE WITH ISO-8601 UTC READ FROM A CLOCK",
+    "changelog": [
+      {"version": "0.1.0", "date": "REPLACE", "note": "Plan created."}
+    ]
+  },
+  "capabilities": [
+    {
+      "id": 1,
+      "name": "First capability",
+      "short": "First",
+      "what": "What it does, in one line.",
+      "build": "not-started",
+      "plan": "none",
+      "where": "No plan yet",
+      "evidence": ""
+    }
+  ],
+  "plans": {
+    "done": [],
+    "now": [],
+    "next": [
+      {
+        "name": "First thing to do",
+        "why": "Why this one first.",
+        "unblocks": "What it makes possible.",
+        "stage": "intent",
+        "capability": 1
+      }
+    ]
+  }
+}

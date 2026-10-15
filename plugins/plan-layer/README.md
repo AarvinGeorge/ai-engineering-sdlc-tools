@@ -21,7 +21,8 @@ claude plugin marketplace add AarvinGeorge/ai-engineering-sdlc-tools
 claude plugin install plan-layer@ai-engineering-sdlc-tools
 ```
 
-Then, in any project you want it for, ask the agent to run `/plan-layer init`.
+Then, in any project you want it for, ask the agent to run `/plan-layer init` — or
+`/plan-layer init --light` for a short project (see "Light and full" below).
 
 **Nothing to install beyond Python 3**, which macOS and most Linux ship. Zero third-party
 packages, by design.
@@ -33,6 +34,7 @@ your-project/
   plan/
     plan.json      the state — you and the agent both edit this
     index.html     the view — generated, committed, never hand-edited
+    archive/       rolled history, in full — written by sync.py, committed with plan.json and index.html
     figures.py     optional: your own diagrams
     MAP.md         the map a fresh session reads first: what lives where, the commands, the reading rules
     archive/       history in full, machine-readable: older done items, old changelog, the queue beyond the front page
@@ -54,7 +56,8 @@ your-project/
   older records into `plan/archive/*.json` **in full** — the last 8 done items, the last 10
   changelog entries and the first 8 queued items stay, plus one queued item per capability so
   the gate never reads "blocked with nothing queued" because of a roll. Nothing is deleted;
-  running it twice is safe. The gate says when it is due, and the Done and Next headings gain
+  running it twice is safe. Since 0.16.0 `sync.py` rolls automatically and prints what moved
+  (`--no-roll` opts out). The gate says when it is due, and the Done and Next headings gain
   "N older in archive/…" counted from the archive file, never typed. Keep-counts are
   overridable per project under `roll` in `.plan-layer.json`.
 - **Views** (0.15.0) are drawings that live beside the page rather than on it — the first kind is
@@ -189,8 +192,8 @@ plan declares `meta.allow_multiple_active: true`.
 rewritten: the page reads a carried-over `status` in the outcome slot and `plan_file` in the
 `file` slot, so nothing is lost on the way across. A finished plan missing either **drifts**.
 
-**Long sections get rolled, not truncated.** Run `scripts/roll.py` when the gate reports that
-records have aged off the front page. It moves them, in full, into `plan/archive/done.json`,
+**Long sections get rolled, not truncated.** `scripts/sync.py` rolls them automatically (0.16.0;
+`scripts/roll.py` does the same by hand, `--dry-run` to preview). It moves them, in full, into `plan/archive/done.json`,
 `archive/changelog.json` and `archive/backlog.json`, and the Done and Next headings then read
 "N older in archive/done.json" from the file itself. Before 0.14.0 this was done by hand into
 a markdown file with the count typed into the heading hint; that count went stale within days,
@@ -300,8 +303,7 @@ Then look at what you drew:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/roll.py"       # when the gate says records have aged off the front page
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sync.py"       # after ANY change: refresh view facts, render, gate — the one command
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sync.py"       # after ANY change: roll, refresh view facts, render, gate — the one command
 ```
 
 It writes every figure to `plan/.figures/` as its own standalone page, screenshots each with
@@ -329,6 +331,17 @@ number, and they take any status they show from the capability, invariant or ite
 to rather than hardcoding it. A figure that hardcodes a fact will eventually disagree with the table above it —
 this removes the possibility rather than checking for it afterwards.
 
+## Light and full
+
+(0.16.0) A one-week project needs the state file and the gate, not figures or an
+archive. `meta.mode: "light"` (written by `init --light` from `templates/plan.light.json`) keeps every structural FAIL and drops the full-only ceremony: figures, the archive and rolling.
+Archify views are opt-in in both modes: declared views are checked exactly as in full mode
+(missing spec, stale spec sha, live revision); no views declared means nothing is enforced.
+Absent means full, so every existing plan is unchanged. Change the one field to move between them.
+
+Works with **`engineering-method`** (optional), the sibling plugin that carries the engineering
+method; plan-layer stays a state tool.
+
 ## Configuration
 
 Optional `.plan-layer.json` in the project root, if the defaults do not suit:
@@ -336,6 +349,9 @@ Optional `.plan-layer.json` in the project root, if the defaults do not suit:
 ```json
 { "plan_dir": "plan", "plan_file": "plan.json", "page_file": "index.html" }
 ```
+
+In `plan.json`: `meta.size_budget_kb` sets the size above which the gate drifts (default 200 KB),
+and `meta.mode` picks light or full.
 
 ## Schema
 

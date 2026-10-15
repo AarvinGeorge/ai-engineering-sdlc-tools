@@ -227,6 +227,74 @@ def rollable(d, cfg):
     }
 
 
+def _append_archive(path, items):
+    """Append items to an archive file, skipping exact duplicates. Returns how many were new."""
+    if not items:
+        return 0
+    have = json.load(open(path, encoding="utf-8")) if os.path.isfile(path) else []
+    keys = {json.dumps(x, sort_keys=True, ensure_ascii=False) for x in have}
+    new = [x for x in items if json.dumps(x, sort_keys=True, ensure_ascii=False) not in keys]
+    atomic_write(path, json.dumps(have + new, indent=1, ensure_ascii=False) + "\n")
+    return len(new)
+
+
+def roll(root=None):
+    """Move what `rollable` says is due into plan/archive/, in full. The one writer.
+
+    roll.py and sync.py both call this, so there is one roll rule and one way
+    of applying it. Nothing is deleted: archive files are append-only and
+    de-duplicated, so a second run is a no-op. Returns the counts moved and the
+    file size before and after (bytes); all zero counts means nothing was due.
+    """
+    p = paths(root)
+    cfg = roll_config(p["root"])
+    d = load(p["root"])
+    before = os.path.getsize(p["src"])
+    r = rollable(d, cfg)
+    out = {"done": len(r["done"]), "changelog": len(r["changelog"]), "next": len(r["next"]),
+           "before": before, "after": before}
+    if not (r["done"] or r["changelog"] or r["next"]):
+        return out
+    adir = os.path.join(p["dir"], ARCHIVE_DIRNAME)
+    os.makedirs(adir, exist_ok=True)
+    out["new"] = (_append_archive(os.path.join(adir, "done.json"), r["done"]),
+                  _append_archive(os.path.join(adir, "changelog.json"), r["changelog"]),
+                  _append_archive(os.path.join(adir, "backlog.json"), r["next"]))
+    if r["done"]:
+        d["plans"]["done"] = d["plans"]["done"][-cfg["keep_done"]:]
+    if r["changelog"]:
+        d["meta"]["changelog"] = d["meta"]["changelog"][-cfg["keep_log"]:]
+    if r["next"]:
+        d["plans"]["next"] = r["keep_next"]
+    save(d, p["root"])
+    out["after"] = os.path.getsize(p["src"])
+    return out
+
+
+# --------------------------------------------------------------------------
+# Size budget and mode (0.16.0). Read from the plan itself, from one place, so
+# check.py and anything else that asks cannot disagree.
+SIZE_BUDGET_KB_DEFAULT = 200
+MODES = ("full", "light")
+
+
+def size_budget_kb(d):
+    """meta.size_budget_kb when it is a positive whole number, else the default.
+
+    The gate FAILs on a value that is present but nonsense (see check.py), so
+    falling back here never hides a typo.
+    """
+    v = (d.get("meta") or {}).get("size_budget_kb")
+    if isinstance(v, int) and not isinstance(v, bool) and v > 0:
+        return v
+    return SIZE_BUDGET_KB_DEFAULT
+
+
+def mode(d):
+    """'light' or 'full'. Absent means full, so every plan written before 0.16.0 is unchanged."""
+    return "light" if (d.get("meta") or {}).get("mode") == "light" else "full"
+
+
 def archive_counts(root=None):
     """How many records sit in each archive file, for the page's section hints."""
     pdir = paths(root)["dir"]

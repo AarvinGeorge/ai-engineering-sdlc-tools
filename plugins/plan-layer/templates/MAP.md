@@ -7,6 +7,7 @@ Drawings, if the project has any, come from `figures.py`. Everything else here i
 |---|---|---|
 | `plan.json` | the live plan: what is active, next, recently done, parked, invariants, facts, glossary | yes, one key at a time, with a small script; never load it whole into context |
 | `index.html` | the rendered page | never; run the renderer |
+| `archive/*.json` | history rolled off by `sync.py`, in full | never by hand; commit it with `plan.json` and `index.html` |
 | `figures.py` | one function per drawing, assembled in `build()` | yes; read ONE function by name, never the whole file |
 | `archive/` | history in full: older done items, old changelog, the queue beyond the front page, retired figures | append-only; read only when the question is about the past |
 | `MAP.md` | this file | when the layout changes |
@@ -18,7 +19,7 @@ P="${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/ai-engineering-sdlc-too
 python3 "$P/scripts/render.py"     # plan.json (+ figures.py) -> index.html
 python3 "$P/scripts/figcheck.py"   # only if a figure changed; then LOOK at plan/.figures/NN.png
 python3 "$P/scripts/check.py"      # the gate: FAIL blocks the turn, DRIFT is advisory
-python3 "$P/scripts/roll.py"       # when the gate says records have aged off the front page
+python3 "$P/scripts/sync.py"       # after ANY change: roll aged records, refresh views, render, gate
 # then republish the page
 ```
 
@@ -26,7 +27,7 @@ python3 "$P/scripts/roll.py"       # when the gate says records have aged off th
 
 - Smallest edit that makes the page true. Move an item between `now` / `next` / `done`; never duplicate it.
 - `meta.updated` comes from the clock, never from memory. Bump `meta.plan_version` and append one changelog line per substantive change.
-- The front page shows this month. `roll.py` keeps the last 8 done, the last 10 changelog entries and the first 8 queued (plus one per capability); the rest live in `archive/` in full. Nothing is deleted.
+- The front page shows this month. `sync.py` rolls automatically and keeps the last 8 done, the last 10 changelog entries and the first 8 queued (plus one per capability); the rest live in `archive/` in full. Nothing is deleted.
 - A figure shows the system as measured, never an invented topology. If two figures tell the same story, retire the older one.
 - Numbers quoted in prose and in a figure live once, in `facts`.
 - Never hand `plan.json` or `figures.py` to a subagent. Hand the slice it needs.
