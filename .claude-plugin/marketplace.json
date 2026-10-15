@@ -28,6 +28,26 @@
         "documentation"
       ],
       "whenToUse": "Use on any project where a coding agent and a human both need to know the current state — what is built, what is being worked on, what is deliberately deferred. Most useful when work spans many sessions, because an agent's memory ends with its context window and a human's memory of what the agent did ends sooner."
+    },
+    {
+      "name": "engineering-method",
+      "description": "An engineering method for working with coding agents, carried to every project: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system). A thin layer over Superpowers.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Aarvin George Poozhikala",
+        "url": "https://github.com/AarvinGeorge"
+      },
+      "source": "./plugins/engineering-method",
+      "category": "workflow",
+      "keywords": [
+        "workflow",
+        "sdlc",
+        "method",
+        "review",
+        "verification",
+        "agents"
+      ],
+      "whenToUse": "Use on any project where a coding agent plans, builds, reviews or ships work, and when deciding how much process a task deserves. Most useful with Superpowers installed, which it points to rather than restates."
     }
   ]
 }

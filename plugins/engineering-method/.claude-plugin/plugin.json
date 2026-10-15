@@ -1,0 +1,20 @@
+{
+  "name": "engineering-method",
+  "description": "An engineering method for working with coding agents, carried to every project: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users). A thin layer over Superpowers that adds what it does not say: evidence and state claims as measurements, cross-model review that executes, model routing by the cost of a mistake, and safe changes to live systems.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Aarvin George Poozhikala",
+    "url": "https://github.com/AarvinGeorge"
+  },
+  "repository": "https://github.com/AarvinGeorge/ai-engineering-sdlc-tools",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "sdlc",
+    "method",
+    "review",
+    "verification",
+    "agents"
+  ],
+  "skills": "./skills/"
+}
