@@ -768,7 +768,10 @@ def run(root=None):
         budget = L.size_budget_kb(d)
         if kb > budget:
             drifts.append("plan.json is %d KB, over its budget %d KB (meta.size_budget_kb) — too large to "
-                          "hand to any agent whole; roll history off, or prune content" % (kb, budget))
+                          "hand to any agent whole; %s" % (kb, budget,
+                                                          "roll history off, or prune content" if full else
+                                                          "prune content or set meta.mode to full (light mode "
+                                                          "keeps no archive)"))
     except OSError:
         pass
 
@@ -779,7 +782,9 @@ def run(root=None):
     # project's recorded live revision (facts.live_revision, written by the
     # deploy) differs from the spec's meta.repository.revision.
     live_rev = str((d.get("facts") or {}).get("live_revision") or "")
-    for v in (d.get("views") or []) if full else []:
+    # Checked in BOTH modes once declared (founder ruling 15 Oct: light mode is used
+    # with Archify). A plan that declares no views is held to nothing here.
+    for v in d.get("views") or []:
         name = v.get("label") or v.get("spec") or "view"
         now_ = L.view_facts(root, v)
         if not now_:

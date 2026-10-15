@@ -17,7 +17,8 @@ drawing nobody can regenerate is the quiet lie this layer exists to prevent.
 Rolling (0.16.0): when records have aged off the front page, sync moves them
 into plan/archive/ in full (plan_lib.roll -- the same function roll.py runs, so
 there is one rule) and prints what moved. Lossless; --no-roll opts out. A plan
-in light mode (meta.mode = "light") is never rolled: it has no archive.
+in light mode (meta.mode = "light") is never rolled: it has no archive. Views
+are opt-in in both modes: once declared they are refreshed and checked alike.
 """
 import os
 import subprocess
@@ -53,7 +54,8 @@ def main():
                   % (r["done"], r["changelog"], r["next"],
                      os.path.relpath(os.path.join(p["dir"], L.ARCHIVE_DIRNAME), p["root"]),
                      r["before"] // 1024, r["after"] // 1024))
-    if "--no-views" not in sys.argv and L.mode(L.load()) == "full":
+    # Views are refreshed in both modes: declared views are opt-in, then checked.
+    if "--no-views" not in sys.argv:
         d = L.load()
         changed, missing = 0, []
         for v in d.get("views") or []:

@@ -165,11 +165,9 @@ class TestLightTemplate(Base):
 
 class TestLightModeSkipsFullOnlyChecks(Base):
     def full_only_material(self):
-        """Things that drift in full mode: a view whose spec is gone, a live revision,
-        a figure reading a missing fact, and history due to roll."""
+        """Things only full mode raises: a figure reading a missing fact, and history due
+        to roll. (Views are NOT here: once declared they are checked in both modes.)"""
         self.history()
-        self.d["views"] = [{"label": "topology", "spec": "plan/archify/missing.json", "spec_sha256": "ab" * 32}]
-        self.d.setdefault("facts", {})["live_revision"] = "abcdef1"
         with open(os.path.join(self.dir, "plan", "figures.py"), "w") as fh:
             fh.write("x = F.get('nowhere')\n")
 
@@ -178,7 +176,7 @@ class TestLightModeSkipsFullOnlyChecks(Base):
         self.write()
         _, _, drifts = self.gate()
         text = "\n".join(drifts)
-        for needle in ("not on disk", "aged off", "fact 'nowhere'"):
+        for needle in ("aged off", "fact 'nowhere'"):
             self.assertIn(needle, text)
 
     def test_light_mode_does_not(self):
@@ -187,7 +185,7 @@ class TestLightModeSkipsFullOnlyChecks(Base):
         self.write()
         _, fails, drifts = self.gate()
         text = "\n".join(fails + drifts)
-        for needle in ("not on disk", "aged off", "nowhere", "live revision", "spec"):
+        for needle in ("aged off", "nowhere", "view"):
             self.assertNotIn(needle, text)
 
     def test_sync_does_not_roll_a_light_plan(self):
@@ -205,6 +203,86 @@ class TestLightModeSkipsFullOnlyChecks(Base):
         self.write()
         _, fails, _ = self.gate()
         self.assertTrue(any("meta.mode" in f for f in fails), fails)
+
+
+class TestViewsAreOptInInBothModes(Base):
+    """Founder ruling, 15 Oct: light mode is used WITH Archify. Declared views are
+    checked exactly as in full mode; no views declared means nothing is enforced."""
+
+    def spec(self, name="topology.architecture.json", rev="abcdef1"):
+        os.makedirs(os.path.join(self.dir, "plan", "archify"), exist_ok=True)
+        path = os.path.join(self.dir, "plan", "archify", name)
+        with open(path, "w") as fh:
+            json.dump({"meta": {"repository": {"revision": rev}}}, fh)
+        return "plan/archify/" + name
+
+    def each_mode(self, setup):
+        out = {}
+        for mode in ("full", "light"):
+            self.tearDown()
+            self.setUp()
+            self.d["meta"]["mode"] = mode
+            setup()
+            self.write()
+            out[mode] = (run("sync.py", project=self.dir), self.gate())
+        return out
+
+    def test_missing_spec_is_the_same_failure_in_light(self):
+        def setup():
+            self.d["views"] = [{"label": "topology", "spec": "plan/archify/nothere.json", "spec_sha256": "ab" * 32}]
+            self.d.setdefault("facts", {})["live_revision"] = "abcdef1"
+        out = self.each_mode(setup)
+        self.assertEqual(out["full"][0].returncode, 2)
+        self.assertEqual(out["light"][0].returncode, 2, out["light"][0].stdout)
+        for mode in out:
+            self.assertTrue(any("not on disk" in x for x in out[mode][1][2]), (mode, out[mode][1]))
+
+    def test_stale_spec_sha_is_the_same_drift_in_light(self):
+        def setup():
+            self.d["views"] = [{"label": "topology", "spec": self.spec(), "spec_sha256": "ab" * 32}]
+        drifts = {}
+        for mode in ("full", "light"):
+            self.tearDown()
+            self.setUp()
+            self.d["meta"]["mode"] = mode
+            setup()
+            self.write()
+            drifts[mode] = [x for x in self.gate()[2] if "spec changed since it was delivered" in x]
+        self.assertEqual(len(drifts["full"]), 1)
+        self.assertEqual(drifts["light"], drifts["full"])
+
+    def test_live_revision_drift_applies_in_light_once_a_view_is_declared(self):
+        self.d["meta"]["mode"] = "light"
+        self.d["views"] = [{"label": "topology", "spec": self.spec(rev="1111111")}]
+        self.d.setdefault("facts", {})["live_revision"] = "2222222"
+        self.write()
+        self.assertEqual(run("sync.py", project=self.dir).returncode, 0)
+        self.assertTrue(any("live revision is 2222222" in x for x in self.gate()[2]))
+
+    def test_light_with_no_views_is_still_clean(self):
+        self.d["meta"]["mode"] = "light"
+        self.d.setdefault("facts", {})["live_revision"] = "abcdef1"
+        self.write()
+        code, fails, drifts = self.gate()
+        self.assertEqual(fails, [])
+        self.assertFalse(any("view" in x for x in drifts), drifts)
+
+
+class TestBudgetWordingByMode(Base):
+    def over(self, mode):
+        self.d["meta"]["mode"] = mode
+        self.d["meta"]["size_budget_kb"] = 4
+        self.d["glossary"] = [{"term": "T%d" % i, "means": "x" * 1000} for i in range(10)]
+        self.write()
+        return [x for x in self.gate()[2] if "plan.json is" in x][0]
+
+    def test_light_does_not_say_roll(self):
+        msg = self.over("light")
+        self.assertNotIn("roll", msg)
+        self.assertIn("prune content or set meta.mode to full", msg)
+
+    def test_full_is_unchanged(self):
+        self.assertIn("roll history off, or prune content", self.over("full"))
 
 
 if __name__ == "__main__":
