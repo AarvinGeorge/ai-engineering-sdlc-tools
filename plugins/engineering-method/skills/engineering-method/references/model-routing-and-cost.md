@@ -46,3 +46,8 @@ every request.
   everything and gains nothing.
 - **Lanes only when speed is asked for and the regions are disjoint.** Four lanes with four reviews
   is the expensive shape; one or two is the default.
+- **Before choosing a weaker model to save usage, read the current limits (/usage); never recall
+  them.** The usual cost driver is context length × turns, so save by fresh sessions and tight
+  briefs before downgrading models.
+- **An eval that decides whether something ships runs on the model that will use it, graded by a
+  mid-tier-or-better judge.**

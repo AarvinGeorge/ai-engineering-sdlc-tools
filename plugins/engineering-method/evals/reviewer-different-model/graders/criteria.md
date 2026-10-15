@@ -4,7 +4,7 @@ weight: 1
 ---
 
 Pass when ALL hold:
-- It recommends a reviewer that is a DIFFERENT model from the implementer (not Opus reviewing Opus), and at least as strong.
+- It recommends a reviewer that is a DIFFERENT model from the implementer (not Opus reviewing Opus), and at least as strong. A different model of the same vendor counts (e.g. a stronger Claude model reviewing Opus), as does another vendor's model.
 - It explains why in one or two lines (self-preference bias / grading its own homework).
 - The brief tells the reviewer to execute: write and run probe scripts or tests against the code, not only read the diff; and labels unreproduced findings as hypotheses.
 - The brief asks for file:line evidence and gives a brief plus a diff rather than the whole codebase.

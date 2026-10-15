@@ -32,7 +32,7 @@
     {
       "name": "engineering-method",
       "description": "An engineering method for working with coding agents, carried to every project: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system). A thin layer over Superpowers.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Aarvin George Poozhikala",
         "url": "https://github.com/AarvinGeorge"

@@ -11,7 +11,7 @@ outage.
 | Read-only by default | Inspection, logs, config reads, benchmarks need no permission. |
 | Ask before mutating | Config edits, restarts, scheduled-job changes, installs, credential changes: state what changes and how to undo it. |
 | Never restart blind | Check for in-flight work first; re-read it after any wait or build. |
-| Back up, then verify the backup | A backup not read back is a hope. |
+| Back up the state the change touches, then verify the backup | A backup not read back is a hope; a code-only change records the rollback revision instead and says so. |
 | Prove before production | On a laptop, a throwaway container, or a separate test stack. Never run a test suite inside the live system. |
 | No secrets in artifacts | Name a credential, never its value — not in documents, commits or transcripts. |
 
@@ -27,7 +27,7 @@ placeholder. The method is enforced by the suite, not by memory.
 The template's sections, in order — adapt the content, keep the shape:
 
 1. **Preconditions** — what must be true before starting, each with the command that checks it.
-2. **Backup, verified** — snapshot the state the change touches; read it back.
+2. **Backup, verified** — snapshot the state the change touches; read it back. A code-only change (no data, schema or config touched, checked against the diff) records the running revision as the rollback point instead.
 3. **Build and test off the live system** — merge, full suites, image build and its own suite.
 4. **Bring the target up to date** — fetch, config regenerated from source (never hand-merged).
 5. **Red against the old** — the new checks run against the old system first and fail, proving
