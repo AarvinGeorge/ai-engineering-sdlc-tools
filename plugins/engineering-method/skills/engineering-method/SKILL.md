@@ -25,7 +25,7 @@ need is itself a defect (principle 7).
 
 | Tier | Typical work | What applies |
 |---|---|---|
-| **a. Exploration** | prototype, spike, notebook, throwaway script | Principles 1–3 (evidence, state claims, vendor docs). One review before anyone relies on it. No deploy file, no numbered docs, no ladder unless asked. |
+| **a. Exploration** | prototype, spike, notebook, throwaway script | Principles 1–4 (evidence, state claims, vendor docs, proven zeros). One review before anyone relies on it. No deploy file, no numbered docs, no ladder unless asked. |
 | **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious. |
 | **c. Live** | a system real people use today | Everything: plan reviewed against the running code before building; per-task cross-model review plus a whole-branch pass; a deploy file from a template with a guard test; in-flight check, verified backup, read-backs, rollback, record (references/live-system-changes.md). |
 
