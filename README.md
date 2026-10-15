@@ -11,6 +11,7 @@ somewhere both sides can read, and make the reading automatic.
 | Plugin | What it does |
 |---|---|
 | [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.2. |
+| [`engineering-method`](plugins/engineering-method) | An engineering method carried to every project as one on-demand skill: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users), a thin layer over Superpowers. Current: 0.1.0. |
 
 ## Install
 
