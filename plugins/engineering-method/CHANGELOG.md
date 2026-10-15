@@ -7,6 +7,9 @@
   judges section order, requires the in-flight check immediately before the restart, and is a
   **guard, not lift** case: it protects behaviour Opus already shows unaided, so it is excluded from
   lift reporting.
+- **Known gap, for 0.1.2:** with the corrected criteria the live-deploy case still fails both arms
+  (Opus, 3 runs each). Fable's reading of the answers: every safeguard is present except asking for
+  proof the merged commit passed tests or CI before the live change. Not chased further in 0.1.1.
 
 **Tuning from the first eval run** (Sonnet, one run per arm: the skill fired in 1 of 7 cases).
 
