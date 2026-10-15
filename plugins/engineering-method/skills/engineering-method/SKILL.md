@@ -1,7 +1,7 @@
 ---
 name: engineering-method
-description: Use when planning, building, reviewing, verifying or shipping software with a coding agent, and when choosing how much process a task deserves. Scales the method by stakes (prototype, internal tool, live system with real users). Adds what Superpowers does not say - evidence and state claims as measurements, a reviewer that is a different model and executes probes, model routing by the cost of a mistake, one writer per worktree, safe changes to a live system, and how to report progress.
-when_to_use: Starting non-trivial work; dispatching implementers or reviewers; choosing a model for a subagent; reporting a test result, a deploy or any "it works / it is live" claim; touching a system real people use; deciding whether something is over-engineered; recording a decision.
+description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering, even when the question looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or is planning, building, reviewing or shipping code of any size, including a quick script, where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, zeros proven able to be non-zero, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
+when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision".
 ---
 
 # engineering-method
@@ -21,7 +21,8 @@ silently picking one.
 ## 1. Decide the stakes first
 
 The process scales with what a mistake costs. Name the tier at the start; ceremony the tier does not
-need is itself a defect (principle 7).
+need is itself a defect (principle 7). **Tier a answers look light:** the thing asked for, plus one
+quick check the person can run. No process sections, no plan, no review pipeline.
 
 | Tier | Typical work | What applies |
 |---|---|---|
@@ -41,7 +42,9 @@ money or touches credentials; the lower one otherwise.
 2. **A state claim is a measurement.** "Deployed", "merged", "parked", "live", "pre-existing",
    "unchanged since" are read in the same pass, command shown, never recalled. *Why:* recalled state
    in the tone of observed state is how a fix gets believed live when it is not. *Test:* each such
-   word sits next to the command that proved it (references/measurement-and-state-claims.md).
+   word sits next to the command that proved it (references/measurement-and-state-claims.md). For
+   "commit X is live": read the revision the running system reports, then check it is or descends
+   from X (`git merge-base --is-ancestor X <running>`); until then the status line says unverified.
 3. **Vendor docs before vendor claims.** Read the tool's official docs and changelog in the same pass
    and cite the page before designing around its behaviour. *Why:* a field read from the system
    confirms or contradicts the docs; it never replaces them. *Test:* every vendor behaviour has a
@@ -82,11 +85,13 @@ money or touches credentials; the lower one otherwise.
 
 **Live systems and permission**
 13. **Read-only by default on anything real people use.** Ask before mutating; never restart blind
-    (check in-flight work first); back up and verify the backup before destructive change; prove on
-    a copy before production; never run test suites inside the live system. *Test:*
+    (check in-flight work first, and again right before switching); back up and read the backup back
+    before change; write the rollback commands and the trigger that fires them BEFORE the change;
+    after it, read back the running revision and a real health path; prove on a copy before
+    production; never run test suites inside the live system. *Test:*
     references/live-system-changes.md.
 14. **A declined permission means stop.** No retry, no narrower form, no moving the same action to a
-    path that does not prompt. Mark the check unverified and report. *Why:* a workaround defeats the
+    path that does not prompt. Say plainly that it was declined, mark the check unverified and report. *Why:* a workaround defeats the
     decision the person just made. *Test:* the report lists what was declined and left unverified.
 
 **Record and report**
