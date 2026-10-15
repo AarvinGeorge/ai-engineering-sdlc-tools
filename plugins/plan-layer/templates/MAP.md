@@ -7,6 +7,7 @@ Drawings, if the project has any, come from `figures.py`. Everything else here i
 |---|---|---|
 | `plan.json` | the live plan: what is active, next, recently done, parked, invariants, facts, glossary | yes, one key at a time, with a small script; never load it whole into context |
 | `index.html` | the rendered page | never; run the renderer |
+| `archive/*.json` | history rolled off by `sync.py`, in full | never by hand; commit it with `plan.json` and `index.html` |
 | `figures.py` | one function per drawing, assembled in `build()` | yes; read ONE function by name, never the whole file |
 | `archive/` | history in full: older done items, old changelog, the queue beyond the front page, retired figures | append-only; read only when the question is about the past |
 | `MAP.md` | this file | when the layout changes |

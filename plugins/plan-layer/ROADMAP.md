@@ -52,6 +52,10 @@ is which is the point of writing them down.
 > edge cases, capabilities, a finished item's long checklist — is not rolled and can still grow past
 > the budget; on that project those four held about 97 KB of the 172 KB after the roll. There is no pruning
 > feature; the gate's DRIFT is the only signal.
+>
+> **Hypothesis, pre-existing (review of 0.16.0):** the archive de-duplicates by exact JSON. A record
+> edited between an interrupted roll and the re-roll would be archived twice, once per version, with
+> the same id. Not reproduced on a real plan; no code change. A fix would key dedup on a stable id.
 
 
 `plan.json` is a **snapshot**. It says an invariant is at risk; it cannot say *when it broke*

@@ -13,9 +13,11 @@ one place (`plan_lib.size_budget_kb`); a present but nonsense value FAILs rather
 silently.
 
 **Light mode for short projects.** `meta.mode: "light"` (absent = full, so every existing plan is
-unchanged) and `init --light` from `templates/plan.light.json`. In light mode the gate does not raise
-views, figures, spec sha, live revision or roll-due signals and `sync.py` never rolls; every structural
-FAIL still applies, and the page renders as before. An unknown mode FAILs. 15 tests
+unchanged) and `init --light` from `templates/plan.light.json`. In light mode the gate does not raise figure or roll-due signals and `sync.py` never rolls; every
+structural FAIL still applies. Archify views are opt-in in both modes: once declared they are refreshed
+and checked exactly as in full mode (a missing spec makes `sync.py` exit 2); a plan with no views is held
+to nothing about them. Over budget, a light plan is told to prune or switch to full, never to roll.
+`plan/archive/` is now written by `sync.py` and is committed with `plan.json` and `index.html`. The page renders as before. An unknown mode FAILs. 21 tests
 (`tests/test_light_and_budget.py`), each written red first.
 
 ## 0.15.2 — 2026-09-27

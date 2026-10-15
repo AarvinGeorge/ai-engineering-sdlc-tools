@@ -22,9 +22,11 @@ method; this one only keeps the state. Neither needs the other.
 ## Light vs full — when
 
 - **Light** (`meta.mode: "light"`, `init --light`): a short project — a one-week take-home, a
-  spike, a small app. You get the state file, the page and the gate's self-consistency FAILs.
-  The gate does not raise views, figures, spec sha, live revision or roll-due signals, and
-  `sync.py` never rolls (there is no archive).
+  spike, a small app. You get the state file, the page and the gate's self-consistency FAILs, without the
+  figures, archive or rolling ceremony: no figure or roll-due signals, and `sync.py` never rolls.
+  **Archify views are opt-in in both modes:** a light plan that declares `views` gets them checked
+  exactly as in full mode (missing spec, stale spec sha, live-revision drift); one that declares
+  none is held to nothing about views.
 - **Full** (the default; `meta.mode` absent or `"full"`): a project that runs for weeks, has a
   deployed system, drawings beside the page, or history worth archiving.
 - Switch by changing the one field. A light plan that outgrows itself becomes full with no
@@ -66,6 +68,10 @@ conversation, exists nowhere a check can see it — and that is exactly how an i
 active for days while the thing it waits on sits unstarted at the bottom of the queue. The gate
 now fails when an active item waits on something that is only queued, because one of the two is
 in the wrong place.
+
+**Commit `plan/archive/` with `plan.json` and `index.html`.** Since 0.16.0 `sync.py` writes
+`plan/archive/*.json` whenever it rolls, so the three move together in one commit — a plan
+committed without its archive has lost the records it rolled.
 
 ## The conventions that keep it readable
 
@@ -307,8 +313,8 @@ it must be answered.
   or verified over a week ago; a figure reading a fact the plan does not define; an active
   item where every unfinished task is blocked; records due to roll; `plan.json` over its size
   budget (`meta.size_budget_kb`, default 200 KB). Exit 0 unless `--strict`.
-- **Light mode** skips the full-only signals: views, figures, spec sha, live revision and
-  roll-due. Every FAIL above still applies.
+- **Light mode** skips the full-only signals: figures and roll-due. Declared views are checked
+  in both modes. Every FAIL above still applies.
 
 **It deliberately does not check whether the plan is true.** No script can. It makes
 *forgetting* visible; judging accuracy stays with the `grounded` and `verified` stages.

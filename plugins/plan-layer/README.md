@@ -34,6 +34,7 @@ your-project/
   plan/
     plan.json      the state — you and the agent both edit this
     index.html     the view — generated, committed, never hand-edited
+    archive/       rolled history, in full — written by sync.py, committed with plan.json and index.html
     figures.py     optional: your own diagrams
     MAP.md         the map a fresh session reads first: what lives where, the commands, the reading rules
     archive/       history in full, machine-readable: older done items, old changelog, the queue beyond the front page
@@ -332,9 +333,10 @@ this removes the possibility rather than checking for it afterwards.
 
 ## Light and full
 
-(0.16.0) A one-week project needs the state file and the gate, not drawings, a live revision or an
-archive. `meta.mode: "light"` (written by `init --light` from `templates/plan.light.json`) keeps every
-structural FAIL and drops the full-only signals: views, figures, spec sha, live revision and rolling.
+(0.16.0) A one-week project needs the state file and the gate, not figures or an
+archive. `meta.mode: "light"` (written by `init --light` from `templates/plan.light.json`) keeps every structural FAIL and drops the full-only ceremony: figures, the archive and rolling.
+Archify views are opt-in in both modes: declared views are checked exactly as in full mode
+(missing spec, stale spec sha, live revision); no views declared means nothing is enforced.
 Absent means full, so every existing plan is unchanged. Change the one field to move between them.
 
 Works with **`engineering-method`** (optional), the sibling plugin that carries the engineering
