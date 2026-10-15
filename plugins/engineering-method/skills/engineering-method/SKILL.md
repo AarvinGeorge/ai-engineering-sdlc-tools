@@ -26,8 +26,8 @@ need is itself a defect (principle 7).
 | Tier | Typical work | What applies |
 |---|---|---|
 | **a. Exploration** | prototype, spike, notebook, throwaway script | Principles 1–3 (evidence, state claims, vendor docs). One review before anyone relies on it. No deploy file, no numbered docs, no ladder unless asked. |
-| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (refs/review-loop); a short decision note for anything non-obvious. |
-| **c. Live** | a system real people use today | Everything: plan reviewed against the running code before building; per-task cross-model review plus a whole-branch pass; a deploy file from a template with a guard test; in-flight check, verified backup, read-backs, rollback, record (refs/live-system-changes). |
+| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious. |
+| **c. Live** | a system real people use today | Everything: plan reviewed against the running code before building; per-task cross-model review plus a whole-branch pass; a deploy file from a template with a guard test; in-flight check, verified backup, read-backs, rollback, record (references/live-system-changes.md). |
 
 Unsure between two tiers? Take the higher one for anything that writes data, sends messages, spends
 money or touches credentials; the lower one otherwise.
@@ -41,7 +41,7 @@ money or touches credentials; the lower one otherwise.
 2. **A state claim is a measurement.** "Deployed", "merged", "parked", "live", "pre-existing",
    "unchanged since" are read in the same pass, command shown, never recalled. *Why:* recalled state
    in the tone of observed state is how a fix gets believed live when it is not. *Test:* each such
-   word sits next to the command that proved it (refs/measurement-and-state-claims).
+   word sits next to the command that proved it (references/measurement-and-state-claims.md).
 3. **Vendor docs before vendor claims.** Read the tool's official docs and changelog in the same pass
    and cite the page before designing around its behaviour. *Why:* a field read from the system
    confirms or contradicts the docs; it never replaces them. *Test:* every vendor behaviour has a
@@ -73,19 +73,19 @@ money or touches credentials; the lower one otherwise.
 10. **Reviewer ≠ implementer, at least as strong, and it executes.** Different model family where
     possible; the reviewer writes and runs probes; an unreproduced finding is a hypothesis.
     *Why:* same-model review grades its own homework, and reading the diff misses what running it
-    finds. *Test:* each finding names the probe that reproduced it (refs/review-loop).
+    finds. *Test:* each finding names the probe that reproduced it (references/review-loop.md).
 11. **Route models by what a mistake costs and whether a test would catch it.** Not by how hard the
     task feels. Turn count beats token price; brief, never corpus; bounds enforced, not stated.
-    Always name the model when dispatching. *Test:* refs/model-routing-and-cost.
+    Always name the model when dispatching. *Test:* references/model-routing-and-cost.md.
 12. **One writer per worktree; parallel only when regions differ and neither needs the other's
     output.** *Why:* two writers interleave commits; dependent lanes produce "my sibling moved"
-    defects. *Test:* refs/parallel-and-worktrees.
+    defects. *Test:* references/parallel-and-worktrees.md.
 
 **Live systems and permission**
 13. **Read-only by default on anything real people use.** Ask before mutating; never restart blind
     (check in-flight work first); back up and verify the backup before destructive change; prove on
     a copy before production; never run test suites inside the live system. *Test:*
-    refs/live-system-changes.
+    references/live-system-changes.md.
 14. **A declined permission means stop.** No retry, no narrower form, no moving the same action to a
     path that does not prompt. Mark the check unverified and report. *Why:* a workaround defeats the
     decision the person just made. *Test:* the report lists what was declined and left unverified.
@@ -93,10 +93,10 @@ money or touches credentials; the lower one otherwise.
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
     indexed the same day; the plan's stage moves when the work moves. *Why:* the next session
-    re-derives whatever this one did not write down. *Test:* refs/docs-and-decisions.
+    re-derives whatever this one did not write down. *Test:* references/docs-and-decisions.md.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; keep the real technical name
     and define it once; report multi-step progress as the ladder with measured numbers. *Test:*
-    refs/progress-ladder.
+    references/progress-ladder.md.
 
 ## 3. Which Superpowers skill, when
 
@@ -106,12 +106,12 @@ money or touches credentials; the lower one otherwise.
 | Writing the plan | `superpowers:writing-plans` | an out-of-scope list; EXTENDS/NEW per capability; tier c: a fresh reviewer reads it against the running code before building |
 | Building | `superpowers:test-driven-development` | principle 9; implementers do not run the full suite |
 | Many tasks in one session | `superpowers:subagent-driven-development` | principles 10–12 |
-| Independent work at once | `superpowers:dispatching-parallel-agents` | the parallel test in refs/parallel-and-worktrees |
+| Independent work at once | `superpowers:dispatching-parallel-agents` | the parallel test in references/parallel-and-worktrees.md |
 | Isolation | `superpowers:using-git-worktrees` | one writer per worktree; reviewers get their own |
-| Review | `superpowers:requesting-code-review` / `receiving-code-review` | refs/review-loop |
+| Review | `superpowers:requesting-code-review` / `receiving-code-review` | references/review-loop.md |
 | Something broke | `superpowers:systematic-debugging` | principle 8; principle 2 for every "it was already broken" |
 | Before saying done | `superpowers:verification-before-completion` | principles 1, 2, 4 |
-| Merging | `superpowers:finishing-a-development-branch` | tier c: refs/live-system-changes |
+| Merging | `superpowers:finishing-a-development-branch` | tier c: references/live-system-changes.md |
 
 ## 4. References (load when the task needs them)
 
