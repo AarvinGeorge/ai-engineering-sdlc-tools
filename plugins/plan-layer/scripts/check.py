@@ -686,6 +686,16 @@ def run(root=None):
                       "nothing reads it; delete it or keep the two the same"
                       % (legacy, d.get("meta", {}).get("plan_version")))
 
+    meta_ = d.get("meta", {})
+    if "mode" in meta_ and meta_["mode"] not in L.MODES:
+        fails.append("meta.mode is %r — it must be one of %s (absent means full)"
+                     % (meta_["mode"], ", ".join(L.MODES)))
+    if "size_budget_kb" in meta_:
+        b = meta_["size_budget_kb"]
+        if not (isinstance(b, int) and not isinstance(b, bool) and b > 0):
+            fails.append("meta.size_budget_kb is %r — it must be a positive whole number of KB "
+                         "(absent means %d)" % (b, L.SIZE_BUDGET_KB_DEFAULT))
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"
@@ -744,17 +754,21 @@ def run(root=None):
     # the keep rules is a drift signal, not a failure: the plan is still true,
     # it is just carrying more than a cold reader can use. Same rules as
     # roll.py, read from one place, so the two cannot disagree.
-    r = L.rollable(d, L.roll_config(root))
-    due = len(r["done"]) + len(r["changelog"]) + len(r["next"])
-    if due:
-        drifts.append("%d record(s) have aged off the front page (done %d, changelog %d, queued %d) — "
-                      "run scripts/roll.py to move them into %sarchive/ in full"
-                      % (due, len(r["done"]), len(r["changelog"]), len(r["next"]), plan_dir))
+    full = L.mode(d) == "full"
+    if full:
+        r = L.rollable(d, L.roll_config(root))
+        due = len(r["done"]) + len(r["changelog"]) + len(r["next"])
+        if due:
+            drifts.append("%d record(s) have aged off the front page (done %d, changelog %d, queued %d) — "
+                          "run scripts/sync.py (it rolls them into %sarchive/ in full) or scripts/roll.py"
+                          % (due, len(r["done"]), len(r["changelog"]), len(r["next"]), plan_dir))
+    # The size budget (0.16.0) is read from the plan, one place, in both modes.
     try:
         kb = os.path.getsize(SRC) // 1024
-        if kb > 200:
-            drifts.append("plan.json is %d KB — too large to hand to any agent whole; "
-                          "roll history off, or prune content" % kb)
+        budget = L.size_budget_kb(d)
+        if kb > budget:
+            drifts.append("plan.json is %d KB, over its budget %d KB (meta.size_budget_kb) — too large to "
+                          "hand to any agent whole; roll history off, or prune content" % (kb, budget))
     except OSError:
         pass
 
@@ -765,7 +779,7 @@ def run(root=None):
     # project's recorded live revision (facts.live_revision, written by the
     # deploy) differs from the spec's meta.repository.revision.
     live_rev = str((d.get("facts") or {}).get("live_revision") or "")
-    for v in d.get("views") or []:
+    for v in (d.get("views") or []) if full else []:
         name = v.get("label") or v.get("spec") or "view"
         now_ = L.view_facts(root, v)
         if not now_:
@@ -806,7 +820,8 @@ def run(root=None):
     }
     # Staleness detection (0.8.0). Structure was never the thing that rotted;
     # the page quietly disagreeing with itself was.
-    drifts.extend(check_figures(root, d))
+    if full:
+        drifts.extend(check_figures(root, d))
     df, dd = check_dependencies(d)
     fails.extend(df)
     drifts.extend(dd)

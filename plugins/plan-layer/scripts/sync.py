@@ -2,7 +2,8 @@
 """The one command after any change: record what the drawings are, render, gate.
 
   sync.py                          # refresh views' recorded facts from disk, render the page, run the gate
-  sync.py --no-views               # render and gate only
+  sync.py --no-views               # skip the view refresh
+  sync.py --no-roll                # do not roll aged records into plan/archive/ (0.16.0)
   sync.py --live-revision <sha>    # ALSO record the commit that is running (facts.live_revision), then the above.
                                    # For a deploy script's last step: the value should be read off the running
                                    # system (a build stamp, an image label), never recalled.
@@ -12,6 +13,11 @@ its declared revision -- the two facts the gate later compares. It is the ONLY
 writer of those fields, so a hand-typed value can never disagree with the file.
 It refuses (exit 2) when a view's spec is missing, because a page that links a
 drawing nobody can regenerate is the quiet lie this layer exists to prevent.
+
+Rolling (0.16.0): when records have aged off the front page, sync moves them
+into plan/archive/ in full (plan_lib.roll -- the same function roll.py runs, so
+there is one rule) and prints what moved. Lossless; --no-roll opts out. A plan
+in light mode (meta.mode = "light") is never rolled: it has no archive.
 """
 import os
 import subprocess
@@ -40,7 +46,14 @@ def main():
             print("  sync: facts.live_revision = %s" % sha)
         else:
             print("  sync: facts.live_revision already %s" % sha)
-    if "--no-views" not in sys.argv:
+    if "--no-roll" not in sys.argv and L.mode(L.load()) == "full":
+        r = L.roll(p["root"])
+        if "new" in r:
+            print("  sync: rolled done %d, changelog %d, queued %d into %s/ in full (%d -> %d KB)"
+                  % (r["done"], r["changelog"], r["next"],
+                     os.path.relpath(os.path.join(p["dir"], L.ARCHIVE_DIRNAME), p["root"]),
+                     r["before"] // 1024, r["after"] // 1024))
+    if "--no-views" not in sys.argv and L.mode(L.load()) == "full":
         d = L.load()
         changed, missing = 0, []
         for v in d.get("views") or []:
