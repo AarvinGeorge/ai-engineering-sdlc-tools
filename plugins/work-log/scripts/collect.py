@@ -232,13 +232,18 @@ def _toplevel(d):
     return os.path.realpath(out.strip()), True
 
 
+GIT_SINCE_PAD_DAYS = 30
+
+
 def collect_commits(dirs, start, end, tz, mapping, read):
     """Period membership and the shown date/time both use the AUTHOR date in tz.
 
-    git's --since filters on committer date, which is >= author date in normal history,
-    so --since=<start midnight> never drops an in-period authored commit; there is no
-    --until (a commit authored inside but committed after the period still counts) and
-    the author date is filtered here.
+    git's --since filters on committer date, which is >= author date in normal history
+    but not always (clock skew, rebases, cherry-picks). So --since is padded back by
+    GIT_SINCE_PAD_DAYS and the exact author-date filter is done here. A commit whose
+    committer date is more than the pad earlier than its author date can still be
+    dropped. There is no --until (a commit authored inside but committed after the
+    period still counts).
     """
     lo = datetime.combine(start, time(0), tzinfo=tz)
     hi = datetime.combine(end + timedelta(days=1), time(0), tzinfo=tz)
@@ -250,7 +255,7 @@ def collect_commits(dirs, start, end, tz, mapping, read):
     seen, commits, filtered = set(), [], False
     for top in tops:
         args = ["-C", top, "log", "--all", "--no-merges",
-                "--since=" + lo.isoformat(timespec="seconds"),
+                "--since=" + (lo - timedelta(days=GIT_SINCE_PAD_DAYS)).isoformat(timespec="seconds"),
                 "--format=%H%x1f%aI%x1f%s"]
         _, email = _git(["-C", top, "config", "user.email"])
         email = email.strip()

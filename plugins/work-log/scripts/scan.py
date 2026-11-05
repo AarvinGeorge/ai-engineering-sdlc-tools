@@ -22,7 +22,7 @@ KEY_PATTERNS = [
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\."),
 ]
 LONG_TOKEN = re.compile(r"[A-Za-z0-9+/_=]{32,}")
-ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+ISO_DATE = re.compile(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b")
 CLOCK = re.compile(r"\b\d{1,2}:\d{2}\b")
 SAFE_ID = re.compile(r"^[A-Za-z]{1,3}\d{1,6}$")
 FILE_PATH = re.compile(r"(?:^|\s)(?:~|\.{0,2})/\S+|\b[\w-]+\.(?:py|js|ts|tsx|md|json|ya?ml|sh|html|css|toml|ipynb)\b")
@@ -108,11 +108,17 @@ def main(argv=None):
         for e in rows:
             if not isinstance(e, dict):
                 raise ValueError("entry is not an object")
-            for k in ("summary", "project"):
-                if not isinstance(e.get(k, ""), str):
+            for k in ("summary", "project", "start", "end"):
+                if not isinstance(e.get(k) or "", str):
                     raise ValueError("entry %s is not text" % k)
         notes = meta.get("notes") or []
         scope = meta.get("scope_name", "")
+        sources = meta.get("sources") or []
+        if not isinstance(sources, list):
+            raise ValueError("meta.sources is not a list")
+        missing = meta.get("missing_weeks") or []
+        if not isinstance(missing, list) or not all(isinstance(w, dict) for w in missing):
+            raise ValueError("meta.missing_weeks is not a list of objects")
         if not isinstance(notes, list) or not isinstance(scope, str) \
                 or not all(isinstance(n, str) for n in notes):
             raise ValueError("meta fields have the wrong type")
@@ -140,10 +146,21 @@ def main(argv=None):
     emit("meta", "scope_name", privacy_rules(scope, never))
     for i, n in enumerate(notes):
         emit("meta", "notes[%d]" % i, privacy_rules(n, never))
+    for i, src in enumerate(sources):
+        emit("meta", "sources[%d]" % i, privacy_rules(str(src), never))
+    if meta.get("created") is not None:
+        emit("meta", "created", privacy_rules(str(meta["created"]), never))
+    for i, w in enumerate(missing):
+        for k in ("start", "end"):
+            if w.get(k) is not None:
+                emit("meta", "missing_weeks[%d].%s" % (i, k), privacy_rules(str(w[k]), never))
     for idx, e in enumerate(rows):
         eid = str(e.get("id") or "")
         if not SAFE_ID.match(eid):
             eid = "#%d" % (idx + 1)
+            emit(eid, "id", ["bad-id"])
+        for k in ("start", "end"):
+            emit(eid, k, privacy_rules(e.get(k) or "", never))
         summary = e.get("summary", "")
         emit(eid, "project", privacy_rules(e.get("project", ""), never))
         if not summary.strip():

@@ -97,3 +97,39 @@ class Scan(unittest.TestCase):
     def test_hyphenated_name_not_key(self):
         d = entries("Fine."); d["entries"][0]["project"] = "alpha-app-2026-q4-migration-workstream-plan"
         self.assertEqual(self.run_scan(d).returncode, 0)
+
+    # --- every field workbook.py writes to the sheet is gated ---
+    def leak(self, d, field_frag, rule, secret="jo@example.com"):
+        r = self.run_scan(d)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn(field_frag, r.stdout); self.assertIn(rule, r.stdout)
+        self.assertNotIn(secret, r.stdout + r.stderr)
+
+    def test_sources_scanned(self):
+        self.leak(entries("Fine.", sources=["Claude Code transcripts", "mail jo@example.com"]),
+                  "meta field sources[1]", "email")
+    def test_created_scanned(self):
+        self.leak(entries("Fine.", created="2026-11-01 jo@example.com"), "meta field created", "email")
+    def test_missing_weeks_scanned(self):
+        self.leak(entries("Fine.", missing_weeks=[{"start": "jo@example.com", "end": "2026-10-25"}]),
+                  "meta field missing_weeks[0].start", "email")
+        self.leak(entries("Fine.", missing_weeks=[{"start": "2026-10-19", "end": "jo@example.com"}]),
+                  "meta field missing_weeks[0].end", "email")
+    def test_clean_sources_created_missing_weeks(self):
+        r = self.run_scan(entries("Fine.", sources=["Claude Code transcripts", "git history"],
+                                  created="2026-11-01T09:30 America/New_York",
+                                  missing_weeks=[{"start": "2026-10-19", "end": "2026-10-25"}]))
+        self.assertEqual(r.returncode, 0, r.stdout)
+    def test_entry_start_end_scanned(self):
+        for k in ("start", "end"):
+            d = entries("Fine."); d["entries"][0][k] = "call jo@example.com"
+            self.leak(d, "field %s" % k, "email")
+    def test_bad_id_is_a_hit(self):
+        d = entries("Fine."); d["entries"][0]["id"] = "call jo@example.com"
+        self.leak(d, "entry #1 field id: bad-id", "bad-id")
+        d["entries"][0]["id"] = ""
+        self.leak(d, "entry #1 field id: bad-id", "bad-id")
+    def test_phone_with_dashes_not_blanked_as_date(self):
+        self.hit("Called 0412-55-0199 yesterday.", "phone")
+        self.hit("Called +49 30 1234-56-78 yesterday.", "phone")
+        self.assertEqual(self.run_scan(entries("Met on 2026-10-26.")).returncode, 0)

@@ -116,6 +116,15 @@ class CLI(unittest.TestCase):
         self.assertEqual([c["subject"] for c in out["commits"]], ["Add login form"])
         self.assertNotIn("hash", json.dumps(out["commits"]))
 
+    def test_git_commit_with_committer_date_before_author_date(self):
+        subprocess.run(["git", "init", "-q", self.alpha], check=True)
+        env = dict(os.environ, GIT_AUTHOR_DATE="2026-10-26T11:20:00+00:00", GIT_COMMITTER_DATE="2026-10-24T11:20:00+00:00")
+        for k, v in (("user.email", "dev@example.invalid"), ("user.name", "Dev")):
+            subprocess.run(["git", "-C", self.alpha, "config", k, v], check=True)
+        subprocess.run(["git", "-C", self.alpha, "commit", "-q", "--allow-empty", "-m", "Skewed clock"], check=True, env=env)
+        out = self.ok(run("--scope", self.alpha, "--start", "2026-10-26", "--end", "2026-11-01", projects=self.p))
+        self.assertEqual([c["subject"] for c in out["commits"]], ["Skewed clock"])
+
     # --- added beyond the brief's list ---
 
     def test_symlinked_scope_matches_real_path(self):

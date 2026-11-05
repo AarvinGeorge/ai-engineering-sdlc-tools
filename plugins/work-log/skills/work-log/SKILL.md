@@ -219,7 +219,8 @@ echo "$TITLES_JSON" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/periods.py" missing
 3. For each `to_create` week: collect that week, write entries with `kind` = `weekly`, scan, build,
    upload to `Work Logs/Weekly`, read back. A `partial` week (it starts before the earliest
    transcript) gets a `notes` line saying the first days may be missing. A week whose collect exits
-   2 gets no sheet; report it as "no activity".
+   2 gets no sheet and is reported as "no activity", but only if `Work Logs/Manual` has no sheets in
+   that week (the same rule as §3).
 4. Put `unrecoverable` and `skipped_by_cap` weeks in `meta.missing_weeks` of the first sheet made,
    or report them if no sheet is made.
 5. The gap finder only looks at weeks after the latest saved weekly sheet. A weekly sheet deleted
