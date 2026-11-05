@@ -233,8 +233,15 @@ def _toplevel(d):
 
 
 def collect_commits(dirs, start, end, tz, mapping, read):
-    def midnight(d):
-        return datetime.combine(d, time(0), tzinfo=tz).isoformat(timespec="seconds")
+    """Period membership and the shown date/time both use the AUTHOR date in tz.
+
+    git's --since filters on committer date, which is >= author date in normal history,
+    so --since=<start midnight> never drops an in-period authored commit; there is no
+    --until (a commit authored inside but committed after the period still counts) and
+    the author date is filtered here.
+    """
+    lo = datetime.combine(start, time(0), tzinfo=tz)
+    hi = datetime.combine(end + timedelta(days=1), time(0), tzinfo=tz)
     tops = []
     for d in dirs:
         top, ok = _toplevel(d)
@@ -243,12 +250,13 @@ def collect_commits(dirs, start, end, tz, mapping, read):
     seen, commits, filtered = set(), [], False
     for top in tops:
         args = ["-C", top, "log", "--all", "--no-merges",
-                "--since=" + midnight(start), "--until=" + midnight(end + timedelta(days=1)),
+                "--since=" + lo.isoformat(timespec="seconds"),
                 "--format=%H%x1f%aI%x1f%s"]
         _, email = _git(["-C", top, "config", "user.email"])
         email = email.strip()
         if email:
-            args.append("--author=" + email)
+            # fixed string, anchored by the ident's angle brackets: no regex lookalikes
+            args += ["--fixed-strings", "--author=<" + email + ">"]
             filtered = True
         code, out = _git(args)
         if code != 0:
@@ -260,10 +268,13 @@ def collect_commits(dirs, start, end, tz, mapping, read):
                 continue
             seen.add(parts[0])
             try:
-                when = datetime.fromtimestamp(C.parse_ts(parts[1]), tz)
+                at = C.parse_ts(parts[1])
             except ValueError:
                 read["git_errors"] += 1
                 continue
+            if not lo.timestamp() <= at < hi.timestamp():
+                continue
+            when = datetime.fromtimestamp(at, tz)
             commits.append({"project": C.project_name(top, mapping), "date": when.date().isoformat(),
                             "time": when.strftime("%H:%M"), "subject": parts[2]})
     commits.sort(key=lambda c: (c["date"], c["time"], c["project"]))
@@ -354,7 +365,8 @@ def run(a):
         json.dump({"error": "no sessions in scope for the period", "files_read": read["files"],
                    "sessions_total": len(sessions), "sessions_in_scope_any_date": len(scoped),
                    "sessions_in_period_any_scope": sum(1 for s in kept if s["days"]),
-                   "earliest_activity": earliest, "commits_in_scope": len(commits)}, sys.stderr)
+                   "earliest_activity": earliest, "commits_in_scope": len(commits),
+                   "excluded_by_marker": read["excluded_by_marker"]}, sys.stderr)
         sys.stderr.write("\n")
         return 2
 

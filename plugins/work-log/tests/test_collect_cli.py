@@ -101,6 +101,7 @@ class CLI(unittest.TestCase):
         r = subprocess.run([sys.executable, COLLECT, "--projects-dir", self.p, "--tz", "America/New_York",
                             "--scope", self.beta, "--start", "2026-10-28", "--end", "2026-10-28", "--no-git"],
                            capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
         out = json.loads(r.stdout)
         self.assertEqual(out["day_totals"], {"2026-10-28": 10.0})
         self.assertEqual(out["tz"], "America/New_York")
@@ -152,6 +153,46 @@ class CLI(unittest.TestCase):
         by = {s["session_id"]: s["active_minutes"] for s in out["sessions"]}
         self.assertEqual((by["s1"], by["s12"]), (5.0, 5.0))
         self.assertEqual(out["day_totals"], {"2026-10-26": 20.0})   # 10 overlapped + 10 for s3
+
+    # --- fix round 1 ---
+
+    def _repo(self, email="dev@example.invalid"):
+        subprocess.run(["git", "init", "-q", self.alpha], check=True)
+        for k, v in (("user.email", email), ("user.name", "Dev"), ("commit.gpgsign", "false")):
+            subprocess.run(["git", "-C", self.alpha, "config", k, v], check=True)
+
+    def _commit(self, msg, authored, committed=None, email="dev@example.invalid"):
+        env = dict(os.environ, GIT_AUTHOR_DATE=authored, GIT_COMMITTER_DATE=committed or authored,
+                   GIT_AUTHOR_EMAIL=email, GIT_COMMITTER_EMAIL=email)
+        subprocess.run(["git", "-C", self.alpha, "commit", "-q", "--allow-empty", "-m", msg], check=True, env=env)
+
+    def test_author_filter_is_anchored(self):
+        self._repo()
+        self._commit("mine", "2026-10-26T11:00:00+00:00")
+        self._commit("prefix lookalike", "2026-10-26T11:05:00+00:00", email="xdev@example.invalid")
+        self._commit("dot lookalike", "2026-10-26T11:10:00+00:00", email="dev@exampleXinvalid")
+        self._commit("plus address", "2026-10-26T11:15:00+00:00", email="dev+wl@example.invalid")
+        out = self.ok(run("--scope", self.alpha, "--start", "2026-10-26", "--end", "2026-11-01", projects=self.p))
+        self.assertEqual([c["subject"] for c in out["commits"]], ["mine"])
+        self.assertTrue(out["git_author_filter"])
+        subprocess.run(["git", "-C", self.alpha, "config", "user.email", "dev+wl@example.invalid"], check=True)
+        out = self.ok(run("--scope", self.alpha, "--start", "2026-10-26", "--end", "2026-11-01", projects=self.p))
+        self.assertEqual([c["subject"] for c in out["commits"]], ["plus address"])
+
+    def test_commit_period_uses_author_date(self):
+        self._repo()
+        self._commit("authored before, committed inside", "2026-10-25T12:00:00+00:00", "2026-10-26T12:00:00+00:00")
+        self._commit("authored inside, committed after", "2026-10-27T12:00:00+00:00", "2026-11-03T12:00:00+00:00")
+        out = self.ok(run("--scope", self.alpha, "--start", "2026-10-26", "--end", "2026-10-27", projects=self.p))
+        self.assertEqual([(c["subject"], c["date"], c["time"]) for c in out["commits"]],
+                         [("authored inside, committed after", "2026-10-27", "12:00")])
+
+    def test_zero_reports_marker_exclusions(self):
+        F.session(self.p, "j", "s10", self.alpha, ["2026-10-31T09:00:00Z", "2026-10-31T09:10:00Z"],
+                  first_prompt="[work-log weekly run] make last week's log")
+        r = run("--scope", self.alpha, "--start", "2026-10-31", "--end", "2026-10-31", "--no-git", projects=self.p)
+        self.assertEqual(r.returncode, 2)
+        self.assertEqual(json.loads(r.stderr)["excluded_by_marker"], 1)
 
     def test_request_only_day_emitted_with_zero(self):
         F.session(self.p, "q", "s13", self.beta, ["2026-10-29T08:00:00Z"], first_prompt="check the build")
