@@ -79,3 +79,21 @@ class Scan(unittest.TestCase):
     def test_bad_input_exit_3(self):
         d = tempfile.mkdtemp(); self.addCleanup(shutil.rmtree, d); p = os.path.join(d, "x.json"); open(p, "w").write("{")
         self.assertEqual(subprocess.run([sys.executable, SCAN, p], capture_output=True).returncode, 3)
+
+    def test_dates_and_times_not_phones(self):
+        for t in ["Met on 2026-10-26 10:00 with the team.", "Covered 2026-10-26 - 2026-11-01",
+                  "Session 2026-10-26 (10:00)"]:
+            self.assertEqual(self.run_scan(entries(t)).returncode, 0, t)
+        r = self.run_scan(entries("Fine.", notes=["Gap: 2026-10-19 - 2026-10-25 no sessions"]))
+        self.assertEqual(r.returncode, 0, r.stdout)
+    def test_real_phones_still_hit(self):
+        self.hit("Called 412.555.0199 today.", "phone")
+        self.hit("Called +1 (412) 555-0199 on 2026-10-26 10:00.", "phone")
+    def test_unsafe_id_not_printed(self):
+        d = entries("Sent to jo@example.com."); d["entries"][0]["id"] = "Met jo@example.com X"
+        r = self.run_scan(d)
+        self.assertEqual(r.returncode, 1); self.assertNotIn("jo@example.com", r.stdout)
+        self.assertIn("entry #1 field summary: email", r.stdout)
+    def test_hyphenated_name_not_key(self):
+        d = entries("Fine."); d["entries"][0]["project"] = "alpha-app-2026-q4-migration-workstream-plan"
+        self.assertEqual(self.run_scan(d).returncode, 0)

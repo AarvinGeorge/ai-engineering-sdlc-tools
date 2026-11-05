@@ -2,6 +2,7 @@
 """Pre-upload privacy and style scan for a work-log entries JSON.
 
 Usage: scan.py ENTRIES.json [--never FILE]
+An unknown meta.style is treated as hr (fail-closed).
 Exit 0 clean, 1 hits (one line each, never the matched text), 3 unreadable input.
 """
 import argparse
@@ -20,7 +21,10 @@ KEY_PATTERNS = [
     re.compile(r"-----BEGIN"),
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\."),
 ]
-LONG_TOKEN = re.compile(r"[A-Za-z0-9+/_=-]{32,}")
+LONG_TOKEN = re.compile(r"[A-Za-z0-9+/_=]{32,}")
+ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+CLOCK = re.compile(r"\b\d{1,2}:\d{2}\b")
+SAFE_ID = re.compile(r"^[A-Za-z]{1,3}\d{1,6}$")
 FILE_PATH = re.compile(r"(?:^|\s)(?:~|\.{0,2})/\S+|\b[\w-]+\.(?:py|js|ts|tsx|md|json|ya?ml|sh|html|css|toml|ipynb)\b")
 COMMIT = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")
 BRANCH = re.compile(r"\b(?:feat|fix|chore|hotfix|release|bugfix)/[\w.-]+")
@@ -34,7 +38,8 @@ def privacy_rules(text, never):
     hits = []
     if EMAIL.search(text):
         hits.append("email")
-    if any(sum(c.isdigit() for c in m.group(0)) >= 10 for m in PHONE.finditer(text)):
+    bare = CLOCK.sub(" ", ISO_DATE.sub(" ", text))
+    if any(sum(c.isdigit() for c in m.group(0)) >= 10 for m in PHONE.finditer(bare)):
         hits.append("phone")
     key = any(p.search(text) for p in KEY_PATTERNS)
     if not key:
@@ -136,7 +141,9 @@ def main(argv=None):
     for i, n in enumerate(notes):
         emit("meta", "notes[%d]" % i, privacy_rules(n, never))
     for idx, e in enumerate(rows):
-        eid = str(e.get("id") or "#%d" % (idx + 1))
+        eid = str(e.get("id") or "")
+        if not SAFE_ID.match(eid):
+            eid = "#%d" % (idx + 1)
         summary = e.get("summary", "")
         emit(eid, "project", privacy_rules(e.get("project", ""), never))
         if not summary.strip():
