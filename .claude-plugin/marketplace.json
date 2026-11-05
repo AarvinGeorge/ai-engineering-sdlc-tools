@@ -48,6 +48,25 @@
         "agents"
       ],
       "whenToUse": "Use on any project where a coding agent plans, builds, reviews or ships work, and when deciding how much process a task deserves. Most useful with Superpowers installed, which it points to rather than restates."
+    },
+    {
+      "name": "work-log",
+      "description": "Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any period, saved as a new Google Sheet in a Work Logs Drive folder (or a local .xlsx), on request or weekly.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Aarvin George Poozhikala",
+        "url": "https://github.com/AarvinGeorge"
+      },
+      "source": "./plugins/work-log",
+      "category": "productivity",
+      "keywords": [
+        "timesheet",
+        "work-log",
+        "reporting",
+        "sdlc",
+        "google-sheets"
+      ],
+      "whenToUse": "Use when you need a record of what you did with Claude Code and roughly how long it took, for HR, a client, a manager or a timesheet. Most useful run weekly, because Claude Code deletes session transcripts after 30 days by default."
     }
   ]
 }

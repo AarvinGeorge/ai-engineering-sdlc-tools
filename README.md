@@ -12,6 +12,7 @@ somewhere both sides can read, and make the reading automatic.
 |---|---|
 | [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.2. |
 | [`engineering-method`](plugins/engineering-method) | An engineering method carried to every project as one on-demand skill: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users), a thin layer over Superpowers. Current: 0.1.0. |
+| [`work-log`](plugins/work-log) | Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any period (last week, October, Q4), saved as a new Google Sheet in a `Work Logs` Drive folder or as a local `.xlsx`. Runs on request or weekly from a Claude Desktop local task, with a pre-upload privacy scan. Current: 0.1.0. |
 
 ## Install
 
@@ -75,6 +76,7 @@ Every plugin here keeps a `ROADMAP.md` naming what it does **not** do, with the 
 revealed each gap. A tool that only documents its strengths is a sales page.
 
 - [plan-layer/ROADMAP.md](plugins/plan-layer/ROADMAP.md)
+- [work-log/ROADMAP.md](plugins/work-log/ROADMAP.md)
 
 ## Design rules
 
