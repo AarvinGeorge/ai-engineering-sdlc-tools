@@ -16,6 +16,12 @@ For a reader who does not work in software: HR, a client, a manager.
   done about it. No blame, no drama, no hiding.
 - Past tense, no "I". Start with the verb: "Built", "Fixed", "Planned", "Reviewed".
 
+**What the scan checks, and what it does not.** `scan.py` catches codes and personal data: file
+paths, branch names, commit hashes, document numbers, abbreviations, over-long summaries, emails,
+phone numbers, key-like strings and the never-list. It cannot judge tone or content: drama or blame,
+step-by-step lists instead of an outcome, or tool names written as ordinary words. Apply those rules
+yourself; a clean scan does not mean the summary is good.
+
 ## Detailed style
 
 For a technical reader, when the user asks for detail.

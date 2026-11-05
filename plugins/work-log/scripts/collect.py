@@ -319,11 +319,15 @@ def run(a):
         if not isinstance(mapping, dict) or not all(isinstance(v, str) for v in mapping.values()):
             raise BadInput("--projects-map must be a JSON object of path -> project name")
     scopes = None if a.all else [os.path.realpath(os.path.expanduser(s)) for s in (a.scope or [os.getcwd()])]
+    if scopes is None:
+        scope_name = "All projects"
+    else:
+        scope_name = " + ".join(C.project_name(s, mapping) for s in scopes)
     pdir = os.path.realpath(os.path.expanduser(a.projects_dir))
 
     files = sorted(f for f in glob.glob(os.path.join(glob.escape(pdir), "*", "*.jsonl")) if os.path.isfile(f))
     if not files:
-        json.dump({"error": "no transcripts found", "projects_dir": pdir}, sys.stderr)
+        json.dump({"error": "no transcripts found", "projects_dir": pdir, "scope_name": scope_name}, sys.stderr)
         sys.stderr.write("\n")
         return 2
 
@@ -362,7 +366,8 @@ def run(a):
         commits, git_filter = collect_commits(dirs, start, end, tz, mapping, read)
 
     if not active:
-        json.dump({"error": "no sessions in scope for the period", "files_read": read["files"],
+        json.dump({"error": "no sessions in scope for the period", "scope_name": scope_name,
+                   "files_read": read["files"],
                    "sessions_total": len(sessions), "sessions_in_scope_any_date": len(scoped),
                    "sessions_in_period_any_scope": sum(1 for s in kept if s["days"]),
                    "earliest_activity": earliest, "commits_in_scope": len(commits),
@@ -391,7 +396,7 @@ def run(a):
     out = {"version": C.plugin_version(), "tz": tzname,
            "idle_minutes": int(a.idle_minutes) if float(a.idle_minutes).is_integer() else a.idle_minutes,
            "period": {"start": start.isoformat(), "end": end.isoformat()},
-           "scope": "all" if scopes is None else scopes,
+           "scope": "all" if scopes is None else scopes, "scope_name": scope_name,
            "read": read, "earliest_activity": earliest, "sessions": rows,
            "day_totals": {d: round(day_secs[d] / 60, 1) for d in sorted({r["date"] for r in rows})},
            "commits": commits, "git_author_filter": git_filter}

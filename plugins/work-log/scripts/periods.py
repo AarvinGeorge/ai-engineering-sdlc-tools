@@ -10,7 +10,8 @@ unrecoverable / already_saved. Exit codes: 0 ok, 3 bad input.
 import argparse, json, re, sys
 from datetime import date, datetime, timedelta
 
-TITLE_RE = re.compile(r"^Work log · (?P<scope>.*) · (?P<a>\d{4}-\d{2}-\d{2}) to (?P<b>\d{4}-\d{2}-\d{2})$")
+TITLE_RE = re.compile(r"Work log · (?P<scope>.*) · (?P<a>\d{4}-\d{2}-\d{2}) to (?P<b>\d{4}-\d{2}-\d{2})")
+SINGLE_TAB = " (single tab)"   # suffix of the read-back fallback upload; counts as saved
 
 
 def last_week(today):
@@ -25,7 +26,9 @@ def week_title(scope_name, start, end):
 def saved_weeks(titles, scope_name):
     out = set()
     for title in titles:
-        m = TITLE_RE.match(title)
+        if title.endswith(SINGLE_TAB):
+            title = title[:-len(SINGLE_TAB)]
+        m = TITLE_RE.fullmatch(title)
         if not m or m.group("scope") != scope_name:
             continue
         try:
@@ -97,6 +100,8 @@ def main(argv=None):
             titles = json.loads(raw)
             if not isinstance(titles, list):
                 raise ValueError("not a list")
+            if not all(isinstance(x, str) for x in titles):
+                raise ValueError("every title must be a string")
         except (OSError, ValueError) as ex:
             sys.stderr.write("periods: bad titles JSON: %s\n" % ex)
             return 3

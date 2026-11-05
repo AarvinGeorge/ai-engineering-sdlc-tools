@@ -44,10 +44,10 @@ example: "Work log for Mon 26 Oct to Sun 1 Nov 2026, this folder and below, HR s
   file" → local `.xlsx` (section 10).
 - **Style**: `hr` by default; `detailed` when the user asks for technical detail.
 
-**Scope name** (goes in the title): the readable name of the scope folder, from the user's projects
-mapping or else the folder name with `-`, `_` and `.` turned into spaces and the first letter
-capitalised; "All projects" for `--all`. Keep it identical from run to run: weekly gap-finding
-matches titles on it exactly.
+**Scope name** (goes in the title): take `scope_name` from `collect.py`'s output (stdout on exit 0,
+the stderr JSON on exit 2). Never work it out yourself: weekly gap-finding matches titles on it
+exactly, so it must come out the same on every run. For example "Alpha app", "All projects", or
+"Beta site + Alpha app" for two named folders.
 
 ## 3. Collect
 
@@ -61,16 +61,16 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/collect.py" --start 2026-10-26 --end 2026
 Other flags: `--idle-minutes N` (default 15), `--tz Area/City`, `--no-git`. Pass `--projects-map`
 only when `~/.config/work-log/projects.json` exists.
 
-- **Exit 0**: `sessions.json` holds `tz`, `idle_minutes`, `period`, `scope`, `read` (counts),
+- **Exit 0**: `sessions.json` holds `scope_name`, `tz`, `idle_minutes`, `period`, `scope`, `read` (counts),
   `earliest_activity`, `sessions` (one row per session per day: `date`, `project`, `start`, `end`,
   `active_minutes`, `title`, `branches`, `requests`), `day_totals` (minutes) and `commits` (`project`,
   `date`, `time`, `subject`).
 - **Exit 3**: a format change or bad input; stderr names the file and line. Report it in plain words
   and stop. Do not guess around it.
-- **Exit 2**: nothing in scope for the period. Read the stderr JSON: `files_read`,
+- **Exit 2**: nothing in scope for the period. Read the stderr JSON: `scope_name`, `files_read`,
   `sessions_total`, `sessions_in_scope_any_date`, `sessions_in_period_any_scope`,
-  `earliest_activity`, `commits_in_scope`, `excluded_by_marker` (or `"no transcripts found"` with no
-  counts). **Continue to section 4** if `period.start` is before `earliest_activity`, or if
+  `earliest_activity`, `commits_in_scope`, `excluded_by_marker` (or `"no transcripts found"` with
+  only `projects_dir` and `scope_name`). **Continue to section 4** if `period.start` is before `earliest_activity`, or if
   `Work Logs/Manual` holds sheets in the period. Stop with no sheet only when transcripts, earlier
   sheets and manual sheets are all empty for the period. Then report the counts in plain words
   (they show the zero could have been non-zero, for example "42 sessions read, 7 of them in this
@@ -109,6 +109,7 @@ Transcripts are deleted after `cleanupPeriodDays` (default 30 days).
               "summary": "Built the sign-in page so customers can log in with their work account."}]}
 ```
 
+- `scope_name` is copied from `sessions.json` unchanged.
 - `kind`: `request` (on request), `weekly` (weekly run) or `manual`. `tz` and `idle_minutes` come
   from `sessions.json`. `type` is exactly `Claude session` or `Manual (hours stated)`. Session
   entries carry `minutes`; manual entries carry `stated_hours`. Ids are short and unique (`E1`, `M1`).
@@ -149,10 +150,12 @@ Tools: `mcp__claude_ai_Google_Drive__search_files`, `mcp__claude_ai_Google_Drive
    `title = 'Work Logs' and mimeType = 'application/vnd.google-apps.folder' and owner = 'me'`.
    The connector does not support a `trashed` query term, so ignore any result whose metadata says
    `trashed: true`. Then `parentId = '<id>' and title = 'Weekly'` (or `'Manual'`) with the same
-   folder mime type. Create a missing folder with `create_file`: `title`, `parentId` (none for
-   `Work Logs`), mime type `application/vnd.google-apps.folder`, no content.
-2. **Weekly sheet**: search `Work Logs/Weekly` for a sheet with the same title. If one exists, skip
-   that week and say so (weekly runs are idempotent).
+   folder mime type. Create a missing folder with `create_file`: `title`,
+   `contentMimeType` = `application/vnd.google-apps.folder`, `parentId` for `Weekly` and `Manual`
+   (none for `Work Logs`), and no content.
+2. **Weekly sheet**: search `Work Logs/Weekly` for a sheet with the same title, or the same title
+   followed by ` (single tab)` (the fallback in section 9). If either exists, skip that week and say
+   so (weekly runs are idempotent).
 3. **On-request sheet**: if the title already exists, append ` (2)`, ` (3)` and so on. Never skip.
 4. **Create** with `create_file`: `title` = the summary `title` (plus any suffix), `parentId` = the
    folder id for the summary `folder`, `contentMimeType` =
@@ -167,13 +170,15 @@ Never claim success without this step.
 - `read_file_content` on the new sheet's id.
 - Confirm the tab names match `tabs`, and that the grand total and each day total equal the
   summary within 0.01 hours (Google's arithmetic can differ in the last digit).
-- On a mismatch: say so, build again with `--single-tab`, upload as `<title> (single tab)`, read
-  that back, and tell the user which file to delete.
+- On a mismatch: say so, build again with `--single-tab`, upload as `<title> (single tab)` (exactly
+  that suffix: `periods.py` counts it as a saved week), read that back, and tell the user which file
+  to delete.
 
 ## 10. No connector, or "save as a file"
 
-If the Drive tools are not available, build with `--out "./<title>.xlsx"` (the summary `title`; a
-`/` in it becomes `-`) in the current folder. Say so in one line, and mention that the Google
+If the Drive tools are not available, build without `--out`: `workbook.py` then writes
+`./<title>.xlsx` in the current folder, with a safe file name (a `/` in the title becomes `-`).
+Keep `--b64` off; it is only for uploads. Say so in one line, and mention that the Google
 Drive connector is optional. Do not ask the user to connect Drive first.
 
 ## 11. Show me here
@@ -198,7 +203,8 @@ run does not count as work.
 
 1. Wide collect for the earliest transcript date: `--start` 60 days ago, `--end` today, same scope.
    Take `earliest_activity` from stdout on exit 0, or from the stderr JSON on exit 2.
-2. List the sheet titles in `Work Logs/Weekly` as a JSON array and pipe them in:
+2. List the sheet titles in `Work Logs/Weekly` as a JSON array of strings and pipe them in, with
+   `--scope-name` set to the `scope_name` from that collect (never typed by hand):
 
 ```bash
 echo "$TITLES_JSON" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/periods.py" missing-weeks \
@@ -207,7 +213,9 @@ echo "$TITLES_JSON" | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/periods.py" missing
 
    It prints `to_create` (each with `start`, `end`, `title`, `partial`), `skipped_by_cap` (more
    than 8 weeks; `--max-weeks N` changes it), `unrecoverable` (older than every transcript) and
-   `already_saved`. Without `--earliest`, every week is unrecoverable.
+   `already_saved`. A title with the ` (single tab)` suffix counts as saved. Without `--earliest`,
+   every week is unrecoverable. Exit 3 means bad input (a bad date, or titles that are not a JSON
+   array of strings).
 3. For each `to_create` week: collect that week, write entries with `kind` = `weekly`, scan, build,
    upload to `Work Logs/Weekly`, read back. A `partial` week (it starts before the earliest
    transcript) gets a `notes` line saying the first days may be missing. A week whose collect exits

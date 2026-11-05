@@ -203,3 +203,34 @@ class CLI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScopeName(unittest.TestCase):
+    setUp = CLI.setUp
+    ok = CLI.ok
+
+    def test_default_scope_name_is_cwd_project(self):
+        out = self.ok(run("--start", "2026-10-26", "--end", "2026-11-01", "--no-git", projects=self.p, cwd=self.alpha))
+        self.assertEqual(out["scope_name"], "Alpha app")
+
+    def test_all_scope_name(self):
+        out = self.ok(run("--all", "--start", "2026-10-26", "--end", "2026-11-01", "--no-git", projects=self.p))
+        self.assertEqual(out["scope_name"], "All projects")
+
+    def test_several_scopes_joined_in_order(self):
+        out = self.ok(run("--scope", self.beta, "--scope", self.alpha, "--start", "2026-10-26", "--end", "2026-11-01",
+                          "--no-git", projects=self.p))
+        self.assertEqual(out["scope_name"], "Beta site + Alpha app")
+
+    def test_scope_name_uses_projects_map(self):
+        m = os.path.join(self.w, "map.json")
+        with open(m, "w") as fh:
+            json.dump({self.alpha: "Alpha product"}, fh)
+        out = self.ok(run("--scope", self.alpha, "--projects-map", m, "--start", "2026-10-26", "--end", "2026-11-01",
+                          "--no-git", projects=self.p))
+        self.assertEqual(out["scope_name"], "Alpha product")
+
+    def test_scope_name_in_zero_stderr(self):
+        r = run("--scope", self.alpha, "--start", "2026-09-01", "--end", "2026-09-07", "--no-git", projects=self.p)
+        self.assertEqual(r.returncode, 2)
+        self.assertEqual(json.loads(r.stderr)["scope_name"], "Alpha app")

@@ -76,3 +76,22 @@ class Periods(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FixRound1(unittest.TestCase):
+    def test_single_tab_fallback_counts_as_saved(self):
+        r = P.missing_weeks([t("2026-11-02", "2026-11-08") + " (single tab)"], "Alpha app",
+                            date(2026, 11, 9), date(2026, 10, 1))
+        self.assertEqual(r["to_create"], []); self.assertEqual(r["already_saved"], ["2026-11-02"])
+
+    def test_other_suffixes_and_trailing_newline_not_saved(self):
+        for title in [t("2026-11-02", "2026-11-08") + " (2)", t("2026-11-02", "2026-11-08") + "\n",
+                      t("2026-11-02", "2026-11-08") + " (single tab)\n"]:
+            r = P.missing_weeks([title], "Alpha app", date(2026, 11, 9), date(2026, 10, 1))
+            self.assertEqual([w["start"] for w in r["to_create"]], ["2026-11-02"], repr(title))
+
+    def test_cli_non_string_title_is_exit_3(self):
+        r = subprocess.run([sys.executable, os.path.join(SCRIPTS, "periods.py"), "missing-weeks",
+                            "--scope-name", "Alpha app", "--today", "2026-11-09", "--titles-json", "-"],
+                           input=json.dumps([t("2026-11-02", "2026-11-08"), 7]), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 3, r.stderr); self.assertNotIn("Traceback", r.stderr)
