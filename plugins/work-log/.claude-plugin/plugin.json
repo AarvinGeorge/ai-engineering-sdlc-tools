@@ -1,0 +1,10 @@
+{
+  "name": "work-log",
+  "description": "Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any period, saved as a new Google Sheet in a Work Logs Drive folder (or a local .xlsx), on request or weekly.",
+  "version": "0.1.0",
+  "author": {"name": "Aarvin George Poozhikala", "url": "https://github.com/AarvinGeorge"},
+  "repository": "https://github.com/AarvinGeorge/ai-engineering-sdlc-tools",
+  "license": "MIT",
+  "keywords": ["timesheet", "work-log", "reporting", "sdlc", "google-sheets"],
+  "skills": "./skills/"
+}
