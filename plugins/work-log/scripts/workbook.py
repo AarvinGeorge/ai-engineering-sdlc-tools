@@ -7,7 +7,7 @@ Input is the entries JSON shape checked by scan.py: {"meta": {...}, "entries": [
 Default: three tabs (Entries, Daily totals with live SUMIFS/SUM formulas that also
 carry cached values, About). --single-tab: one "Work log" tab, totals as values.
 Default --out is ./<title>.xlsx. Prints one JSON summary object on stdout.
-Exit 0 ok, 3 bad input (message names the entry id and field).
+Exit 0 ok, 3 bad input (message names the entry id and field) or output not writable.
 """
 import argparse
 import base64
@@ -109,7 +109,9 @@ def validate(data):
                 raise BadInput("%s: minutes must be a number >= 0" % eid)
         elif not is_number(e.get("stated_hours")) or e["stated_hours"] < 0:
             raise BadInput("%s: stated_hours must be a number >= 0" % eid)
-        for k in ("start", "end", "project", "summary"):
+        if not isinstance(e.get("project"), str) or not e["project"].strip():
+            raise BadInput("%s: project is missing or empty" % eid)
+        for k in ("start", "end", "summary"):
             if e.get(k) is not None and not isinstance(e[k], str):
                 raise BadInput("%s: %s must be text" % (eid, k))
     return meta, entries
@@ -154,14 +156,14 @@ def sorted_rows(entries):
 
 def entry_cells(e, h):
     return [e["date"], e.get("start") or None, e.get("end") or None, h,
-            e.get("project") or "", e["type"], e.get("summary") or "", e["id"]]
+            e["project"], e["type"], e.get("summary") or "", e["id"]]
 
 
 def totals(rows):
     by_day, by_day_proj = {}, {}
     for e, h in rows:
         by_day[e["date"]] = by_day.get(e["date"], 0.0) + h
-        k = (e["date"], e.get("project") or "")
+        k = (e["date"], e["project"])
         by_day_proj[k] = by_day_proj.get(k, 0.0) + h
     return by_day, by_day_proj
 
@@ -169,8 +171,9 @@ def totals(rows):
 def about_rows(meta):
     try:
         zone, zone_name = local_zone(meta.get("tz"))
-    except Exception:  # unknown IANA name: fall back to this machine's zone
+    except Exception:  # unknown IANA name: say so, fall back to this machine's zone
         zone, zone_name = local_zone(None)
+        print("workbook: note: unknown time zone %r, using %s" % (meta.get("tz"), zone_name), file=sys.stderr)
     created = meta.get("created") or "%s %s" % (datetime.now(zone).strftime("%Y-%m-%dT%H:%M"), zone_name)
     idle = meta.get("idle_minutes", 15)
     rows = [
@@ -371,16 +374,21 @@ def main(argv=None):
     tabs, by_day, grand = (single_tab if a.single_tab else three_tabs)(meta, rows)
     title = title_of(meta)
     out = a.out or os.path.join(".", file_name(title))
-    write_zip(out, package(tabs))
-    with open(out, "rb") as fh:
-        blob = fh.read()
+    try:
+        write_zip(out, package(tabs))
+        with open(out, "rb") as fh:
+            blob = fh.read()
+        if a.b64:
+            with open(a.b64, "w", encoding="ascii", newline="") as fh:
+                fh.write(base64.b64encode(blob).decode("ascii"))
+    except OSError as exc:
+        print("workbook: cannot write output: %s" % exc, file=sys.stderr)
+        return 3
     summary = {"path": os.path.abspath(out), "title": title, "bytes": len(blob),
                "sha256": hashlib.sha256(blob).hexdigest(), "tabs": [t[0] for t in tabs],
                "entries": len(rows), "day_totals": {d: clean_total(by_day[d]) for d in sorted(by_day)},
                "grand_total": clean_total(grand), "folder": folder_of(meta)}
     if a.b64:
-        with open(a.b64, "w", encoding="ascii", newline="") as fh:
-            fh.write(base64.b64encode(blob).decode("ascii"))
         summary["b64_path"] = os.path.abspath(a.b64)
     sys.stdout.buffer.write((json.dumps(summary, ensure_ascii=False) + "\n").encode("utf-8"))
     return 0
