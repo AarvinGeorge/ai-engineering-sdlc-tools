@@ -12,12 +12,14 @@ def line(type_, ts, cwd, sid, text=None, **extra):
     return d
 
 def session(root, slug, sid, cwd, stamps, title=None, first_prompt="build the login page", extra_lines=()):
-    """stamps: ISO strings; the first is a user prompt, then alternate assistant/user."""
+    """stamps: ISO strings; the first is a user prompt, then alternate assistant/user.
+    Later user lines are tool results (as in real transcripts), so they are not requests."""
     os.makedirs(os.path.join(root, slug), exist_ok=True)
     rows = []
+    tool_result = [{"type": "tool_result", "tool_use_id": "toolu_x", "content": "ok"}]
     for i, ts in enumerate(stamps):
         t = "user" if i % 2 == 0 else "assistant"
-        rows.append(line(t, ts, cwd, sid, first_prompt if i == 0 else None))
+        rows.append(line(t, ts, cwd, sid, first_prompt if i == 0 else (tool_result if t == "user" else None)))
     if title:
         rows.append({"type": "ai-title", "aiTitle": title, "sessionId": sid})
     rows.extend(extra_lines)

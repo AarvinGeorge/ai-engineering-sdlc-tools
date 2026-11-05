@@ -91,4 +91,6 @@ def project_name(path, mapping):
         base = os.path.basename(path)
     base = re.sub(r"[-_.]", " ", base)
     base = re.sub(r" +", " ", base).strip()
+    if not base:
+        return "Unknown project"
     return base[:1].upper() + base[1:]

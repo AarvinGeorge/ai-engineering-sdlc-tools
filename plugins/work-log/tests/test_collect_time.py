@@ -65,3 +65,35 @@ class Time(unittest.TestCase):
 
     def test_version(self):
         self.assertEqual(C.plugin_version(), "0.1.0")
+
+    def test_project_name_empty_falls_back(self):
+        for p in ("/", "//", "/home/dev/---", "/home/dev/_._", ""):
+            self.assertEqual(C.project_name(p, {}), "Unknown project", p)
+
+    def test_allocate_nested_and_disjoint(self):
+        got = collect.allocate({"a": [(0, 100), (200, 300)], "b": [(50, 60)], "c": [(400, 400)], "d": []})
+        self.assertAlmostEqual(got["a"], 95 + 100)
+        self.assertAlmostEqual(got["b"], 5)
+        self.assertEqual((got["c"], got["d"]), (0.0, 0.0))
+
+    def test_allocate_scales(self):
+        import random, time as _t
+        rnd = random.Random(7)
+        per = {}
+        for s in range(500):
+            t, ivs = rnd.randint(0, 10000), []
+            for _ in range(50):
+                a = t + rnd.randint(0, 300); b = a + rnd.randint(1, 900); ivs.append((a, b)); t = b
+            per["s%d" % s] = ivs
+        t0 = _t.perf_counter(); got = collect.allocate(per); took = _t.perf_counter() - t0
+        self.assertLess(took, 2.0)
+        events = sorted(iv for ivs in per.values() for iv in ivs)
+        union, cur = 0, None
+        for a, b in events:
+            if cur is None or a > cur[1]:
+                if cur: union += cur[1] - cur[0]
+                cur = [a, b]
+            else:
+                cur[1] = max(cur[1], b)
+        union += cur[1] - cur[0]
+        self.assertAlmostEqual(sum(got.values()), union, places=3)
