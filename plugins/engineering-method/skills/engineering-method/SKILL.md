@@ -91,7 +91,7 @@ money or touches credentials; the lower one otherwise.
     production; never run test suites inside the live system. *Test:*
     references/live-system-changes.md.
 14. **A declined permission means stop.** No retry, no narrower form, no moving the same action to a
-    path that does not prompt. Say plainly that it was declined, mark the check unverified and report. *Why:* a workaround defeats the
+    path that does not prompt. Say plainly that it was declined, mark the check unverified and report. *Why:* a work-around defeats the
     decision the person just made. *Test:* the report lists what was declined and left unverified.
 
 **Record and report**

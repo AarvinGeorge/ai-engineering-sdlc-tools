@@ -23,7 +23,7 @@ than failing, because a label deliberately placed beside a box trips the same
 estimate, and a check people learn to dismiss is worse than no check.
 
 Whether a figure tells the truth about the system is the part no script can
-do. Read the screenshots. The standing rule this serves (Karou, 8 Sep 2026):
+do. Read the screenshots. The standing rule this serves (a client project, 8 Sep 2026):
 every figure must be easy to read, never cluttered, and must show the system
 as measured, never an invented topology.
 

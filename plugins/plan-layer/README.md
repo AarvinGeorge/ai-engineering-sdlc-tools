@@ -364,8 +364,7 @@ nothing looks broken.
 Two things this deliberately does not do yet — no independent reviewer, and no way for a human
 to dispute a claim in the file itself. History is now **kept** (0.14.0 rolls it into
 `plan/archive/` in full) but not yet **readable** from the page; an archive index is queued.
-Since 0.14.0 the plugin plans with itself: its own `plan/plan.json` sits at the root of the
-marketplace repository. Each gap is written up with the evidence that revealed it and a sketch
+Each gap is written up with the evidence that revealed it and a sketch
 of the fix in [ROADMAP.md](ROADMAP.md).
 
 ## Durability

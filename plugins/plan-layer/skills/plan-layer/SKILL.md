@@ -100,7 +100,7 @@ somebody works from and a page they abandon for the plan document.
 "tasks": [
   { "name": "7 book two named people at once", "state": "todo",
     "tests": "two names resolve in one request", "from": "the executive seat",
-    "send": "Book a call with Alex and Priya on Tuesday",
+    "send": "Book a call with Alex and Dana on Tuesday",
     "pass": "both guests are on the event", "how": "reply in the same thread" }
 ]
 ```
