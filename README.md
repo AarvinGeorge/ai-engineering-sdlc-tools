@@ -93,10 +93,6 @@ These are what the tools have in common, and what a new one here should honour.
   ground it sits on, in both themes, asserted by a test. Two tokens once shipped at 4.31:1
   and 4.09:1 — close enough to look right and still fail.
 
-## Licence
-
-MIT. See [LICENSE](LICENSE).
-
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout, how to run each plugin's tests, and the review rule, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
@@ -105,6 +101,6 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 Report vulnerabilities privately through GitHub's **Security** tab, not as public issues. See [SECURITY.md](SECURITY.md).
 
-## License
+## Licence
 
-[MIT](LICENSE).
+MIT. See [LICENSE](LICENSE).

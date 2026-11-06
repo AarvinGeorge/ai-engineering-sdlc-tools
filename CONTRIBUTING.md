@@ -44,7 +44,7 @@ python3 -m pytest plugins/work-log/tests -q
 ## Versioning and changelogs
 
 - Each plugin is versioned independently with [Semantic Versioning](https://semver.org/): patch for fixes, minor for backwards-compatible features, major for breaking changes.
-- Each plugin keeps a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/) style. Add an entry for every user-visible change, newest first.
+- Each plugin keeps a `CHANGELOG.md`: one dated entry per version (`## 0.1.1 — 2026-10-15`), newest first. Add an entry for every user-visible change.
 - When you bump a version, change it in **both** `.claude-plugin/marketplace.json` and the plugin's own `.claude-plugin/plugin.json`, and update the version shown in the root `README.md`.
 
 ## Review rule
