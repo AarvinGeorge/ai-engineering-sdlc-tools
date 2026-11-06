@@ -117,10 +117,10 @@ class TestRender(Base):
 
     def test_arbitrary_contract_keys_survive(self):
         """An allow-list of key names silently drops a project's own wording."""
-        self.make_plan(contract={"for_agent": "A", "for_priya": "B"})
+        self.make_plan(contract={"for_agent": "A", "for_dana": "B"})
         run("render.py", project=self.dir)
         page = self.page()
-        self.assertIn("For Priya", page)
+        self.assertIn("For Dana", page)
         self.assertIn(">B<", page)
 
     def test_stale_detection(self):
@@ -617,7 +617,7 @@ class TestTaskColumns(Base):
 
     def _full_task(self, name="1 book two named people", state="active", **over):
         t = {"name": name, "state": state, "tests": "guests resolve by name",
-             "from": "the developer seat", "send": "book a call with Alex and Priya",
+             "from": "the developer seat", "send": "book a call with Alex and Dana",
              "pass": "both guests on the event", "how": "reply in the same thread"}
         t.update(over)
         return t
@@ -644,7 +644,7 @@ class TestTaskColumns(Base):
         self.assertIn("book two named people", cells[0])
         self.assertIn("guests resolve by name", cells[1])
         self.assertIn("the developer seat", cells[2])
-        self.assertIn("book a call with Alex and Priya", cells[3])
+        self.assertIn("book a call with Alex and Dana", cells[3])
         self.assertIn("both guests on the event", cells[4])
         self.assertIn("reply in the same thread", cells[5])
 

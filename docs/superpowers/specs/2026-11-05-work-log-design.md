@@ -106,7 +106,7 @@ Subagent transcripts are not counted as separate time: they run inside a session
 
 **Project names:**
 
-- Project names are readable, such as "Karou agent".
+- Project names are readable, such as "example agent".
 - They come from a small `projects` mapping the person can edit, or else the folder name with separators turned into spaces.
 - File paths never appear.
 

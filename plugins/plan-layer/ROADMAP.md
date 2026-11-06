@@ -149,11 +149,11 @@ dispute anything, but does not remove the need for the channel.
 
 ## Gap 4 — the plugin does not use itself
 
-> **Closed, 0.14.0 (27 Sep 2026).** `plan/plan.json` at the root of this repository is the plugin's
-> own plan, rendered and gated by its own scripts. The three open gaps above are its queued items.
+> **Closed, 0.14.0 (27 Sep 2026).** The plugin's maintainer plans with the plugin itself, rendered
+> and gated by its own scripts (that working plan is kept privately, not in this repository).
 
 
-`ai-engineering-sdlc-tools` has no `plan/plan.json` of its own. A planning tool that does not
+Before 0.14.0, `ai-engineering-sdlc-tools` had no plan of its own (the plan that closed this gap is kept outside the public repository). A planning tool that does not
 plan with itself has not met its own users. Doing so would have surfaced Gaps 1–3 sooner, and
 would make this file redundant — these would simply be items on the plugin's own page.
 

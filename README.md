@@ -1,5 +1,7 @@
 # ai-engineering-sdlc-tools
 
+[![tests](https://github.com/AarvinGeorge/ai-engineering-sdlc-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/AarvinGeorge/ai-engineering-sdlc-tools/actions/workflows/tests.yml)
+
 Software-development-lifecycle tooling for AI engineering work — a Claude Code marketplace.
 
 The through-line: **a coding agent's memory ends with its context window, and a human's
@@ -10,8 +12,8 @@ somewhere both sides can read, and make the reading automatic.
 
 | Plugin | What it does |
 |---|---|
-| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.15.2. |
-| [`engineering-method`](plugins/engineering-method) | An engineering method carried to every project as one on-demand skill: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users), a thin layer over Superpowers. Current: 0.1.0. |
+| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month. Current: 0.16.0. |
+| [`engineering-method`](plugins/engineering-method) | An engineering method carried to every project as one on-demand skill: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users), a thin layer over Superpowers. Current: 0.1.1. |
 | [`work-log`](plugins/work-log) | Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any period (last week, October, Q4), saved as a new Google Sheet in a `Work Logs` Drive folder or as a local `.xlsx`. Runs on request or weekly from a Claude Desktop local task, with a pre-upload privacy scan. Current: 0.1.0. |
 
 ## Install
@@ -53,15 +55,10 @@ plugins/<name>/                    one directory per plugin
   skills/<name>/SKILL.md           what the agent reads
   templates/                       what init copies into a project (plan.json, MAP.md)
   tests/                           run with: python3 -m unittest tests/*.py
-plan/                              this repository's OWN plan, kept with plan-layer itself
 ```
 
 Adding a plugin means adding a directory under `plugins/` and one entry to
 `marketplace.json`. Nothing else moves.
-
-This repository plans with itself: `plan/plan.json` at the root is plan-layer's own plan,
-rendered to `plan/index.html` by the same scripts it ships. If the tool is not good enough to
-run on its own roadmap, it is not good enough to publish.
 
 ## Works with
 
@@ -95,6 +92,14 @@ These are what the tools have in common, and what a new one here should honour.
 - **Colour is measured, never eyeballed.** Every text token clears WCAG AA against every
   ground it sits on, in both themes, asserted by a test. Two tokens once shipped at 4.31:1
   and 4.09:1 — close enough to look right and still fail.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout, how to run each plugin's tests, and the review rule, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
+
+## Security
+
+Report vulnerabilities privately through GitHub's **Security** tab, not as public issues. See [SECURITY.md](SECURITY.md).
 
 ## Licence
 
