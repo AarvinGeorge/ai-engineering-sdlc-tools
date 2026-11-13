@@ -10,6 +10,7 @@ project's plan, and does it exist? -- so the three scripts cannot disagree.
 """
 import json
 import os
+import re
 import subprocess
 import tempfile
 
@@ -293,6 +294,23 @@ def size_budget_kb(d):
 def mode(d):
     """'light' or 'full'. Absent means full, so every plan written before 0.16.0 is unchanged."""
     return "light" if (d.get("meta") or {}).get("mode") == "light" else "full"
+
+
+# --------------------------------------------------------------------------
+# Work-id naming (0.17.0), opt-in through meta.naming. One pattern, read from
+# here, so the gate and anything else that names work cannot disagree.
+#   Epic E-NN · Story E-NN.Sn · Task E-NN.Sn.Tn · Finding E-NN.Fn · Release R-NN
+# Initiatives (I-n) and decisions (D-NNN) are not work items, so a now/next
+# item is never named by one alone. ASCII digits only. The id ends at the end
+# of the name, whitespace, ':', '·', ',', ';' or '-' (so "E-01-search" and
+# "R-04-hotfix" pass); "E-01x", "E-01.S" and "E-01)" do not.
+NAMINGS = ("work-ids",)
+WORK_ID = re.compile(r"^(?:E-[0-9]{2,}(?:\.S[0-9]+(?:\.T[0-9]+)?|\.F[0-9]+)?|R-[0-9]{2,})(?=$|[\s:·,;-])")
+
+
+def has_work_id(name):
+    """True when an item name starts with an epic, story, task, finding or release id."""
+    return isinstance(name, str) and bool(WORK_ID.match(name))
 
 
 def archive_counts(root=None):

@@ -35,17 +35,18 @@ An agent costs **its context size times its turn count**. So does the controllin
 every request.
 
 - **Brief, never corpus.** Extract the fifty relevant lines; do not hand an agent whole files.
-- **Implementers run the suite once before committing and never loop on a long run; the controller
-  runs it on the merged head.** Implementers that re-ran long suites stalled without committing,
-  repeatedly.
+- **Builders run the full suite once before reporting and never loop on a long run; the controller
+  runs it again on the merged head, inside the project tree.** Implementers that re-ran long suites
+  stalled without committing, repeatedly; runs of touched modules only missed failures elsewhere
+  (measurement-and-state-claims.md, "Suite results").
 - **Bounds are enforced, not stated.** Give a tool-call bound; an agent past it is told "stop and
   report", not left to finish. Unenforced bounds were overrun three-fold in practice.
 - **Compact or start fresh before a long mechanical phase** (a deploy, a suite run, a sweep). The
   plan, the ledger and the deploy file carry the state.
 - **Defer work that waits on something anyway.** Building early against a moving head costs
   everything and gains nothing.
-- **Lanes only when speed is asked for and the regions are disjoint.** Four lanes with four reviews
-  is the expensive shape; one or two is the default.
+- **Lanes when the parallel test passes, sized to what can be reviewed.** Four lanes with four
+  reviews is the expensive shape; two or three is the usual size (parallel-and-worktrees.md).
 - **Before choosing a weaker model to save usage, read the current limits (/usage); never recall
   them.** The usual cost driver is context length × turns, so save by fresh sessions and tight
   briefs before downgrading models.

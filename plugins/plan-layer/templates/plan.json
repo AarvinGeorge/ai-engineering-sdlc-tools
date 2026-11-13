@@ -7,6 +7,7 @@
     "north_star": "The outcome this whole plan serves. One sentence. Delete if you have none yet.",
     "north_star_owner": "WHO MAY CHANGE IT. Naming an owner is what freezes it.",
     "headings": {},
+    "_naming_example": "Delete this line. To name work from the hierarchy (Epic E-NN, Story E-NN.Sn, Task E-NN.Sn.Tn, Finding E-NN.Fn, Release R-NN = the deployment ledger's sequence number), set \"naming\": \"work-ids\": the gate then fails on a now or next item whose name does not start with one. Names never change once given.",
     "changelog": [
       {
         "version": "0.1.0",

@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.2.0 — 2026-11-13
+
+**Lessons from a run of live promotions, made general.** Twenty-one principles (five new); every
+addition is a rule, its reason in one line, and a test. `SKILL.md` stays under 150 lines (149).
+
+- **New principles 17–20 (Delivery):** root cause, not symptom, and a repeat fault changes the
+  mechanism; no regression is a hard gate, settled by a base check against what production runs;
+  rehearse the procedure, test once and promote the artifact, with a real-model bench before
+  production; the record is re-tested for currency before it is cited and guarded (secrets and
+  personal data, planted control, no rewrite-preserving tags) before it leaves.
+- **`live-system-changes.md`:** "The deploy file is code" (a different model reviews it after every
+  command block is dry-run on the bench; it executes nothing inside a live container, enforced by a
+  guard test with a planted violation; re-read against the final head before each gate). "Proving a
+  release": the nine promotion lessons (rehearse the procedure; expected state recorded by machine;
+  a read-only pre-switch check; recovery read back like a deploy; repeat faults get a mechanism fix;
+  smoke never shrinks for what a change touches; test once, promote the artifact) plus real-model
+  benches and the pipeline order. "Pushing and backups": a pre-push guard with a planted-leak
+  control; never push tags that preserve rewritten history.
+- **`measurement-and-state-claims.md`:** "Suite results" (builders run the full suite once before
+  reporting; the controller's run is inside the project tree; a skip count is a measurement; the
+  base check settles "is this a regression") and "Negatives and time" (a negative carries its
+  window; timestamps from the clock only).
+- **`review-loop.md`:** every stage carries its review, run in the stage; a reviewer-proposed fix
+  gets its own re-review whatever its severity; "The executor's brief" (full output, the shell
+  named, a call budget sized to the procedure, safe stopping points).
+- **`docs-and-decisions.md`:** "Using the record" (decision currency; search the record before a
+  removal or a step; a repeated reminder is encoded where it is read, the same turn) and "Names:
+  one hierarchy, never renamed" (Initiative `I-n`, Epic `E-NN`, Story `E-NN.Sn`, Task
+  `E-NN.Sn.Tn`, Release `R-NN` = the deployment ledger's sequence number, Finding `E-NN.Fn`,
+  Decision `D-NNN`; a crosswalk for old names). Decision-log entries carry their `D-NNN`.
+- **`progress-ladder.md`:** the promotion pipeline grid (one row per release, one column per
+  stage, `✓ ✗ ·`, the build commit and stage times under each row, a note where a release is
+  held), shown with every progress report on work that promotes releases; "Making a report
+  honest" (numbers from a run in the same pass, state words beside their command, the CAVEAT line,
+  decisions numbered given or not given). The ladder's footer gains skipped counts and a CAVEAT line.
+- **`model-routing-and-cost.md`:** the suite rule now reads "full suite, once, before reporting".
+- **Description:** `when_to_use` adds "is this a regression", "promote", "release", "show
+  progress" (description plus `when_to_use`: 1,316 characters, cap 1,536).
+- **Review:** a different model reviewed the branch with executed probes (READY WITH FIXES, 0
+  Critical, 4 Important, 9 Minor). Fixed: the backup-ref push rule named its own unsafe command
+  (`--all`); the grid's held row was one mark short; "re-review whatever its severity" contradicted
+  the scoped re-review rule (now: code the reviewer wrote); missing why/test lines added; "nothing
+  inside a live container" narrowed to tests, shells and scripts; watch and limited bench defined;
+  stage reviews scoped by tier. The naming table is kept in both plugins on purpose (each installs
+  alone).
+- **Fidelity round (independent evaluation):** principle 21, autonomy under a standing go (sort
+  each question: mine, the owner's later, the owner's now; never idle or defer on your own), with
+  review-loop.md "Autonomy under a standing go". Also added, each as rule / why / test: list
+  outward side effects before any step on a live system; read health before a user-visible step,
+  stop at the first usage-limit error, keep production and test spend apart; a bench names each
+  deliberate difference from production; watch with an observation log; a lessons register;
+  platform assumptions recorded with the version checked; every finding has a home before a plan
+  is complete; the `pipefail` + `grep -q` SIGPIPE trap; truthy-word switches; flaky timing tests
+  measured best-of-N, not loosened. Parallel lanes are the default when the parallel test passes.
+  Principles 19 and 20 shortened to pointers; the grid example uses invented times and commits,
+  with a title date consistent with its rows. Rebased onto the public main (hygiene merge).
+- **Evals:** see the review summary for base vs head pass counts (7 cases, Opus, Sonnet judge,
+  3 runs per arm). No new eval case is added for principles 17–21.
+
 ## 0.1.1 — 2026-10-15
 
 - **Live changes, matched to practice (Fable ruling):** back up the state a change touches and read it

@@ -18,8 +18,8 @@ cost more than the parallelism saved.
 | One plan calls the other's new function | serial, callee first |
 | A review of work still being written | serial, wait for the head to settle |
 
-Parallel is not free: each lane carries a review. Fan out when speed is asked for and the test
-passes, not by reflex.
+When the test passes, parallel is the default: separate worktrees, a review per lane, the suites
+after each merge. Each lane carries a review, so count that cost; when the test fails, run serial.
 
 ## One writer per worktree
 

@@ -91,6 +91,12 @@
           "type": "integer",
           "minimum": 1,
           "description": "0.16.0. The gate drifts when plan.json is larger than this many KB. Absent means 200."
+        },
+        "naming": {
+          "enum": [
+            "work-ids"
+          ],
+          "description": "0.17.0, opt-in. 'work-ids': every item in plans.now and plans.next is named from the work hierarchy first (Epic E-NN, Story E-NN.Sn, Task E-NN.Sn.Tn, Finding E-NN.Fn, Release R-NN), and the gate fails on one that is not. Finished items are not held to it. Absent means no naming check."
         }
       }
     },

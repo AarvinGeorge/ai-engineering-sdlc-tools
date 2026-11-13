@@ -696,6 +696,23 @@ def run(root=None):
             fails.append("meta.size_budget_kb is %r — it must be a positive whole number of KB "
                          "(absent means %d)" % (b, L.SIZE_BUDGET_KB_DEFAULT))
 
+    # Opt-in naming: a plan that declares meta.naming = "work-ids" names every
+    # live item from the work hierarchy, so the page, the branch, the ledger and
+    # the decision log can be joined on one id. Finished items are history and
+    # are not held to it; absent means no check.
+    if "naming" in meta_:
+        if meta_["naming"] not in L.NAMINGS:
+            fails.append("meta.naming is %r — it must be one of %s (absent means no naming check)"
+                         % (meta_["naming"], ", ".join(L.NAMINGS)))
+        else:
+            for bucket in ("now", "next"):
+                for p in plans.get(bucket, []):
+                    if not L.has_work_id(p.get("name")):
+                        fails.append("plans.%s item %r does not start with a work id — with "
+                                     "meta.naming = work-ids every live item is named E-NN, "
+                                     "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
+                                     % (bucket, p.get("name")))
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"

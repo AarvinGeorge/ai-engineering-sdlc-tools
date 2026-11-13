@@ -83,6 +83,29 @@ pair answers "what is happening right now" without the reader choosing between c
 The gate **fails** on a second active item. A project that genuinely runs several streams
 says so with `meta.allow_multiple_active: true` rather than by accident.
 
+**Name work from one hierarchy, and never rename it (opt-in).** The industry's work breakdown
+(initiative, epic, story, task), plus numbered releases, findings and decision records, gives
+every item one id that the page, the branch, the commit range, the deployment ledger and the
+decision log can all be joined on:
+
+| Level | Form | What it is | Its one source of truth |
+|---|---|---|---|
+| Initiative | `I-1` | a theme the epics serve | the plan's north star and capabilities |
+| Epic | `E-01 slug` | one body of work: one plan document, one branch `e-01-slug` | its plan document |
+| Story | `E-01.S2` | a slice that ships in ONE release | the plan document |
+| Task | `E-01.S2.T3` | one build step: one implementer, one review, one commit range | the task ledger |
+| Finding | `E-01.F1` | a defect from a review or a bench, numbered within its epic | the task ledger, then a story |
+| Release | `R-04` | exactly what was promoted; the deployment ledger's sequence number, never reused | the deployment ledger |
+| Decision | `D-001` | one decision-log entry | the decision log |
+
+A name, once given, never changes. When a project adopts this mid-flight, keep a **crosswalk**
+(old name → new name → plan document → state at adoption) in a living document and leave old
+branches unrenamed. Set `meta.naming: "work-ids"` and the gate **fails** on any item in
+`plans.now` or `plans.next` whose name does not start with an epic, story, task, finding or
+release id (`E-01 search`, `R-04 E-01.S2 ship the slice`). Finished items are history and are
+not held to it. Absent, nothing is checked, so existing plans are unchanged; any other value,
+`null` included, fails.
+
 **A checklist someone has to EXECUTE declares columns.** A manual pass, an acceptance run, a
 migration rehearsal: steps like these carry instructions, not just a name. Put them in
 `task_columns` on the item and the same keys on each task, and the page renders one row per
@@ -305,7 +328,8 @@ it must be answered.
   items claiming one plan document; duplicate capability ids; a second item in `plans.now`;
   `meta.updated` in the future; the page out of sync with the JSON; `plan_version`
   disagreeing with the newest changelog entry; an unknown `meta.mode`; a `meta.size_budget_kb`
-  that is not a positive whole number. Exit code 1.
+  that is not a positive whole number; an unknown `meta.naming`, or, with
+  `meta.naming: "work-ids"`, a now or next item not named from a work id. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched; the last substantive commit newer than `meta.updated`; a plan older than
   fourteen days; a finished plan with no period or no outcome; `meta.version` disagreeing
@@ -369,8 +393,9 @@ Optional `.plan-layer.json` in the project root:
 { "plan_dir": "plan", "plan_file": "plan.json", "page_file": "index.html" }
 ```
 
-In `plan.json` itself: `meta.mode` (`"full"` or `"light"`) and `meta.size_budget_kb` (the KB
-size above which the gate drifts; default 200).
+In `plan.json` itself: `meta.mode` (`"full"` or `"light"`), `meta.size_budget_kb` (the KB
+size above which the gate drifts; default 200) and `meta.naming` (`"work-ids"` to require work
+ids on live items; absent means no check).
 
 ## Publishing the page
 
