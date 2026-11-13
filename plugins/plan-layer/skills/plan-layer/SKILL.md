@@ -103,7 +103,8 @@ A name, once given, never changes. When a project adopts this mid-flight, keep a
 branches unrenamed. Set `meta.naming: "work-ids"` and the gate **fails** on any item in
 `plans.now` or `plans.next` whose name does not start with an epic, story, task, finding or
 release id (`E-01 search`, `R-04 E-01.S2 ship the slice`). Finished items are history and are
-not held to it. Absent, nothing is checked, so existing plans are unchanged.
+not held to it. Absent, nothing is checked, so existing plans are unchanged; any other value,
+`null` included, fails.
 
 **A checklist someone has to EXECUTE declares columns.** A manual pass, an acceptance run, a
 migration rehearsal: steps like these carry instructions, not just a name. Put them in

@@ -49,8 +49,9 @@ read-back fails: do not improvise past the file.
 - **Reviewed by a different model, and every command block dry-run on the bench before that
   review.** *Why:* the first bench runs of one release stopped on faults in the deploy file, not in
   the product. *Test:* the record shows each block's bench run and names the reviewer's model.
-- **It executes nothing inside a live container.** Tests run on a laptop, in a throwaway started
-  from the release image, or on the bench; the live system only receives the tested artifact.
+- **It runs no tests, shells or ad hoc scripts inside a live container.** Tests run on a laptop, in
+  a throwaway started from the release image, or on the bench; the live system only receives the
+  tested artifact, and read-backs use read-only commands.
   *Why:* a suite run inside production can write, send or lock what real people use. *Test:* a guard
   test in the normal suite fails on any deploy-file step that runs a test, a shell or an ad hoc
   script inside the live container (`docker exec <live> pytest …`), and a planted violation turns it
@@ -91,9 +92,11 @@ read-back fails: do not improvise past the file.
    because the model kept writing after the turn had ended. *Test:* the gate lists the real-model
    bench cases and their results.
 9. **The pipeline, in order:** build → cross-model review → full suite → bench → gate → production
-   → watch → limited bench → wider rollout. A red stage holds the release where it is; holding needs
-   no one's permission, promoting does. *Test:* the promotion grid (progress-ladder.md) shows every
-   release on every stage.
+   → watch (a fixed window of health reads after the switch) → limited bench (the release on a small
+   set of real users or secondary instances) → wider rollout. A red stage holds the release where it
+   is; holding needs no one's permission, promoting does. *Why:* a stage skipped once becomes the
+   stage nobody runs. *Test:* the promotion grid (progress-ladder.md) shows every release on every
+   stage.
 
 ## Pushing and backups
 
@@ -102,10 +105,11 @@ read-back fails: do not improvise past the file.
   push on a hit. *Why:* work only on a laptop is one disk from lost, and a push is permanent.
   *Test:* the guard is installed as the pre-push hook, and a control run with a planted fake value
   shows it refusing (a scan that has never fired is not shown able to).
-- **Never push tags or refs that preserve rewritten history.** Push branches (`git push origin
-  --all`), not `--tags` or `--mirror`, when a rewrite removed data. *Why:* one backup tag re-publishes
-  everything the rewrite removed. *Test:* `git ls-remote --tags origin` after the push lists none of
-  them.
+- **Never push tags or refs that preserve rewritten history.** When a rewrite removed data and
+  backup refs of the old history still exist locally, push the branches you name
+  (`git push origin main feature-x`), never `--all`, `--tags` or `--mirror`, which carry the backups
+  too. *Why:* one backup tag or branch re-publishes everything the rewrite removed. *Test:*
+  `git ls-remote origin` after the push lists none of the backup refs.
 
 ## Pipeline and judgement
 

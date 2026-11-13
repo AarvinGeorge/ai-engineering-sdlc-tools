@@ -38,6 +38,13 @@ addition is a rule, its reason in one line, and a test. `SKILL.md` stays under 1
 - **`model-routing-and-cost.md`:** the suite rule now reads "full suite, once, before reporting".
 - **Description:** `when_to_use` adds "is this a regression", "promote", "release", "show
   progress" (description plus `when_to_use`: 1,316 characters, cap 1,536).
+- **Review:** a different model reviewed the branch with executed probes (READY WITH FIXES, 0
+  Critical, 4 Important, 9 Minor). Fixed: the backup-ref push rule named its own unsafe command
+  (`--all`); the grid's held row was one mark short; "re-review whatever its severity" contradicted
+  the scoped re-review rule (now: code the reviewer wrote); missing why/test lines added; "nothing
+  inside a live container" narrowed to tests, shells and scripts; watch and limited bench defined;
+  stage reviews scoped by tier. The naming table is kept in both plugins on purpose (each installs
+  alone).
 - **Not yet verified:** the eval cases were not re-run for this release (they spend model calls);
   no new eval case is added.
 

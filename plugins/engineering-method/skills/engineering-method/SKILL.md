@@ -113,7 +113,7 @@ money or touches credentials; the lower one otherwise.
     release. *Why:* without the base run, "already broken" and "we broke it" are both guesses.
     *Test:* both runs are shown (references/measurement-and-state-claims.md).
 19. **Rehearse the procedure, test once, promote the artifact.** The deploy file is dry-run on a
-    production-shaped bench, reviewed by another model and runs nothing inside a live container; a
+    production-shaped bench, reviewed by another model, runs no tests inside a live container; a
     real-model bench precedes production; the tested digest is what ships. *Why:* faked-model goldens
     miss timing and retries, and a rebuilt artifact is untested. *Test:*
     references/live-system-changes.md ("Proving a release").

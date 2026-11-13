@@ -301,15 +301,11 @@ def mode(d):
 # here, so the gate and anything else that names work cannot disagree.
 #   Epic E-NN · Story E-NN.Sn · Task E-NN.Sn.Tn · Finding E-NN.Fn · Release R-NN
 # Initiatives (I-n) and decisions (D-NNN) are not work items, so a now/next
-# item is never named by one alone.
+# item is never named by one alone. ASCII digits only. The id ends at the end
+# of the name, whitespace, ':', '·', ',', ';' or '-' (so "E-01-search" and
+# "R-04-hotfix" pass); "E-01x", "E-01.S" and "E-01)" do not.
 NAMINGS = ("work-ids",)
-WORK_ID = re.compile(r"^(?:E-\d{2,}(?:\.S\d+(?:\.T\d+)?|\.F\d+)?|R-\d{2,})(?=$|[\s:·,;)\]-])")
-
-
-def naming(d):
-    """'work-ids' when the plan opts in, else None. Absent means no naming check."""
-    v = (d.get("meta") or {}).get("naming")
-    return v if v in NAMINGS else None
+WORK_ID = re.compile(r"^(?:E-[0-9]{2,}(?:\.S[0-9]+(?:\.T[0-9]+)?|\.F[0-9]+)?|R-[0-9]{2,})(?=$|[\s:·,;-])")
 
 
 def has_work_id(name):

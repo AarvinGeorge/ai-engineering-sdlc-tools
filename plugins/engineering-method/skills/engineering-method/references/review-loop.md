@@ -30,20 +30,21 @@ review. This file says who reviews, what they must do, and when to stop.
 - **Its own worktree.** A reviewer's probe that edits files must never land in a build tree.
 - **Plans too.** On tier c, a written plan is reviewed against the running code before anything is
   built. Self-review of a plan passed two plans that three review rounds then found five Criticals in.
-- **Every stage carries its review, run as part of the stage.** Plan, task, branch, bench and
-  promotion each get theirs in the same step; never end a stage by asking whether to review. Only
+- **Every stage carries its review, run as part of the stage.** On tier c, plan, task, branch, bench
+  and promotion each get theirs in the same step (tier b: plan and task); never end a stage by asking whether to review. Only
   the go or no-go word is asked of the person. *Why:* a review listed as "next" is a review that
   waits on a reminder. *Test:* the plan's task list has a review row for every stage.
 
 ## Fix rounds
 
-- **One review per task. A scoped re-review only for a Critical, or an Important on a security
-  boundary.** Test-only and docs-only fixes are read by the controller from the diff when the
+- **One review per task. A scoped re-review only for a Critical, an Important on a security
+  boundary, or code the reviewer wrote (below).** Test-only and docs-only fixes are read by the controller from the diff when the
   implementer's report shows red, then green. **This is a deliberate departure from Superpowers**,
   which re-reviews every fix round: it trades a small risk on low-stakes fix diffs for cost. On tier c
   work, or when unsure, follow Superpowers and re-review every round.
-- **A fix the reviewer proposed or wrote gets its own re-review.** The reviewer is now its author,
-  so someone else reads it, whatever its severity. *Why:* a fix taken as written from a review
+- **Code the reviewer wrote gets its own re-review.** When a fix is taken as code from the review
+  (not as a finding the implementer then fixes), the reviewer is its author, so someone else reads
+  it, whatever its severity. *Why:* a fix taken as written from a review
   slipped in a regression; the suggestion had been reviewed, the code had not. *Test:* the fix
   diff has its own review row naming a reviewer other than its author.
 - **A fix that adds a check in one branch is usually the wrong shape.** Ask where the property must
@@ -64,14 +65,15 @@ mark it unverified".
 
 An agent that runs a procedure (a deploy file, a bench, a migration) needs more than a reviewer:
 
-- **Full output, never a tail.** It returns the complete output of each check, so a reader can
-  see what passed rather than a summary of it.
+- **Full output, never a tail.** It returns the complete output of each check. *Why:* a summary
+  hides which line failed. *Test:* the report carries each check's output.
 - **The shell, named.** Say which shell runs the commands (zsh does not split a variable into
-  words; `$b:r` is a modifier there), and keep strict mode on.
+  words; `$b:r` is a modifier there), and keep strict mode on. *Why:* the same line means different
+  things in bash and zsh. *Test:* the brief names the shell.
 - **A call budget sized to the procedure.** Count the steps, add margin for retries on flaky
-  connections; a budget smaller than the file stops the run in the middle.
+  connections. *Why:* a budget smaller than the file stops the run in the middle. *Test:* the brief
+  shows the step count beside the budget.
 - **Safe stopping points, named.** Mark the steps after which it may stop and resume without
   leaving state half-changed; at the budget it stops at the last one and reports the next step.
   *Why:* executors bound too tightly stopped mid-procedure, and the next pass had to rediscover
-  where. *Test:* the brief lists budget, shell and stopping points; the report names the last
-  completed step.
+  where. *Test:* the brief lists the stopping points; the report names the last completed step.

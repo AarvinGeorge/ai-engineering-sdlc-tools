@@ -76,7 +76,8 @@ a name says what kind of thing it is.
   plan document and its state at adoption; old branches are not renamed, new ones use the new form;
   decision ids start at `D-001` with the first entry after adoption (earlier entries are cited by
   timestamp). Plan documents keep their number and gain the epic in their title and header
-  (`covers: E-01`).
+  (`covers: E-01`). *Why:* without it, every old record points at a name nothing uses any more.
+  *Test:* each old name in use at adoption has a crosswalk row.
 - The planning page uses the same names (plan-layer can enforce it with `meta.naming`).
 
 ## Plans

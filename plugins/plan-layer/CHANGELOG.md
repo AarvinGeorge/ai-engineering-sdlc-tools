@@ -7,10 +7,12 @@ any item in `plans.now` or `plans.next` whose name does not start with an epic, 
 finding or release id (`E-01`, `E-01.S2`, `E-01.S2.T3`, `E-01.F1`, `R-04`). Initiatives (`I-n`)
 and decisions (`D-NNN`) are not work items, so they do not satisfy it alone. Finished items are
 not held to it; an unknown `meta.naming` value FAILs. Absent means no check, so every existing
-plan is unchanged. The pattern lives in one place (`plan_lib.WORK_ID`, `plan_lib.has_work_id`).
+plan is unchanged. `null` FAILs too. The pattern lives in one place (`plan_lib.WORK_ID`, `plan_lib.has_work_id`):
+ASCII digits only; the id ends at the end of the name, whitespace, `:`, `·`, `,`, `;` or `-`.
 The skill documents the hierarchy, its one source of truth per level, "names never change" and
 the crosswalk for old names; the full template carries a one-line `_naming_example`; the schema
-gains `meta.naming`. 9 tests (`tests/test_naming.py`), written red first (6 red before the code).
+gains `meta.naming`. 10 tests (`tests/test_naming.py`), written red first (6 red before the code); 178 passed, 0
+skipped (base 168, 0 skipped).
 
 ## 0.16.0 — 2026-10-15
 

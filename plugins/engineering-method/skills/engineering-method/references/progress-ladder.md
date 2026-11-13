@@ -56,10 +56,11 @@ work that promotes releases, directly under the ladder.
 
 - **One row per release** (`R-NN`, with the story it ships), one column per stage: build,
   cross-model review, full suite, bench, gate, production, watch, limited bench, wider rollout.
-- **Marks:** `✓` passed, `✗` failed, `·` not reached. A release held at a stage reads `✗→ held` and
+- **Marks:** `✓` passed, `✗` failed, `·` not reached. A release held at a stage reads `✗→held` and
   every stage after it stays `·`.
 - **Under each row:** the build commit under the release id, and the time each stage finished
-  (UTC; the date is in the title line). A stage that ran on a different commit from the build shows
+  (UTC; the date of the first stage is in the title line, and the times run forward from it, so a
+  smaller time than the one before it is the next day). A stage that ran on a different commit from the build shows
   that commit in its cell instead, and that is a finding.
 - **A note under a held release** saying where it is held, why, and what releases it.
 - **Read, never recalled:** every mark and time comes from the deployment ledger and the stage
@@ -72,7 +73,7 @@ R-01 E-01.S1   ✓       ✓       ✓       ✓       ✓       ✓       ✓  
      4be20c1   10:02   11:40   12:15   14:58   15:12   19:25   20:26   01:07
 R-02 E-02.S1   ✓       ✓       ✓       ✓       ✓       ✓       ✓       ✓       ·
      9d07a3e   22:10   23:30   00:05   02:40   03:07   03:49   04:50   06:16
-R-03 E-02.S2   ✓       ✓       ✓       ✗→ held       ·       ·       ·       ·
+R-03 E-02.S2   ✓       ✓       ✓       ✗→held  ·       ·       ·       ·       ·
      c81f5b2   07:55   09:40   10:20   11:01
      HELD at bench: the real model wrote after the turn had ended and a follow-up was sent;
      fix in re-review, then the bench re-runs. Production stays on R-02.
@@ -81,12 +82,15 @@ R-03 E-02.S2   ✓       ✓       ✓       ✗→ held       ·       ·      
 ## Making a report honest
 
 - **Every number from a run in the same pass.** Counts, times and suite results are read now, with
-  the command; a figure carried from an earlier report is labelled with its time or dropped.
+  the command; a figure carried from an earlier report is labelled with its time or dropped. *Why:*
+  a carried number reads as a fresh one. *Test:* each number has its command or its time.
 - **State words beside the command that proved them.** "Live 9e04c11 (GET /version, 14:32 UTC)",
-  never "live" alone (measurement-and-state-claims.md).
+  never "live" alone (measurement-and-state-claims.md). *Why:* a bare "live" is a memory in the tone
+  of a measurement. *Test:* no state word stands alone.
 - **The caveat line.** Say what is NOT yet fixed, and anything claimed earlier that the diff does
   not contain. *Why:* a report of fixes with no caveat line read as "all fixed" while two roots were
   untouched and one claimed change was 0 lines of the diff. *Test:* the footer has a CAVEAT line,
   even when it says "none known".
-- **The person's decisions, numbered, given or not given.** Each with the time it was given, so
-  nothing waits silently and nothing is assumed given.
+- **The person's decisions, numbered, given or not given.** Each with the time it was given. *Why:*
+  an unnumbered ask waits silently, and a remembered "yes" gets assumed. *Test:* every given
+  decision carries its time.

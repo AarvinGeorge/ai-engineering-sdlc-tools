@@ -24,13 +24,14 @@ def naming_fails(fails):
 class TestWorkIdPattern(unittest.TestCase):
     def test_accepted_forms(self):
         for n in ("E-01 search", "E-01.S2 slice", "E-01.S2.T3 one step", "E-12.F4 fix the cap",
-                  "R-07 release", "E-101 three digits", "E-01", "E-01.S2: colon", "E-01 · dot"):
+                  "R-07 release", "E-101 three digits", "E-01", "E-01.S2: colon", "E-01 · dot", "E-01-search", "R-04-hotfix"):
             self.assertTrue(L.has_work_id(n), n)
 
     def test_rejected_forms(self):
         for n in ("Search for E-01", "e-01 lower case", "E-1 one digit", "E-01x glued",
                   "R-7", "Round 1e", "I-1 initiative is not a work item", "D-001 a decision",
-                  "", None, "E-01.S slice without number"):
+                  "", None, "E-01.S slice without number",
+                  "E-\u0660\u0661 non-ASCII digits", "E-01) unbalanced", " E-01 leading space"):
             self.assertFalse(L.has_work_id(n), repr(n))
 
 
@@ -80,6 +81,12 @@ class TestNamingGate(Base):
 
     def test_unknown_naming_value_fails(self):
         self.d["meta"]["naming"] = "jira"
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("meta.naming" in f for f in fails), fails)
+
+    def test_null_naming_value_fails(self):
+        self.d["meta"]["naming"] = None
         self.write()
         _, fails, _ = self.gate()
         self.assertTrue(any("meta.naming" in f for f in fails), fails)
