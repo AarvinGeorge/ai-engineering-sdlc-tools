@@ -45,8 +45,8 @@ every request.
   plan, the ledger and the deploy file carry the state.
 - **Defer work that waits on something anyway.** Building early against a moving head costs
   everything and gains nothing.
-- **Lanes only when speed is asked for and the regions are disjoint.** Four lanes with four reviews
-  is the expensive shape; one or two is the default.
+- **Lanes when the parallel test passes, sized to what can be reviewed.** Four lanes with four
+  reviews is the expensive shape; two or three is the usual size (parallel-and-worktrees.md).
 - **Before choosing a weaker model to save usage, read the current limits (/usage); never recall
   them.** The usual cost driver is context length × turns, so save by fresh sessions and tight
   briefs before downgrading models.

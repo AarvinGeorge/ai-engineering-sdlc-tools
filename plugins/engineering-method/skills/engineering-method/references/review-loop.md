@@ -77,3 +77,23 @@ An agent that runs a procedure (a deploy file, a bench, a migration) needs more 
   leaving state half-changed; at the budget it stops at the last one and reports the next step.
   *Why:* executors bound too tightly stopped mid-procedure, and the next pass had to rediscover
   where. *Test:* the brief lists the stopping points; the report names the last completed step.
+
+## Autonomy under a standing go
+
+When the owner has given a standing go for a body of work, the agent does not stop to ask about
+calls it can make itself.
+
+- **Sort every open question into three.** *Mine:* an engineering call inside the agreed scope;
+  decide it, log it with the reason, keep moving. *The owner's, later:* park it with the trigger
+  that brings it back. *The owner's, now:* a true gate (money, credentials, an irreversible send
+  to real people, a change of scope or of a past ruling); ask it plainly, once, and keep working on
+  anything it does not block. *Why:* asking about what you could decide stalls the work and spends
+  the owner's attention; deciding the owner's gate takes it from them. *Test:* each question in the
+  report carries its sort, and the decision log holds the calls made.
+- **Never idle or defer on your own.** Putting work off to "tomorrow" or "after the owner replies"
+  needs a reason the owner gave or a real dependency. *Why:* self-imposed waits cost the owner a
+  day for nothing. *Test:* every deferral names its dependency or the ruling behind it.
+- **A standing go does not cover what the go excludes.** Principles 13 and 14 still hold: a
+  declined permission stops, and a live mutation is announced. *Test:* the go's scope is quoted
+  where the call is logged.
+

@@ -11,6 +11,8 @@ outage.
 | Read-only by default | Inspection, logs, config reads, benchmarks need no permission. |
 | Ask before mutating | Config edits, restarts, scheduled-job changes, installs, credential changes: state what changes and how to undo it. |
 | Never restart blind | Check for in-flight work first; re-read it after any wait or build. |
+| List side effects first | Before any test or setup step that touches a live system or a real account, list what it sends or changes outside the system (messages, notices, invitations, charges); a sent message cannot be unsent. *Test:* the list sits above the step. |
+| Read health before a user-visible step | Read the system's recent errors (model errors, usage limits, failed jobs) before any step real people will see; stop at the first usage-limit error. Keep spend separate between production and test, each with its own hard limit. *Why:* a step relayed through an unhealthy system reached no one, and a shared spend pool let a test loop starve production-adjacent work. |
 | Back up the state the change touches, then verify the backup | A backup not read back is a hope; a code-only change records the rollback revision instead and says so. |
 | Prove before production | On a laptop, a throwaway container, or a separate test stack. Never run a test suite inside the live system (a guard test enforces it; below). |
 | No secrets in artifacts | Name a credential, never its value — not in documents, commits or transcripts. |
@@ -62,8 +64,10 @@ read-back fails: do not improvise past the file.
 ## Proving a release
 
 1. **Rehearse the procedure, not only the code.** The bench runs the same deploy file, the same
-   commands, on a production-shaped target. *Why:* a bench that proved the code let the steps fail
-   live. *Test:* the bench record and the production record follow one file.
+   commands, on a production-shaped target that copies production's mechanism; each deliberate
+   difference is named with its reason. *Why:* a bench that proved the code let the steps fail live,
+   and unnamed differences drift. *Test:* the bench record and the production record follow one
+   file, and the bench lists its differences from production.
 2. **Expected state is recorded by machine.** Flags, plugin counts, image ids and config hashes that
    a read-back compares against are written by a script from the release, never typed. *Why:*
    hand-kept lists went stale between releases. *Test:* every expected value names the command that
@@ -91,12 +95,16 @@ read-back fails: do not improvise past the file.
    bench with the real model can. *Why:* a fix green on every golden looped on the first real bench
    because the model kept writing after the turn had ended. *Test:* the gate lists the real-model
    bench cases and their results.
-9. **The pipeline, in order:** build → cross-model review → full suite → bench → gate → production
-   → watch (a fixed window of health reads after the switch) → limited bench (the release on a small
-   set of real users or secondary instances) → wider rollout. A red stage holds the release where it
-   is; holding needs no one's permission, promoting does. *Why:* a stage skipped once becomes the
-   stage nobody runs. *Test:* the promotion grid (progress-ladder.md) shows every release on every
-   stage.
+9. **Watch with an observation log.** During the watch, read content, not only counts, and log each
+   observed symptom (a refusal, a retry, a silent turn, a rephrase) with its evidence; fixes go
+   through the pipeline, never onto live. *Why:* a count of zero errors hid wrong answers. *Test:*
+   the watch record lists what was read and each symptom with its evidence.
+10. **The pipeline, in order:** build → cross-model review → full suite → bench → gate → production
+    → watch (a fixed window of health reads after the switch) → limited bench (the release on a small
+    set of real users or secondary instances) → wider rollout. A red stage holds the release where it
+    is; holding needs no one's permission, promoting does. *Why:* a stage skipped once becomes the
+    stage nobody runs. *Test:* the promotion grid (progress-ladder.md) shows every release on every
+    stage.
 
 ## Pushing and backups
 

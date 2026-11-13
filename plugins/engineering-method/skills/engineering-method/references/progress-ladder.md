@@ -67,14 +67,14 @@ work that promotes releases, directly under the ladder.
   records in the same pass, and the title line says when and from what.
 
 ```
-PROMOTION · read 14 Mar 14:05 UTC from ledger + stage records
+PROMOTION · from 2 Mar · read 4 Mar 09:00 UTC from the ledger and stage records
                build   review  full    bench   gate    prod    watch   limited rollout
 R-01 E-01.S1   ✓       ✓       ✓       ✓       ✓       ✓       ✓       ✓       ·
-     4be20c1   10:02   11:40   12:15   14:58   15:12   19:25   20:26   01:07
+     5a1e3d0   08:10   09:05   09:40   10:30   11:00   11:45   12:45   16:20
 R-02 E-02.S1   ✓       ✓       ✓       ✓       ✓       ✓       ✓       ✓       ·
-     9d07a3e   22:10   23:30   00:05   02:40   03:07   03:49   04:50   06:16
+     b72c9f4   17:00   18:15   18:50   20:10   20:30   21:05   22:05   02:30
 R-03 E-02.S2   ✓       ✓       ✓       ✗→held  ·       ·       ·       ·       ·
-     c81f5b2   07:55   09:40   10:20   11:01
+     e03d8a6   06:40   07:30   08:05   08:45
      HELD at bench: the real model wrote after the turn had ended and a follow-up was sent;
      fix in re-review, then the bench re-runs. Production stays on R-02.
 ```

@@ -112,16 +112,16 @@ money or touches credentials; the lower one otherwise.
     running the same check on what production runs; an unexplained base-vs-head difference stops the
     release. *Why:* without the base run, "already broken" and "we broke it" are both guesses.
     *Test:* both runs are shown (references/measurement-and-state-claims.md).
-19. **Rehearse the procedure, test once, promote the artifact.** The deploy file is dry-run on a
-    production-shaped bench, reviewed by another model, runs no tests inside a live container; a
-    real-model bench precedes production; the tested digest is what ships. *Why:* faked-model goldens
-    miss timing and retries, and a rebuilt artifact is untested. *Test:*
-    references/live-system-changes.md ("Proving a release").
-20. **The record is re-tested before it is cited, and guarded before it leaves.** Check an old decision
-    for currency; search the record before a removal; write a repeated reminder where it is read, that
-    turn; push through a secrets-and-personal-data guard with a planted control, and never push tags
-    that preserve rewritten history. *Why:* an aged rule and a backup tag both went out unread.
-    *Test:* references/docs-and-decisions.md, references/live-system-changes.md.
+19. **Rehearse the procedure, test once, promote the artifact.** Dry-run the deploy file on a
+    production-shaped bench; a real-model bench precedes production; the tested digest ships. *Why:*
+    faked-model goldens miss timing and retries. *Test:* references/live-system-changes.md.
+20. **The record is re-tested before it is cited, and guarded before it leaves.** *Why:* a stale rule
+    or a pushed secret cannot be taken back. *Test:* references/docs-and-decisions.md ("Using the
+    record"), references/live-system-changes.md ("Pushing and backups").
+21. **Under a standing go, decide engineering calls and keep moving; ask only true owner gates.**
+    Sort each question: mine (decide, log the reason), the owner's later (park with a trigger), the
+    owner's now (spend, credentials, irreversible sends, scope). Never idle or defer on your own.
+    *Why:* asking what you could decide stalls the work. *Test:* references/review-loop.md ("Autonomy").
 
 ## 3. Which Superpowers skill, when
 

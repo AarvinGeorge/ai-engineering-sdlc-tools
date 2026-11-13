@@ -11,6 +11,12 @@ same pass, remote clocks read on the host) apply; this file adds exit codes, sui
 - `cmd | tail -5` exits with tail's status, not cmd's. A failing suite piped and then `&&`-chained to
   a commit lets the commit through. Use `set -o pipefail`, a wrapper script that exits non-zero, or
   gate explicitly on the summary line (`OK`, `passed`, `0 failed`). Same for `bash -n … | tail`.
+- **Under `pipefail`, `producer | grep -q` can fail falsely:** `grep -q` exits at the first match,
+  the producer gets SIGPIPE, and the pipe reports failure. Count matches instead
+  (`n=$(producer | grep -c pattern)`). *Test:* a strict-mode check with a match returns success.
+- **A switch that reads only some truthy words fails silently.** If a setting accepts `1`, `true`
+  and `yes`, then `on` means off. *Test:* each switch's accepted values are written beside it, and a
+  read-back shows the feature on.
 
 ## Suite results
 
@@ -27,6 +33,10 @@ same pass, remote clocks read on the host) apply; this file adds exit codes, sui
   check on the revision live today: failing on both is pre-existing (its own backlog item); failing
   only on the head is a regression and stops the release. *Why:* without the base run, both "it was
   already broken" and "we broke it" are guesses. *Test:* both runs are shown, with their revisions.
+
+- **A flaky timing test is fixed by measuring better, not by loosening the limit.** Take the best of
+  N runs against the same limit. *Why:* a raised limit stops catching the slowdown it was written
+  for. *Test:* the limit is unchanged in the diff.
 
 ## Negatives and time
 

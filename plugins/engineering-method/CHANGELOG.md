@@ -2,7 +2,7 @@
 
 ## 0.2.0 — 2026-11-13
 
-**Lessons from a run of live promotions, made general.** Twenty principles (four new); every
+**Lessons from a run of live promotions, made general.** Twenty-one principles (five new); every
 addition is a rule, its reason in one line, and a test. `SKILL.md` stays under 150 lines (149).
 
 - **New principles 17–20 (Delivery):** root cause, not symptom, and a repeat fault changes the
@@ -45,8 +45,19 @@ addition is a rule, its reason in one line, and a test. `SKILL.md` stays under 1
   inside a live container" narrowed to tests, shells and scripts; watch and limited bench defined;
   stage reviews scoped by tier. The naming table is kept in both plugins on purpose (each installs
   alone).
-- **Not yet verified:** the eval cases were not re-run for this release (they spend model calls);
-  no new eval case is added.
+- **Fidelity round (independent evaluation):** principle 21, autonomy under a standing go (sort
+  each question: mine, the owner's later, the owner's now; never idle or defer on your own), with
+  review-loop.md "Autonomy under a standing go". Also added, each as rule / why / test: list
+  outward side effects before any step on a live system; read health before a user-visible step,
+  stop at the first usage-limit error, keep production and test spend apart; a bench names each
+  deliberate difference from production; watch with an observation log; a lessons register;
+  platform assumptions recorded with the version checked; every finding has a home before a plan
+  is complete; the `pipefail` + `grep -q` SIGPIPE trap; truthy-word switches; flaky timing tests
+  measured best-of-N, not loosened. Parallel lanes are the default when the parallel test passes.
+  Principles 19 and 20 shortened to pointers; the grid example uses invented times and commits,
+  with a title date consistent with its rows. Rebased onto the public main (hygiene merge).
+- **Evals:** see the review summary for base vs head pass counts (7 cases, Opus, Sonnet judge,
+  3 runs per arm). No new eval case is added for principles 17–21.
 
 ## 0.1.1 — 2026-10-15
 

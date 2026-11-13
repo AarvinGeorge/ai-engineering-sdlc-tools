@@ -54,6 +54,13 @@ header describes; it never replaces reading the body when the task depends on th
   that lives only in conversation is lost at the next compaction. *Test:* the reply names the file
   and line that now holds the rule.
 
+- **Keep a lessons register.** One table: what failed, what works, its source, whether it still
+  holds; a row is added the turn the lesson is learned, and searched before any setup or deploy
+  step. *Why:* lessons scattered across records were relearned. *Test:* the step cites its row.
+- **Record each platform assumption with the version it was checked on,** pinned by a boundary
+  test. *Why:* an upgrade silently changes behaviour the code relied on. *Test:* the upgrade
+  rehearsal reads the list and every entry has its test.
+
 ## Names: one hierarchy, never renamed
 
 The industry's work breakdown (Scrum, Jira, SAFe: initiative, epic, story, task), plus numbered
@@ -85,7 +92,10 @@ a name says what kind of thing it is.
 Tier b: a short decision note, and a numbered plan only when the work spans sessions. Tier c: a
 numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
-moves, not afterwards.
+moves, not afterwards. **Every finding has a home before a plan is called complete:** a coverage
+table maps each finding from the traces and reviews to the story that fixes it, or to a stated
+deferral. *Why:* fixes were dropped between the trace and the plan. *Test:* the table has no
+finding without a row.
 
 ## Branches
 
