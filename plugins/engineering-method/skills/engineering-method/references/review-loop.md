@@ -9,7 +9,8 @@ review. This file says who reviews, what they must do, and when to stop.
   elsewhere (self-preference bias in LLM-as-judge is well documented, alongside position and
   verbosity bias). Same-model review weakens the gate at no saving.
 - **At least as strong as the implementer.** Strong implements, the other strong reviews; a
-  mid-tier implementer can be reviewed by either strong model.
+  mid-tier implementer can be reviewed by either strong model. A ranking between two models is a
+  vendor claim: cite it, or say it is unverified and how the person can check it.
 - **A fresh agent per task.** Fresh context, a brief and a diff, never the implementer's
   conversation.
 - **A final whole-branch pass** on tier c work, from a different angle than the per-task reviews.
