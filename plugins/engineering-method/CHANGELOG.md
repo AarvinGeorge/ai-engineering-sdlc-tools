@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.2.0 — 2026-11-13
+
+**Lessons from a run of live promotions, made general.** Twenty principles (four new); every
+addition is a rule, its reason in one line, and a test. `SKILL.md` stays under 150 lines (149).
+
+- **New principles 17–20 (Delivery):** root cause, not symptom, and a repeat fault changes the
+  mechanism; no regression is a hard gate, settled by a base check against what production runs;
+  rehearse the procedure, test once and promote the artifact, with a real-model bench before
+  production; the record is re-tested for currency before it is cited and guarded (secrets and
+  personal data, planted control, no rewrite-preserving tags) before it leaves.
+- **`live-system-changes.md`:** "The deploy file is code" (a different model reviews it after every
+  command block is dry-run on the bench; it executes nothing inside a live container, enforced by a
+  guard test with a planted violation; re-read against the final head before each gate). "Proving a
+  release": the nine promotion lessons (rehearse the procedure; expected state recorded by machine;
+  a read-only pre-switch check; recovery read back like a deploy; repeat faults get a mechanism fix;
+  smoke never shrinks for what a change touches; test once, promote the artifact) plus real-model
+  benches and the pipeline order. "Pushing and backups": a pre-push guard with a planted-leak
+  control; never push tags that preserve rewritten history.
+- **`measurement-and-state-claims.md`:** "Suite results" (builders run the full suite once before
+  reporting; the controller's run is inside the project tree; a skip count is a measurement; the
+  base check settles "is this a regression") and "Negatives and time" (a negative carries its
+  window; timestamps from the clock only).
+- **`review-loop.md`:** every stage carries its review, run in the stage; a reviewer-proposed fix
+  gets its own re-review whatever its severity; "The executor's brief" (full output, the shell
+  named, a call budget sized to the procedure, safe stopping points).
+- **`docs-and-decisions.md`:** "Using the record" (decision currency; search the record before a
+  removal or a step; a repeated reminder is encoded where it is read, the same turn) and "Names:
+  one hierarchy, never renamed" (Initiative `I-n`, Epic `E-NN`, Story `E-NN.Sn`, Task
+  `E-NN.Sn.Tn`, Release `R-NN` = the deployment ledger's sequence number, Finding `E-NN.Fn`,
+  Decision `D-NNN`; a crosswalk for old names). Decision-log entries carry their `D-NNN`.
+- **`progress-ladder.md`:** the promotion pipeline grid (one row per release, one column per
+  stage, `✓ ✗ ·`, the build commit and stage times under each row, a note where a release is
+  held), shown with every progress report on work that promotes releases; "Making a report
+  honest" (numbers from a run in the same pass, state words beside their command, the CAVEAT line,
+  decisions numbered given or not given). The ladder's footer gains skipped counts and a CAVEAT line.
+- **`model-routing-and-cost.md`:** the suite rule now reads "full suite, once, before reporting".
+- **Description:** `when_to_use` adds "is this a regression", "promote", "release", "show
+  progress" (description plus `when_to_use`: 1,316 characters, cap 1,536).
+- **Not yet verified:** the eval cases were not re-run for this release (they spend model calls);
+  no new eval case is added.
+
 ## 0.1.1 — 2026-10-15
 
 - **Live changes, matched to practice (Fable ruling):** back up the state a change touches and read it

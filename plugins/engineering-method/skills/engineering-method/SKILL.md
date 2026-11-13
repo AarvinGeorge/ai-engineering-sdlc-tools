@@ -1,7 +1,7 @@
 ---
 name: engineering-method
 description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering, even when the question looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or is planning, building, reviewing or shipping code of any size, including a quick script, where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, zeros proven able to be non-zero, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
-when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision".
+when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress".
 ---
 
 # engineering-method
@@ -50,7 +50,8 @@ money or touches credentials; the lower one otherwise.
    confirms or contradicts the docs; it never replaces them. *Test:* every vendor behaviour has a
    citation or is labelled a hypothesis.
 4. **The global measurement rules apply** (proven zeros, fail loudly, dates read in the same pass).
-   This skill adds exit codes, state words and labels (references/measurement-and-state-claims.md).
+   This skill adds exit codes, full-suite and skip counts, negatives with their window, clock-only
+   times, state words and labels (references/measurement-and-state-claims.md).
 
 **Design**
 5. **Recommend the industry practice first, then adapt.** Name the standard way and who does it,
@@ -99,8 +100,28 @@ money or touches credentials; the lower one otherwise.
     indexed the same day; the plan's stage moves when the work moves. *Why:* the next session
     re-derives whatever this one did not write down. *Test:* references/docs-and-decisions.md.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; keep the real technical name
-    and define it once; on tier c (or when asked) report progress as the ladder with measured numbers. *Test:*
-    references/progress-ladder.md.
+    and define it once; on tier c (or when asked) report progress as the ladder with measured numbers,
+    a caveat line and the promotion grid; name work from one hierarchy that never renames (E-01.S2,
+    R-04, D-001). *Test:* references/progress-ladder.md, references/docs-and-decisions.md.
+
+**Delivery (tier c; tier b where it applies)**
+17. **Root cause, not symptom; a repeat fault changes the mechanism.** Run the case, inventory every
+    mechanism on the concept, extend the one where the property must hold. *Why:* symptom fixes came
+    back. *Test:* the fix names the root it closes; a repeat names the mechanism changed.
+18. **No regression is a hard gate.** Pin what works first; "is this a regression?" is settled by
+    running the same check on what production runs; an unexplained base-vs-head difference stops the
+    release. *Why:* without the base run, "already broken" and "we broke it" are both guesses.
+    *Test:* both runs are shown (references/measurement-and-state-claims.md).
+19. **Rehearse the procedure, test once, promote the artifact.** The deploy file is dry-run on a
+    production-shaped bench, reviewed by another model and runs nothing inside a live container; a
+    real-model bench precedes production; the tested digest is what ships. *Why:* faked-model goldens
+    miss timing and retries, and a rebuilt artifact is untested. *Test:*
+    references/live-system-changes.md ("Proving a release").
+20. **The record is re-tested before it is cited, and guarded before it leaves.** Check an old decision
+    for currency; search the record before a removal; write a repeated reminder where it is read, that
+    turn; push through a secrets-and-personal-data guard with a planted control, and never push tags
+    that preserve rewritten history. *Why:* an aged rule and a backup tag both went out unread.
+    *Test:* references/docs-and-decisions.md, references/live-system-changes.md.
 
 ## 3. Which Superpowers skill, when
 
@@ -108,21 +129,21 @@ money or touches credentials; the lower one otherwise.
 |---|---|---|
 | Intent is fuzzy | `superpowers:brainstorming` | name the stakes tier; principle 5 |
 | Writing the plan | `superpowers:writing-plans` | an out-of-scope list; EXTENDS/NEW per capability; tier c: a fresh reviewer reads it against the running code before building |
-| Building | `superpowers:test-driven-development` | principle 9; implementers run the suite once before committing, never loop on a long run |
+| Building | `superpowers:test-driven-development` | principle 9; builders run the FULL suite once before reporting (not only touched modules), never loop on a long run |
 | Many tasks in one session | `superpowers:subagent-driven-development` | principles 10–12 |
 | Independent work at once | `superpowers:dispatching-parallel-agents` | the parallel test in references/parallel-and-worktrees.md |
 | Isolation | `superpowers:using-git-worktrees` | one writer per worktree; reviewers get their own |
-| Review | `superpowers:requesting-code-review` / `receiving-code-review` | references/review-loop.md |
+| Review | `superpowers:requesting-code-review` / `receiving-code-review` | references/review-loop.md; a reviewer-written fix is re-reviewed |
 | Something broke | `superpowers:systematic-debugging` | principle 8; principle 2 for every "it was already broken" |
 | Before saying done | `superpowers:verification-before-completion` | principles 1, 2, 4 |
 | Merging | `superpowers:finishing-a-development-branch` | tier c: references/live-system-changes.md |
 
 ## 4. References (load when the task needs them)
 
-- `references/review-loop.md` — cross-model reviewer, probes, scoped re-review, fix-round escalation
+- `references/review-loop.md` — cross-model reviewer, probes, review at every stage, re-review of reviewer fixes, the executor's brief
 - `references/model-routing-and-cost.md` — which model for which job, and how agents stay cheap
-- `references/measurement-and-state-claims.md` — exit codes, state words, labels (adds to the global measurement rules)
-- `references/progress-ladder.md` — the progress format, with a filled example
+- `references/measurement-and-state-claims.md` — exit codes, suite results and skips, base checks, negatives and time, state words, labels
+- `references/progress-ladder.md` — the progress format, the promotion pipeline grid, honest-report rules
 - `references/parallel-and-worktrees.md` — when to fan out, and who may write where
-- `references/live-system-changes.md` — the deploy standard: template, guard test, in-flight, backup, rollback
-- `references/docs-and-decisions.md` — numbered docs, headers, the decision log, the index
+- `references/live-system-changes.md` — the deploy standard, the deploy file as code, proving a release, pushing and backups
+- `references/docs-and-decisions.md` — numbered docs, headers, the decision log, using the record, the naming hierarchy
