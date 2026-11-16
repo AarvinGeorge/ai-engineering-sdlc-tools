@@ -18,5 +18,5 @@
     "paused": "Paused",
     "done": "Done"
   },
-  "fetch": "With the Notion connector, fetch the database at meta.tracker.target and query every row (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names: Name (title), Status, Stage, Updated, Link."
+  "fetch": "With the Notion connector, fetch the database at meta.tracker.target and query every row (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names: Name (title), Status, Stage, Updated, Link; flatten every property to a plain string (a select or status as its option name, a date as ISO text, empty as an empty string), and save the rows as the tracker holds them: never build the list from the plan."
 }

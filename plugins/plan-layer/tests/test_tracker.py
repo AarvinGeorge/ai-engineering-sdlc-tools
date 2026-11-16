@@ -230,11 +230,151 @@ class TestDiff(TrackerBase):
         self.assertEqual(r.returncode, 1)
         self.assertEqual(r.stdout.count("create row"), 2)
 
-    def test_expected_output_is_accepted_as_actual(self):
+    def test_expected_object_shape_is_refused_as_actual(self):
         self.write()
         exp = self.tracker("expected").stdout
         r = self.tracker("diff", "--actual", self.actual_file(None, raw=exp))
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("from the tracker", r.stdout)
+        self.assertIsNone(self.state(), "the gate cannot be cleared without the tracker")
+
+
+class TestFixRound(TrackerBase):
+    def good(self):
+        return [{"Name": r["Name"], "Status": r["Status"], "Stage": r["Stage"]}
+                for r in self.expected()["rows"]]
+
+    def test_wrong_title_on_a_matching_id_is_a_rename(self):
+        self.write()
+        rows = self.good()
+        rows[0]["Name"] = "E-01.S2 Totally different title"
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("rename 'E-01.S2 Totally different title' to 'E-01.S2 Login page'", r.stdout)
+
+    def test_older_done_row_not_marked_done_is_flagged(self):
+        self.d["plans"]["done"] = [{"name": "E-00.S%d Old %d" % (i, i), "period": "p", "outcome": "o"}
+                                   for i in range(8)]
+        self.write()
+        os.makedirs(os.path.join(self.dir, "plan", "archive"))
+        with open(os.path.join(self.dir, "plan", "archive", "done.json"), "w") as fh:
+            json.dump([{"name": "E-00.S99 Archived thing", "period": "p", "outcome": "o"}], fh)
+        rows = self.good() + [{"Name": "E-00.S1 Old 1", "Status": "In progress", "Stage": "building"},
+                              {"Name": "E-00.S99 Archived thing", "Status": "In progress", "Stage": "x"}]
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("set Status of 'E-00.S1 Old 1' to 'Done'", r.stdout)
+        self.assertIn("set Status of 'E-00.S99 Archived thing' to 'Done'", r.stdout)
+        rows[-2]["Status"] = rows[-1]["Status"] = "Done"
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
         self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_non_string_value_exits_2_naming_field_and_row(self):
+        self.write()
+        rows = self.good()
+        rows[1]["Status"] = {"name": "In progress"}
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("Status", r.stdout)
+        self.assertIn("E-01.S3 Logout page", r.stdout)
+        self.assertIn("plain string", r.stdout)
+
+    def test_adapters_tell_the_agent_to_flatten(self):
+        for kind in ("notion", "generic"):
+            with open(os.path.join(TRACKERS, kind + ".json")) as fh:
+                self.assertIn("flatten every property to a plain string", json.load(fh)["fetch"])
+
+    def write_adapter(self, kind, adapter):
+        os.makedirs(os.path.join(self.dir, "plan", "trackers"), exist_ok=True)
+        with open(os.path.join(self.dir, "plan", "trackers", kind + ".json"), "w") as fh:
+            json.dump(adapter, fh)
+
+    def linear(self, status_map=None):
+        return {"fields": {"name": "Title", "status": "State"},
+                "status_map": status_map or {"intent": "Backlog", "grounded": "Backlog",
+                                             "planned": "Todo", "building": "In Progress",
+                                             "verified": "In Review", "recorded": "In Review",
+                                             "paused": "Paused", "done": "Done"}}
+
+    def test_project_adapter_without_optional_fields(self):
+        self.write_adapter("linear", self.linear())
+        self.d["meta"]["tracker"] = {"kind": "linear", "target": "team"}
+        self.write()
+        rows = self.expected()["rows"]
+        self.assertEqual(rows[0]["Title"], "E-01.S2 Login page")
+        self.assertEqual(rows[0]["State"], "In Progress")
+        self.assertEqual(set(rows[0]) - {"key"}, {"Title", "State"})
+        act = [{"Title": r["Title"], "State": r["State"]} for r in rows]
+        self.assertEqual(self.tracker("diff", "--actual", self.actual_file(act)).returncode, 0)
+        act[0]["State"] = "Todo"
+        r = self.tracker("diff", "--actual", self.actual_file(act))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("set State of 'E-01.S2 Login page' to 'In Progress'", r.stdout)
+        _, fails, _ = self.gate()
+        self.assertEqual(tracker_msgs(fails), [], fails)
+
+    def test_project_adapter_is_checked_before_the_plugin_one(self):
+        self.write_adapter("notion", self.linear({"intent": "Backlog", "grounded": "Backlog",
+                                                  "planned": "Todo", "building": "Doing it",
+                                                  "verified": "x", "recorded": "x",
+                                                  "paused": "Paused", "done": "Done"}))
+        self.write()
+        self.assertEqual(self.expected()["rows"][0]["State"], "Doing it")
+
+    def test_readme_documents_project_adapters_and_a_linear_example(self):
+        with open(os.path.join(TRACKERS, "README.md")) as fh:
+            text = fh.read()
+        self.assertIn("plan/trackers/", text)
+        self.assertIn("Linear", text)
+
+    def test_no_plan_exits_2_for_diff(self):
+        import shutil
+        shutil.rmtree(os.path.join(self.dir, "plan"), ignore_errors=True)
+        r = self.tracker("diff", "--actual", os.path.join(self.dir, "x.json"))
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("plan", r.stdout)
+
+    def test_sync_returns_2_for_unreadable_input_even_when_gate_fails(self):
+        self.d["plans"]["now"][0]["tasks"] = [{"name": "t", "state": "weird"}]
+        self.write()
+        r = run("sync.py", "--tracker", "--actual", self.actual_file(None, raw="{"), project=self.dir)
+        self.assertIn("FAIL", r.stdout)
+        self.assertEqual(r.returncode, 2, r.stdout)
+
+    def test_sync_actual_without_tracker_is_usage(self):
+        self.write()
+        r = run("sync.py", "--actual", self.actual_file([]), project=self.dir)
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("--tracker", r.stdout)
+
+    def test_separator_after_the_id_does_not_defeat_rename_matching(self):
+        for sep in ("\u2014", "\u2013", ":", "\u00b7", "-"):
+            self.d["plans"]["next"] = [item("E-01.S3 %s Caf\u00e9 na\u00efve search" % sep)]
+            self.write()
+            rows = [r for r in self.good() if r["Name"].startswith("E-01.S2")]
+            rows.append({"Name": "Caf\u00e9 na\u00efve search", "Status": "Idea", "Stage": "intent"})
+            r = self.tracker("diff", "--actual", self.actual_file(rows))
+            self.assertEqual(r.returncode, 1, (sep, r.stdout))
+            self.assertEqual(r.stdout.count("rename"), 1, (sep, r.stdout))
+            self.assertNotIn("create row", r.stdout, sep)
+            self.assertNotIn("not in the plan", r.stdout, sep)
+
+    def test_same_name_without_ids_is_one_plan_problem(self):
+        self.d["plans"]["next"] = [item("Tidy docs"), item("Tidy docs")]
+        self.write()
+        rows = [r for r in self.good() if r["Name"].startswith("E-01.S2")]
+        rows.append({"Name": "Tidy docs", "Status": "Idea", "Stage": "intent"})
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.stdout.count("share the name 'Tidy docs'"), 1, r.stdout)
+        self.assertIn("give them work ids", r.stdout)
+        self.assertNotIn("archive all but one", r.stdout)
+
+    def test_utc_now_lives_in_plan_lib_only(self):
+        import plan_lib
+        self.assertRegex(plan_lib.utc_now(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        for f in ("check.py", "pause.py", "tracker.py"):
+            with open(os.path.join(PLUGIN, "scripts", f)) as fh:
+                self.assertNotIn("%Y-%m-%dT%H:%M:%SZ", fh.read(), f)
 
 
 class TestGate(TrackerBase):
@@ -245,18 +385,39 @@ class TestGate(TrackerBase):
         self.assertEqual(len(tracker_msgs(drifts)), 1, drifts)
         self.assertIn("never", tracker_msgs(drifts)[0])
 
-    def test_reconcile_clears_it_and_a_plan_edit_brings_it_back(self):
-        self.write()
+    def reconcile_clean(self):
         rows = [{"Name": r["Name"], "Status": r["Status"], "Stage": r["Stage"]}
                 for r in self.expected()["rows"]]
-        self.tracker("diff", "--actual", self.actual_file(rows))
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_reconcile_clears_it_and_a_change_to_a_row_brings_it_back(self):
+        self.write()
+        self.reconcile_clean()
         _, fails, drifts = self.gate()
         self.assertEqual(tracker_msgs(fails + drifts), [], drifts)
-        self.d["meta"]["updated"] = "2026-01-02T00:00:00Z"
+        self.d["plans"]["next"][0]["stage"] = "planned"
         self.write()
         _, fails, drifts = self.gate()
         self.assertEqual(len(tracker_msgs(drifts)), 1, drifts)
         self.assertEqual(tracker_msgs(fails), [])
+
+    def test_unrelated_edit_does_not_force_a_refetch(self):
+        self.write()
+        self.reconcile_clean()
+        self.d["meta"]["updated"] = "2026-01-02T00:00:00Z"
+        self.d["parked"] = [{"id": "P1", "q": "q", "trigger": "t"}]
+        self.write()
+        _, fails, drifts = self.gate()
+        self.assertEqual(tracker_msgs(fails + drifts), [], drifts)
+
+    def test_pause_after_reconcile_drifts_even_in_the_same_second(self):
+        self.write()
+        self.reconcile_clean()
+        self.d["meta"]["paused"] = {"at": "2026-01-01T00:00:00Z"}
+        self.write()
+        _, _, drifts = self.gate()
+        self.assertEqual(len(tracker_msgs(drifts)), 1, drifts)
 
     def test_last_reconcile_with_unfixed_drift_still_drifts(self):
         self.write()

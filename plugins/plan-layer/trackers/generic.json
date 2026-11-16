@@ -18,5 +18,5 @@
     "paused": "Paused",
     "done": "Done"
   },
-  "fetch": "With the tracker's connector, list every row of the board, sheet or project at meta.tracker.target (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names."
+  "fetch": "With the tracker's connector, list every row of the board, sheet or project at meta.tracker.target (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names; flatten every property to a plain string (a select or status as its option name, a date as ISO text, empty as an empty string), and save the rows as the tracker holds them: never build the list from the plan."
 }

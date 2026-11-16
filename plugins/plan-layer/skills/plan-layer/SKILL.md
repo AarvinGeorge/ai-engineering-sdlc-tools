@@ -57,11 +57,9 @@ so a turn cannot end on a page that contradicts itself.
 
 ### Showing "the plan"
 
-Anything shown as "the plan" — in a reply, a summary, a handover — is drawn from the plan
-file, not from memory of it, and shows **all** its active tracks (every item in `plans.now`,
-then `plans.next` in order), not only the one being worked on. When a go/no-go is being
-asked for, say **which** one is meant: name the item, by its work id when it has one. A "go"
-given to a plan the asker only partly saw is a go to something else.
+Anything shown as "the plan" is drawn from the plan file, not memory, and shows all its
+active tracks (`plans.now`, then `plans.next` in order). When a go/no-go is asked for, name
+which item is meant, by work id when it has one.
 
 ### Say what waits on what
 
@@ -251,25 +249,29 @@ tracker's connector. It does the deriving and the comparing.
 
 Opt in with `meta.tracker`: `{"kind": "notion", "target": "<database url or id>"}`; optional
 `status_map`, `fields` (merged over the adapter) and `recent_done` (default 5). Absent, nothing
-changes. The adapter is one data file, `trackers/<kind>.json` (`notion` and `generic` ship;
-`trackers/README.md` says how to add another): field names (Name, Status, Stage, Updated,
-Link), one status value per stage plus `Paused` and `Done`, and a `fetch` note.
+changes. The adapter is one data file, `<kind>.json` (`notion` and `generic` ship in
+`trackers/`; a project's own goes in `plan/trackers/` and is checked first, so a plugin update
+never wipes it; `trackers/README.md` says how to write one, with a Linear example): field
+names (Name and Status required; Stage, Updated, Link optional and only compared when
+declared), one status value per stage plus `Paused` and `Done`, and a `fetch` note.
 
 The loop, after any change:
 
 1. `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sync.py" --tracker` prints the expected rows and the
    next step. (`tracker.py expected` prints them as JSON.)
-2. Fetch every row from the tracker with its connector (all pages) into a JSON file: a list of
-   objects keyed by the adapter's field names.
+2. Fetch every row from the tracker with its connector (all pages) into a JSON file: a bare list
+   of objects keyed by the adapter's field names, every value flattened to a plain string. Never
+   save `expected`'s output as the actual rows; it is refused.
 3. `sync.py --tracker --actual <file>` prints one instruction per difference (`create row …`,
    `set Status of '<name>' to '<value>'`, `rename '<name>' to start with its work id`,
    `row '<name>' not in the plan: archive or add to the plan`). Carry them out, fetch again,
    rerun until it exits 0. Exit 2 means the file could not be read: nothing was compared.
 
-Mirrored: `plans.now`, `plans.next` and the last `recent_done` finished items. Each run is
-recorded in `plan/tracker-state.json` (time, drift count, the plan `updated` it was compared
-against; commit it with the plan). The gate **drifts** when that record is missing or older
-than the plan's `updated`, or left differences open. With `meta.naming: "work-ids"` the gate
+Mirrored: `plans.now`, `plans.next` and the last `recent_done` finished items; a row for older
+finished work must say Done. Each run is recorded in `plan/tracker-state.json` (time, drift
+count, a hash of the expected rows; commit it with the plan). The gate **drifts** when that
+record is missing, when the rows the plan now expects differ from the recorded hash (an
+unrelated edit does not count), or when differences were left open. With `meta.naming: "work-ids"` the gate
 **fails** a now/next item lacking a work id, so every row can carry one.
 
 ## Pause and resume
@@ -389,7 +391,7 @@ it must be answered.
   with `plan_version`; an item naming no capability; assertions declared but never verified,
   or verified over a week ago; a figure reading a fact the plan does not define; an active
   item where every unfinished task is blocked; records due to roll; `plan.json` over its size
-  budget (`meta.size_budget_kb`, default 200 KB); a tracker mirror never reconciled, or not since the plan last changed. Exit 0 unless `--strict`.
+  budget (`meta.size_budget_kb`, default 200 KB); a tracker mirror never reconciled, or not since its expected rows last changed. Exit 0 unless `--strict`.
 - **Light mode** skips the full-only signals: figures and roll-due. Declared views are checked
   in both modes. Every FAIL above still applies.
 

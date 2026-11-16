@@ -32,6 +32,29 @@ and prints each difference as an instruction to carry out.
   connector call lists every row (all pages), and that the output is a JSON list
   of objects keyed by the adapter's field names.
 
+Only `name` and `status` are required in `fields`. `stage`, `updated` and `link` are
+optional: a field the adapter does not declare is neither written nor compared. Rows
+in the `--actual` file must be a bare JSON list as the tracker holds them, every value a
+plain string (flatten selects, dates and the like when fetching); the object that
+`tracker.py expected` prints is refused.
+
+**A project's own adapter** goes in `plan/trackers/<kind>.json`. It is checked before
+the plugin's `trackers/`, so it can add a tracker or replace a shipped one, and a plugin
+update never overwrites it.
+
+Example, Linear (issues have a state but no stage column), saved as
+`plan/trackers/linear.json`, with `meta.tracker: {"kind": "linear", "target": "<team>"}`:
+
+```json
+{
+  "fields": {"name": "Title", "status": "State", "link": "URL"},
+  "status_map": {"intent": "Backlog", "grounded": "Backlog", "planned": "Todo",
+                 "building": "In Progress", "verified": "In Review", "recorded": "In Review",
+                 "paused": "Paused", "done": "Done"},
+  "fetch": "List every issue of the team through the Linear connector (all pages); save a JSON list of {Title, State, URL} with every value a plain string (the state by name)."
+}
+```
+
 A plan can override any of this without a new file: `meta.tracker.fields`,
 `meta.tracker.status_map` (merged over the adapter) and `meta.tracker.recent_done`
 (how many of the latest finished items to mirror, default 5).
@@ -40,6 +63,6 @@ A plan can override any of this without a new file: `meta.tracker.fields`,
 
 Rows are matched on the work id at the start of the name (`E-01.S2`); a row whose
 name lacks the id but matches the item's title is matched too and reported as a
-rename. Name, Status and Stage are compared; Updated and Link are written when a
+rename. The full name (a different title on a matching id is a rename), Status and, when declared, Stage are compared; Updated and Link are written when a
 row is created and never compared. Rows for finished work that has rolled into
-`plan/archive/` are known and never reported as strays.
+`plan/archive/` are known and never reported as strays; a row for finished work must say the `done` value.

@@ -43,7 +43,7 @@ def tracker_step():
     """
     import tracker
     d = L.load()
-    cfg, err = L.tracker_config(d)
+    cfg, err = L.tracker_config(d, L.paths()["root"])
     if err or cfg is None:
         print("  sync: tracker: %s" % (err or "--tracker given but meta.tracker is not set"))
         return 2
@@ -59,6 +59,9 @@ def tracker_step():
 
 
 def main():
+    if "--actual" in sys.argv and "--tracker" not in sys.argv:
+        print("  sync: usage: sync.py --tracker --actual <file> (--actual only goes with --tracker)")
+        return 2
     if not L.has_plan():
         return 0
     p = L.paths()
@@ -104,15 +107,18 @@ def main():
     # Flush first: when stdout is a pipe, our lines would otherwise print AFTER
     # the children's, and "rolled ..." would read as happening after the gate.
     sys.stdout.flush()
-    tracker_rc = 0
+    tracker_rc, gate_rc = 0, 0
     for script in ("render.py", "check.py"):
         if script == "check.py" and "--tracker" in sys.argv:
             tracker_rc = tracker_step()
             sys.stdout.flush()
         r = subprocess.run([sys.executable, os.path.join(HERE, script)])
-        if r.returncode not in (0, None) and script == "check.py":
-            return r.returncode
-    return tracker_rc
+        if script == "check.py":
+            gate_rc = r.returncode or 0
+    # Unreadable tracker input is 2 whatever the gate said: nothing was compared.
+    if tracker_rc == 2:
+        return 2
+    return gate_rc or tracker_rc
 
 
 if __name__ == "__main__":

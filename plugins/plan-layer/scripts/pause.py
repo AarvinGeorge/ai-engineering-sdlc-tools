@@ -19,18 +19,12 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HANDOFF = "HANDOFF.md"
-
-
-def now_utc():
-    """The current UTC time as ISO-8601 with a Z, read from the clock."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def git_facts(root):
@@ -91,7 +85,7 @@ def render_handoff(d, git_line, read_at, fails, drifts):
 def pause(p):
     """Write the note, set meta.paused, bump meta.updated, re-render. Returns 0."""
     root = p["root"]
-    at = now_utc()
+    at = L.utc_now()
     git_line = git_facts(root)
     d = L.load(root)
     d.setdefault("meta", {})["paused"] = {"at": at}
@@ -106,6 +100,8 @@ def pause(p):
     print("  pause: the gate reads %d FAIL, %d DRIFT" % (len(fails), len(drifts)))
     print("  REMINDER: stop this work's recurring loops and scheduled tasks (cron, /loop, "
           "scheduled routines) now, so nothing keeps running against a paused plan.")
+    if L.tracker_config(d, root)[0]:
+        print("  NEXT: run sync.py --tracker so the tracker shows the active items as Paused")
     return 0
 
 
@@ -116,7 +112,7 @@ def resume(p):
     if "paused" not in (d.get("meta") or {}):
         print("  resume: the plan is not paused; nothing changed")
         return 0
-    at = now_utc()
+    at = L.utc_now()
     del d["meta"]["paused"]
     d["meta"]["updated"] = at
     L.save(d, root)
@@ -127,10 +123,18 @@ def resume(p):
         lines[2:2] = ["**RESUMED at %s.** This note is history now; re-read the plan." % at, ""]
         L.atomic_write(note, "\n".join(lines))
     print("  resume: meta.paused cleared at %s; restart any loops or scheduled tasks you stopped" % at)
+    if L.tracker_config(d, root)[0]:
+        print("  NEXT: run sync.py --tracker so the tracker shows the items as active again")
     return 0
 
 
+USAGE = "usage: pause.py [--resume]   (no other arguments)"
+
+
 def main():
+    if [a for a in sys.argv[1:] if a != "--resume"] or sys.argv[1:].count("--resume") > 1:
+        print(USAGE)
+        return 2
     if not L.has_plan():
         return 0
     p = L.paths()

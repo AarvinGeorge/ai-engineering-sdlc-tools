@@ -331,14 +331,24 @@ def work_id(name):
 TRACKERS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trackers")
 TRACKER_STATE_FILENAME = "tracker-state.json"
 TRACKER_RECENT_DONE_DEFAULT = 5
-_STAGE_KEYS = ("name", "status", "stage", "updated", "link")
+_REQUIRED_FIELDS = ("name", "status")
 
 
-def tracker_config(d):
+def utc_now():
+    """The current UTC time as ISO-8601 with a Z, read from the clock. The one formatter."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def tracker_config(d, root=None):
     """Resolve meta.tracker against its adapter. Returns (config, error); one is None.
 
     Why: the gate, tracker.py and sync.py must all read the same effective
-    fields and status map. config = {kind, target, fields, status_map,
+    fields and status map. The adapter is looked up at <plan dir>/trackers/<kind>.json
+    first (a project's own, which a plugin update never touches), then in the
+    plugin's trackers/. Only name and status are required fields; stage, updated
+    and link are mirrored and compared only when the adapter declares them.
+    config = {kind, target, fields, status_map,
     recent_done, fetch}. Overrides in meta.tracker are merged over the adapter.
     Absent meta.tracker returns (None, None): the feature is off.
     """
@@ -353,11 +363,20 @@ def tracker_config(d):
         return None, "meta.tracker.kind is %r — it must name an adapter file in trackers/" % (kind,)
     if not isinstance(target, str) or not target.strip():
         return None, "meta.tracker.target is %r — it must be the tracker's database url or id" % (target,)
-    path = os.path.join(TRACKERS_DIR, kind + ".json")
-    try:
-        adapter = json.load(open(path, encoding="utf-8"))
-    except Exception:
-        return None, "meta.tracker.kind %r has no readable adapter at trackers/%s.json" % (kind, kind)
+    adapter, tried = None, []
+    for base in (os.path.join(paths(root)["dir"], "trackers"), TRACKERS_DIR):
+        path = os.path.join(base, kind + ".json")
+        if os.path.isfile(path):
+            try:
+                adapter = json.load(open(path, encoding="utf-8"))
+            except Exception as exc:
+                return None, "adapter %s does not parse: %s" % (path, exc)
+            if not isinstance(adapter, dict):
+                return None, "adapter %s must be a JSON object" % path
+            break
+        tried.append(path)
+    if adapter is None:
+        return None, "meta.tracker.kind %r has no adapter (looked in plan/trackers/ and the plugin's trackers/)" % kind
     fields = dict(adapter.get("fields") or {})
     smap = dict(adapter.get("status_map") or {})
     for key, bag in (("fields", fields), ("status_map", smap)):
@@ -368,9 +387,9 @@ def tracker_config(d):
                                                for k, v in over.items())):
             return None, "meta.tracker.%s must be an object of non-empty strings" % key
         bag.update(over)
-    missing = [k for k in _STAGE_KEYS if not fields.get(k)]
+    missing = [k for k in _REQUIRED_FIELDS if not fields.get(k)]
     if missing or not smap.get("paused") or not smap.get("done"):
-        return None, "adapter %r is incomplete (fields %s, status_map paused/done)" % (kind, ", ".join(_STAGE_KEYS))
+        return None, "adapter %r is incomplete (fields name and status, status_map paused and done)" % kind
     rd = t.get("recent_done", TRACKER_RECENT_DONE_DEFAULT)
     if not (isinstance(rd, int) and not isinstance(rd, bool) and rd >= 0):
         return None, "meta.tracker.recent_done is %r — it must be a whole number, 0 or more" % (rd,)

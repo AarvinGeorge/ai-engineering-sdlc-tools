@@ -125,6 +125,22 @@ class TestPause(PauseBase):
         self.assertGreaterEqual(self.read()["meta"]["paused"]["at"], first)
 
 
+class TestArgs(PauseBase):
+    def test_unknown_argument_is_usage_and_pauses_nothing(self):
+        for arg in ("--help", "-h", "--bogus"):
+            r = self.pause(arg)
+            self.assertEqual(r.returncode, 2, (arg, r.stdout))
+            self.assertIn("usage", (r.stdout + r.stderr).lower())
+        self.assertNotIn("paused", self.read()["meta"])
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "plan", "HANDOFF.md")))
+
+    def test_tells_the_agent_to_sync_the_tracker_when_one_is_set(self):
+        self.assertNotIn("sync.py --tracker", self.pause().stdout)
+        self.d["meta"]["tracker"] = {"kind": "notion", "target": "x"}
+        self.write()
+        self.assertIn("sync.py --tracker", self.pause().stdout)
+
+
 class TestResume(PauseBase):
     def test_resume_clears_paused_and_marks_the_note(self):
         self.pause()
