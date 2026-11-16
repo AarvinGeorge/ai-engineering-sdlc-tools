@@ -1,0 +1,22 @@
+{
+  "kind": "generic",
+  "description": "A neutral starting point for any tracker that can show a name, a status and a stage per row (a board, a spreadsheet, an issue list). Copy it, rename it and adjust the field names and status values to match the tracker.",
+  "fields": {
+    "name": "Name",
+    "status": "Status",
+    "stage": "Stage",
+    "updated": "Updated",
+    "link": "Link"
+  },
+  "status_map": {
+    "intent": "Backlog",
+    "grounded": "Backlog",
+    "planned": "Ready",
+    "building": "In progress",
+    "verified": "In review",
+    "recorded": "In review",
+    "paused": "Paused",
+    "done": "Done"
+  },
+  "fetch": "With the tracker's connector, list every row of the board, sheet or project at meta.tracker.target (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names."
+}

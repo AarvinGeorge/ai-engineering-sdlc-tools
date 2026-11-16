@@ -4,6 +4,11 @@
   sync.py                          # refresh views' recorded facts from disk, render the page, run the gate
   sync.py --no-views               # skip the view refresh
   sync.py --no-roll                # do not roll aged records into plan/archive/ (0.16.0)
+  sync.py --tracker [--actual <f>] # ALSO mirror the plan into meta.tracker's tracker (0.18.0): print the
+                                   # expected rows and the next step, or, with --actual <file> of rows the agent
+                                   # fetched through the tracker's connector, the exact fixes (exit 1 on drift,
+                                   # 2 on unreadable input). Runs after the render and before the gate, so the
+                                   # gate sees the reconcile it just recorded.
   sync.py --live-revision <sha>    # ALSO record the commit that is running (facts.live_revision), then the above.
                                    # For a deploy script's last step: the value should be read off the running
                                    # system (a build stamp, an image label), never recalled.
@@ -28,6 +33,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def tracker_step():
+    """The --tracker leg: summary and next step, or the diff against --actual. Returns its exit code.
+
+    Why here: sync is "the one command after any change", so the mirror is
+    reconciled by the same command, with the same rule as tracker.py.
+    """
+    import tracker
+    d = L.load()
+    cfg, err = L.tracker_config(d)
+    if err or cfg is None:
+        print("  sync: tracker: %s" % (err or "--tracker given but meta.tracker is not set"))
+        return 2
+    if "--actual" in sys.argv:
+        i = sys.argv.index("--actual")
+        if i + 1 >= len(sys.argv):
+            print("  sync: tracker: --actual needs a file")
+            return 2
+        print("  sync: tracker reconcile against %s" % sys.argv[i + 1])
+        return tracker.reconcile(sys.argv[i + 1])
+    print("  sync: tracker mirror")
+    return tracker.next_step(d, cfg)
 
 
 def main():
@@ -76,11 +104,15 @@ def main():
     # Flush first: when stdout is a pipe, our lines would otherwise print AFTER
     # the children's, and "rolled ..." would read as happening after the gate.
     sys.stdout.flush()
+    tracker_rc = 0
     for script in ("render.py", "check.py"):
+        if script == "check.py" and "--tracker" in sys.argv:
+            tracker_rc = tracker_step()
+            sys.stdout.flush()
         r = subprocess.run([sys.executable, os.path.join(HERE, script)])
         if r.returncode not in (0, None) and script == "check.py":
             return r.returncode
-    return 0
+    return tracker_rc
 
 
 if __name__ == "__main__":

@@ -97,6 +97,26 @@
             "work-ids"
           ],
           "description": "0.17.0, opt-in. 'work-ids': every item in plans.now and plans.next is named from the work hierarchy first (Epic E-NN, Story E-NN.Sn, Task E-NN.Sn.Tn, Finding E-NN.Fn, Release R-NN), and the gate fails on one that is not. Finished items are not held to it. Absent means no naming check."
+        },
+        "tracker": {
+          "type": "object",
+          "required": ["kind", "target"],
+          "properties": {
+            "kind": {"type": "string", "description": "Names an adapter file, trackers/<kind>.json (notion, generic, or one you add)."},
+            "target": {"type": "string", "description": "The tracker's database url or id."},
+            "status_map": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Overrides merged over the adapter's stage -> tracker status values (keys: stage ids, plus paused and done)."},
+            "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Overrides merged over the adapter's field names (name, status, stage, updated, link)."},
+            "recent_done": {"type": "integer", "minimum": 0, "description": "How many of the latest finished items to mirror. Default 5."}
+          },
+          "description": "0.18.0, opt-in. Mirrors plans.now, plans.next and recent done into an external tracker. plan-layer derives the expected rows (tracker.py expected) and diffs them against rows the agent fetched through the tracker's connector (tracker.py diff --actual). The gate drifts when the last reconcile (plan/tracker-state.json) is missing or older than meta.updated. Absent means the feature is off."
+        },
+        "paused": {
+          "type": "object",
+          "required": ["at"],
+          "properties": {
+            "at": {"type": "string", "description": "ISO-8601 UTC time the work was paused, read from the clock by pause.py."}
+          },
+          "description": "0.18.0. Written by pause.py, cleared by pause.py --resume. While present, active items show as the adapter's Paused value in the tracker mirror and the session brief opens with a PAUSED line pointing at plan/HANDOFF.md."
         }
       }
     },

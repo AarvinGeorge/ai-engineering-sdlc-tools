@@ -713,6 +713,31 @@ def run(root=None):
                                      "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
                                      % (bucket, p.get("name")))
 
+    # External-tracker mirror (opt-in via meta.tracker). A malformed block FAILs;
+    # a mirror that was never reconciled, or not since the plan last changed,
+    # or reconciled with differences left, DRIFTs. Work-id naming for tracker
+    # rows is the naming check above (meta.naming), not a second copy of it.
+    tcfg, terr = L.tracker_config(d)
+    if terr:
+        fails.append(terr)
+    elif tcfg:
+        st = L.tracker_state(root)
+        if not st or not st.get("at"):
+            drifts.append("tracker mirror (%s) was never reconciled — fetch its rows and run "
+                          "tracker.py diff --actual <file>" % tcfg["kind"])
+        elif st.get("plan_updated") != meta_.get("updated"):
+            drifts.append("tracker mirror (%s) was last reconciled at %s against plan updated %s, "
+                          "but the plan now says %s — reconcile again"
+                          % (tcfg["kind"], st["at"], st.get("plan_updated"), meta_.get("updated")))
+        elif st.get("drift"):
+            drifts.append("tracker mirror (%s): the last reconcile (%s) left %s difference(s) — "
+                          "apply them and diff again" % (tcfg["kind"], st["at"], st["drift"]))
+
+    # Pause (meta.paused): present means paused, so it must be well formed.
+    if "paused" in meta_ and L.paused_at(d) is None:
+        fails.append("meta.paused is %r — it must be {\"at\": an ISO-8601 UTC time}; "
+                     "pause.py writes it" % (meta_["paused"],))
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"

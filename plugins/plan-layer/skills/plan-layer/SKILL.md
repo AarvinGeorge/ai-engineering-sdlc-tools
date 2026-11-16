@@ -1,6 +1,6 @@
 ---
 name: plan-layer
-description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init [--light], status, check, render, sync, help.
+description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init [--light], status, check, render, sync [--tracker], pause [--resume], help.
 ---
 
 # plan-layer
@@ -54,6 +54,14 @@ of date."
 tasks say the work is done, its status must not say it is waiting to start. If an active item
 works on a capability, that capability cannot read as untouched. The gate **fails** on these,
 so a turn cannot end on a page that contradicts itself.
+
+### Showing "the plan"
+
+Anything shown as "the plan" — in a reply, a summary, a handover — is drawn from the plan
+file, not from memory of it, and shows **all** its active tracks (every item in `plans.now`,
+then `plans.next` in order), not only the one being worked on. When a go/no-go is being
+asked for, say **which** one is meant: name the item, by its work id when it has one. A "go"
+given to a plan the asker only partly saw is a go to something else.
 
 ### Say what waits on what
 
@@ -218,6 +226,8 @@ That property decays every time someone who knows the context writes a sentence.
 | `/plan-layer check` | Run the gate: structural failures and drift signals |
 | `/plan-layer render` | Regenerate the page from the JSON |
 | `/plan-layer sync` | After ANY change: roll aged records into `plan/archive/` (lossless; `--no-roll` opts out), refresh view facts from disk, render, run the gate — the one command. `--live-revision <sha>` at the end of a deploy |
+| `/plan-layer sync --tracker [--actual <file>]` | The sync above, then mirror the plan into the external tracker named in `meta.tracker` (see "Tracker mirror"). Without `--actual`: prints the expected rows and the exact next step. With `--actual <file>` (rows you fetched): prints each fix; exit 1 on drift, 0 clean, 2 on unreadable input |
+| `/plan-layer pause` | Write `plan/HANDOFF.md`, set `meta.paused`, re-render. `pause.py --resume` clears it (see "Pause and resume") |
 | `/plan-layer roll` | Move aged records into `plan/archive/` in full by hand — `sync` already does this; use `roll --dry-run` to preview |
 | `/plan-layer help` | This document |
 
@@ -230,6 +240,49 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render.py" --check  # is the page stale?
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py"           # the gate
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/figcheck.py"        # look at the figures
 ```
+
+## Tracker mirror (opt-in)
+
+Many teams mirror plan state into an external tracker. It drifts: rows go missing, a status
+goes stale, a row loses its work id. The remedy is a reconcile loop, run every sync: derive
+what the tracker SHOULD hold from the plan (the source of truth), compare with what it DOES
+hold, fix the difference. plan-layer cannot call a tracker's API; **you** do, through that
+tracker's connector. It does the deriving and the comparing.
+
+Opt in with `meta.tracker`: `{"kind": "notion", "target": "<database url or id>"}`; optional
+`status_map`, `fields` (merged over the adapter) and `recent_done` (default 5). Absent, nothing
+changes. The adapter is one data file, `trackers/<kind>.json` (`notion` and `generic` ship;
+`trackers/README.md` says how to add another): field names (Name, Status, Stage, Updated,
+Link), one status value per stage plus `Paused` and `Done`, and a `fetch` note.
+
+The loop, after any change:
+
+1. `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/sync.py" --tracker` prints the expected rows and the
+   next step. (`tracker.py expected` prints them as JSON.)
+2. Fetch every row from the tracker with its connector (all pages) into a JSON file: a list of
+   objects keyed by the adapter's field names.
+3. `sync.py --tracker --actual <file>` prints one instruction per difference (`create row …`,
+   `set Status of '<name>' to '<value>'`, `rename '<name>' to start with its work id`,
+   `row '<name>' not in the plan: archive or add to the plan`). Carry them out, fetch again,
+   rerun until it exits 0. Exit 2 means the file could not be read: nothing was compared.
+
+Mirrored: `plans.now`, `plans.next` and the last `recent_done` finished items. Each run is
+recorded in `plan/tracker-state.json` (time, drift count, the plan `updated` it was compared
+against; commit it with the plan). The gate **drifts** when that record is missing or older
+than the plan's `updated`, or left differences open. With `meta.naming: "work-ids"` the gate
+**fails** a now/next item lacking a work id, so every row can carry one.
+
+## Pause and resume
+
+`/plan-layer pause` is an on-call handover note for stopping work. `pause.py` reads the clock
+(UTC), git (branch, HEAD, uncommitted files) and the gate now, and writes `plan/HANDOFF.md`:
+active now, resume order (now then next), parked questions, traps (invariants not holding,
+gate FAILs, drift), and a line that the numbers were read at that time and must be re-read
+before citing. It sets `meta.paused = {"at": …}` and bumps `meta.updated`; while paused the
+tracker shows active items as the adapter's `Paused`, and the session brief's first line reads
+`PAUSED at <at> — read plan/HANDOFF.md before anything else`. It then reminds you to stop this
+work's recurring loops and scheduled tasks: do that, then run `sync.py --tracker`.
+`pause.py --resume` clears `meta.paused`; `HANDOFF.md` stays, marked resumed.
 
 ## init
 
@@ -329,14 +382,14 @@ it must be answered.
   `meta.updated` in the future; the page out of sync with the JSON; `plan_version`
   disagreeing with the newest changelog entry; an unknown `meta.mode`; a `meta.size_budget_kb`
   that is not a positive whole number; an unknown `meta.naming`, or, with
-  `meta.naming: "work-ids"`, a now or next item not named from a work id. Exit code 1.
+  `meta.naming: "work-ids"`, a now or next item not named from a work id; a malformed `meta.tracker` or `meta.paused`. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched; the last substantive commit newer than `meta.updated`; a plan older than
   fourteen days; a finished plan with no period or no outcome; `meta.version` disagreeing
   with `plan_version`; an item naming no capability; assertions declared but never verified,
   or verified over a week ago; a figure reading a fact the plan does not define; an active
   item where every unfinished task is blocked; records due to roll; `plan.json` over its size
-  budget (`meta.size_budget_kb`, default 200 KB). Exit 0 unless `--strict`.
+  budget (`meta.size_budget_kb`, default 200 KB); a tracker mirror never reconciled, or not since the plan last changed. Exit 0 unless `--strict`.
 - **Light mode** skips the full-only signals: figures and roll-due. Declared views are checked
   in both modes. Every FAIL above still applies.
 
@@ -395,7 +448,8 @@ Optional `.plan-layer.json` in the project root:
 
 In `plan.json` itself: `meta.mode` (`"full"` or `"light"`), `meta.size_budget_kb` (the KB
 size above which the gate drifts; default 200) and `meta.naming` (`"work-ids"` to require work
-ids on live items; absent means no check).
+ids on live items; absent means no check), `meta.tracker` (the tracker mirror above) and
+`meta.paused` (written by `pause.py`; do not hand-edit).
 
 ## Publishing the page
 

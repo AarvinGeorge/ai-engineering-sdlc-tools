@@ -313,6 +313,94 @@ def has_work_id(name):
     return isinstance(name, str) and bool(WORK_ID.match(name))
 
 
+def work_id(name):
+    """The leading work id of an item name ('E-01.S2' from 'E-01.S2 Login page'), else None.
+
+    Same pattern as has_work_id, so the gate and the tracker mirror cannot
+    disagree about what an id is.
+    """
+    m = WORK_ID.match(name) if isinstance(name, str) else None
+    return m.group(0) if m else None
+
+
+# --------------------------------------------------------------------------
+# Tracker mirror and pause. One reading of meta.tracker / meta.paused, shared
+# by tracker.py, pause.py, brief.py and the gate. The adapters are data files in
+# <plugin>/trackers/<kind>.json; the reconcile record is plan/tracker-state.json
+# (outside plan.json, so it never counts against the size budget).
+TRACKERS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trackers")
+TRACKER_STATE_FILENAME = "tracker-state.json"
+TRACKER_RECENT_DONE_DEFAULT = 5
+_STAGE_KEYS = ("name", "status", "stage", "updated", "link")
+
+
+def tracker_config(d):
+    """Resolve meta.tracker against its adapter. Returns (config, error); one is None.
+
+    Why: the gate, tracker.py and sync.py must all read the same effective
+    fields and status map. config = {kind, target, fields, status_map,
+    recent_done, fetch}. Overrides in meta.tracker are merged over the adapter.
+    Absent meta.tracker returns (None, None): the feature is off.
+    """
+    meta = d.get("meta") or {}
+    if "tracker" not in meta:
+        return None, None
+    t = meta["tracker"]
+    if not isinstance(t, dict):
+        return None, "meta.tracker is %r — it must be an object {kind, target}" % (t,)
+    kind, target = t.get("kind"), t.get("target")
+    if not isinstance(kind, str) or not re.fullmatch(r"[a-z0-9_-]+", kind or ""):
+        return None, "meta.tracker.kind is %r — it must name an adapter file in trackers/" % (kind,)
+    if not isinstance(target, str) or not target.strip():
+        return None, "meta.tracker.target is %r — it must be the tracker's database url or id" % (target,)
+    path = os.path.join(TRACKERS_DIR, kind + ".json")
+    try:
+        adapter = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return None, "meta.tracker.kind %r has no readable adapter at trackers/%s.json" % (kind, kind)
+    fields = dict(adapter.get("fields") or {})
+    smap = dict(adapter.get("status_map") or {})
+    for key, bag in (("fields", fields), ("status_map", smap)):
+        over = t.get(key)
+        if over is None:
+            continue
+        if not (isinstance(over, dict) and all(isinstance(k, str) and isinstance(v, str) and v
+                                               for k, v in over.items())):
+            return None, "meta.tracker.%s must be an object of non-empty strings" % key
+        bag.update(over)
+    missing = [k for k in _STAGE_KEYS if not fields.get(k)]
+    if missing or not smap.get("paused") or not smap.get("done"):
+        return None, "adapter %r is incomplete (fields %s, status_map paused/done)" % (kind, ", ".join(_STAGE_KEYS))
+    rd = t.get("recent_done", TRACKER_RECENT_DONE_DEFAULT)
+    if not (isinstance(rd, int) and not isinstance(rd, bool) and rd >= 0):
+        return None, "meta.tracker.recent_done is %r — it must be a whole number, 0 or more" % (rd,)
+    return {"kind": kind, "target": target, "fields": fields, "status_map": smap,
+            "recent_done": rd, "fetch": adapter.get("fetch", "")}, None
+
+
+def tracker_state_path(root=None):
+    """Where the last reconcile is recorded: <plan dir>/tracker-state.json."""
+    return os.path.join(paths(root)["dir"], TRACKER_STATE_FILENAME)
+
+
+def tracker_state(root=None):
+    """The recorded reconcile {at, drift, plan_updated, kind}, or None when absent or unreadable."""
+    try:
+        v = json.load(open(tracker_state_path(root), encoding="utf-8"))
+        return v if isinstance(v, dict) else None
+    except Exception:
+        return None
+
+
+def paused_at(d):
+    """meta.paused.at when the plan is validly paused, else None. Absent is the normal case."""
+    p = (d.get("meta") or {}).get("paused")
+    at = p.get("at") if isinstance(p, dict) else None
+    if isinstance(at, str) and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z", at):
+        return at
+    return None
+
+
 def archive_counts(root=None):
     """How many records sit in each archive file, for the page's section hints."""
     pdir = paths(root)["dir"]

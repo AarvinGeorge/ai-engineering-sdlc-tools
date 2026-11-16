@@ -43,7 +43,11 @@ def session_start():
     import check
     fails, drifts, s = check.run()
 
-    lines = ["=== PLAN STATE (injected by plan-layer; the plan JSON is the source) ===",
+    lines = []
+    at = L.paused_at(L.load())
+    if at:
+        lines.append("PAUSED at %s \u2014 read plan/HANDOFF.md before anything else" % at)
+    lines += ["=== PLAN STATE (injected by plan-layer; the plan JSON is the source) ===",
              "%s · plan v%s · updated %s" % (s.get("project") or "project",
                                              s.get("plan_version"), s.get("updated"))]
 
