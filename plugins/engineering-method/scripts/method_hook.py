@@ -30,6 +30,8 @@ import time
 STATE_FILE = "method-stage.json"
 STATE_TTL_SECONDS = 7 * 24 * 3600
 MAX_SCAN_CHARS = 4096  # stage intent sits at the start of a prompt
+WRAPPER_TAGS = {"pasted_content", "command-name", "command-message", "command-args",
+                "system-reminder"}
 
 STAGES = [
     {"stage": "plan",
@@ -192,16 +194,18 @@ def set_stage(session_id, stage):
 
 
 def strip_blocks(text):
-    """Remove ``` fences and <tag>...</tag> blocks in linear time.
+    """Remove ``` fences and <tag>...</tag> blocks over the whole text, linearly.
 
     Why: a regex with a backreference backtracks quadratically on unclosed
     tags. This uses str.find only: each opening tag is matched by an
-    anchored regex, and its closing tag is searched for once. An unclosed
-    tag is left in place. Inputs: text. Output: text with blocks replaced by
-    a space. Side effects: none.
+    anchored regex, and its closing tag is searched for once; a tag name
+    whose closer is missing is remembered so it is never searched for again.
+    An unclosed fence or WRAPPER_TAGS tag (pasted_content, ...) drops
+    everything after it; any other unclosed tag is left in place. Inputs:
+    text. Output: text with blocks replaced by a space. Side effects: none.
     """
     out, i = [], 0
-    while True:  # code fences; an unclosed fence runs to the end
+    while True:
         j = text.find("```", i)
         if j < 0:
             out.append(text[i:])
@@ -211,7 +215,7 @@ def strip_blocks(text):
         if k < 0:
             break
         i = k + 3
-    text, out, i = "".join(out), [], 0
+    text, out, i, unclosed = "".join(out), [], 0, set()
     while True:
         j = text.find("<", i)
         if j < 0:
@@ -222,13 +226,18 @@ def strip_blocks(text):
             out.append(text[i:j + 1])
             i = j + 1
             continue
-        close = text.find("</%s>" % m.group(1), m.end())
-        if close < 0:
+        name = m.group(1)
+        close = -1 if name in unclosed else text.find("</%s>" % name, m.end())
+        if close >= 0:
+            out.append(text[i:j] + " ")
+            i = close + len(name) + 3
+        elif name in WRAPPER_TAGS:
+            out.append(text[i:j])
+            break
+        else:
+            unclosed.add(name)
             out.append(text[i:m.end()])
             i = m.end()
-        else:
-            out.append(text[i:j] + " ")
-            i = close + len(m.group(1)) + 3
     return "".join(out)
 
 
@@ -236,14 +245,15 @@ def clean_prompt(prompt):
     """Strip the parts of a prompt that are not the user's own words.
 
     Why: pasted logs, code and tool wrappers contain stage words that say
-    nothing about what the user is asking for. Scans only the first
-    MAX_SCAN_CHARS characters (stage intent sits at the start, and the cap
-    bounds the work). Removes fences, tag blocks (pasted_content,
-    command-name, ...) and lines that look like logs or code, but not
-    indented list items. Inputs: prompt text. Output: cleaned text. Side
-    effects: none.
+    nothing about what the user is asking for. Fences and tag blocks are
+    removed over the WHOLE prompt first (so a long paste cannot lose its
+    closing tag to the cap, and a request after it is still seen); only then
+    is the remainder capped to MAX_SCAN_CHARS (stage intent sits at the
+    start, and the cap bounds the work). Log/code-looking lines are dropped,
+    but not indented list items. Inputs: prompt text. Output: cleaned text.
+    Side effects: none.
     """
-    text = strip_blocks(prompt[:MAX_SCAN_CHARS])
+    text = strip_blocks(prompt)[:MAX_SCAN_CHARS]
     return "\n".join(l for l in text.split("\n") if not _NOISE_LINE_RE.match(l))
 
 

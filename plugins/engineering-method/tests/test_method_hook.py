@@ -284,6 +284,42 @@ class Robustness(Base):
         self.assertEqual(self.prompt("steps:\n    deploy()", session="c").stdout, "")
 
 
+class LongPaste(Base):
+    """Round 3: wrappers are stripped over the whole prompt, then the cap applies."""
+
+    def paste(self, tail):
+        return "<pasted_content id=1>" + "deploy the thing, release notes. " * 200 + "</pasted_content> " + tail
+
+    def test_long_paste_stage_words_ignored(self):
+        text = self.paste("summarise this")
+        self.assertGreater(text.index("</pasted_content>"), 6000)
+        self.assertEqual(self.prompt(text).stdout, "")
+
+    def test_request_after_long_paste_is_seen(self):
+        self.assertIn("stage review", context(self.prompt(self.paste("review this"))))
+
+    def test_unclosed_wrapper_drops_the_rest(self):
+        import time
+        text = "<pasted_content>" + "deploy and release now. " * 45000
+        self.assertGreater(len(text), 1000000)
+        t = time.time()
+        p = self.prompt(text)
+        self.assertLess(time.time() - t, 1.0)
+        self.assertEqual(p.stdout, "")
+
+    def test_megabyte_of_unclosed_generic_tags_still_fast(self):
+        import time
+        for chunk in ("<a> ", "<li>x\n"):
+            t = time.time()
+            p = self.prompt("review it " + chunk * (1024 * 1024 // len(chunk)), session=repr(chunk))
+            self.assertLess(time.time() - t, 1.0, repr(chunk))
+            self.assertIn("stage review", context(p))
+
+    def test_long_fence_stage_words_ignored(self):
+        text = "```\n" + "deploy it\n" * 800 + "```\nsummarise this"
+        self.assertEqual(self.prompt(text).stdout, "")
+
+
 class Wiring(unittest.TestCase):
     def setUp(self):
         with open(HOOKS_JSON) as fh:
