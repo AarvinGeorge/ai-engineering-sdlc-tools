@@ -88,6 +88,7 @@ _BY_NAME = {s["stage"]: s for s in STAGES}
 _WORD_TO_STAGE = {w: s for s in STAGES for w in s["words"]}
 _WORD_RE = re.compile(r"[A-Za-z]+")  # hyphens split tokens: re-deploy, unit-tests
 _OPEN_TAG_RE = re.compile(r"<([A-Za-z][\w:-]*)[^<>]*>")  # anchored, no backtracking
+_CLOSE_TAG_RE = re.compile(r"</([A-Za-z][\w:-]*)\s*>")
 _NOISE_LINE_RE = re.compile(
     r"^(?:(?:[ ]{4,}|\t)(?![-*]\s|\d+\.\s)|\s*\d{4}-\d{2}-\d{2}|\s*\d{1,2}:\d{2}:\d{2}"
     r"|\s*(?:ERROR|WARN|WARNING|INFO|DEBUG|Traceback)\b|\s*>>>|\s*\$ |\s*def )")
@@ -194,15 +195,16 @@ def set_stage(session_id, stage):
 
 
 def strip_blocks(text):
-    """Remove ``` fences and <tag>...</tag> blocks over the whole text, linearly.
+    """Remove ``` fences and wrapper blocks over the whole text, linearly.
 
     Why: a regex with a backreference backtracks quadratically on unclosed
-    tags. This uses str.find only: each opening tag is matched by an
-    anchored regex, and its closing tag is searched for once; a tag name
-    whose closer is missing is remembered so it is never searched for again.
-    An unclosed fence or WRAPPER_TAGS tag (pasted_content, ...) drops
-    everything after it; any other unclosed tag is left in place. Inputs:
-    text. Output: text with blocks replaced by a space. Side effects: none.
+    tags, and a closer search per distinct tag name would not be linear
+    either. Only WRAPPER_TAGS (pasted_content, command-name, ...) get block
+    stripping, with one closer search each; an unclosed fence or wrapper
+    drops everything after it. Any other <tag> or </tag> token is removed
+    on its own and its contents stay, so "Vec<T>" cannot hide a request.
+    Uses str.find and anchored regexes only. Inputs: text. Output: text with
+    blocks replaced by a space. Side effects: none.
     """
     out, i = [], 0
     while True:
@@ -215,28 +217,28 @@ def strip_blocks(text):
         if k < 0:
             break
         i = k + 3
-    text, out, i, unclosed = "".join(out), [], 0, set()
+    text, out, i = "".join(out), [], 0
     while True:
         j = text.find("<", i)
         if j < 0:
             out.append(text[i:])
             break
-        m = _OPEN_TAG_RE.match(text, j)
+        m = _OPEN_TAG_RE.match(text, j) or _CLOSE_TAG_RE.match(text, j)
         if not m:
             out.append(text[i:j + 1])
             i = j + 1
             continue
         name = m.group(1)
-        close = -1 if name in unclosed else text.find("</%s>" % name, m.end())
-        if close >= 0:
+        close = -1
+        if name in WRAPPER_TAGS and not m.group(0).startswith("</"):
+            close = text.find("</%s>" % name, m.end())
+            if close < 0:
+                out.append(text[i:j])
+                break
             out.append(text[i:j] + " ")
             i = close + len(name) + 3
-        elif name in WRAPPER_TAGS:
-            out.append(text[i:j])
-            break
-        else:
-            unclosed.add(name)
-            out.append(text[i:m.end()])
+        else:  # any other tag: drop the token, keep what is inside
+            out.append(text[i:j] + " ")
             i = m.end()
     return "".join(out)
 

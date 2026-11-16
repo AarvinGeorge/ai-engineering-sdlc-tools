@@ -209,8 +209,10 @@ class FixRound(Base):
 
     def test_skips_tag_wrapped_blocks(self):
         self.assertIsNone(self.stage_of("<pasted_content id=1>deploy and release</pasted_content>"))
-        self.assertIsNone(self.stage_of("hello <log>rollback happened</log> ok"))
-        self.assertEqual(self.stage_of("<foo>release</foo> then review"), "review")
+        self.assertIsNone(self.stage_of("hello <system-reminder>rollback happened</system-reminder> ok"))
+        self.assertEqual(self.stage_of("<pasted_content>release</pasted_content> then review"), "review")
+        # other tags: the token goes, the contents stay
+        self.assertEqual(self.stage_of("<foo>release</foo> then review"), "release")
 
     def test_skips_log_and_code_lines(self):
         for line in ("2026-11-16 10:00:01 deploy failed", "10:00:01 deploy failed",
@@ -318,6 +320,25 @@ class LongPaste(Base):
     def test_long_fence_stage_words_ignored(self):
         text = "```\n" + "deploy it\n" * 800 + "```\nsummarise this"
         self.assertEqual(self.prompt(text).stdout, "")
+
+
+class TagTokens(Base):
+    """Round 4: only known wrappers are block-stripped; other tags lose just the token."""
+
+    def test_thousands_of_distinct_unclosed_tags_fast(self):
+        import time
+        text = "review this " + " ".join("<t%d>" % i for i in range(30000))
+        self.assertGreater(len(text), 200000)
+        t = time.time()
+        p = self.prompt(text)
+        self.assertLess(time.time() - t, 1.0)
+        self.assertIn("stage review", context(p))
+
+    def test_generic_type_syntax_does_not_hide_the_request(self):
+        self.assertIn("stage build", context(self.prompt("why does Vec<T> fail here, fix it")))
+
+    def test_stray_closing_tag_removed_contents_kept(self):
+        self.assertIn("stage review", context(self.prompt("</div> review it")))
 
 
 class Wiring(unittest.TestCase):
