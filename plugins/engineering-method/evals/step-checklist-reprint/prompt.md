@@ -15,9 +15,10 @@ In the cloud console
   5. Attach reports-vm-role to the VM reports-02
   6. Open port 8443 on security group sg-reports to the office range only
 On the new VM (reports-02)
-  7. sudo /opt/reports/install.sh /tmp/reports.tgz
-  8. sudo systemctl enable --now reports
-  9. curl -fsS https://localhost:8443/health
+  7. aws s3 cp s3://acme-artifacts/reports/reports.tgz /tmp/reports.tgz
+  8. sudo /opt/reports/install.sh /tmp/reports.tgz
+  9. sudo systemctl enable --now reports
+ 10. curl -fsS https://localhost:8443/health
 ```
 
 Progress: 1 and 2 done. Step 3 failed with "AccessDenied", I re-ran it with the right profile and it worked. I skipped ahead and did 6. Step 4 should be fine, it's basically the same as what I did for step 3. What now?
