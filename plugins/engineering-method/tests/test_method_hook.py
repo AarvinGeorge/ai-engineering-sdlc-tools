@@ -139,7 +139,7 @@ class Prompt(Base):
         self.assertIn("stage build", context(self.prompt("/plan fix the bug", session="y")))
 
     def test_whole_word_only(self):
-        for i, text in enumerate(("the planet is big", "pushing-away", "contest", "prereview")):
+        for i, text in enumerate(("the planet is big", "contest", "prereview", "update it and check it")):
             self.assertEqual(self.prompt(text, session="w%d" % i).stdout, "", text)
 
     def test_case_insensitive(self):
@@ -179,6 +179,75 @@ class Prompt(Base):
             state = json.load(fh)
         self.assertNotIn("old", state)
         self.assertIn("s1", state)
+
+
+class FixRound(Base):
+    """Review round: set memory, false positives, false negatives, brief format."""
+    n = 0
+
+    def stage_of(self, text):
+        FixRound.n += 1
+        c = context(self.prompt(text, session="fx%d" % FixRound.n))
+        if c is None:
+            return None
+        return re.search(r"stage (\w+)", c).group(1)
+
+    def test_alternating_stages_each_speak_once(self):
+        spoken = [context(self.prompt(t)) is not None for t in
+                  ("fix it", "run the tests", "fix that one too", "tests again", "fix", "tests")]
+        self.assertEqual(spoken, [True, True, False, False, False, False])
+
+    def test_session_start_resets_set(self):
+        self.prompt("fix it")
+        self.prompt("run the tests")
+        self.start("compact")
+        self.assertIsNotNone(context(self.prompt("fix it")))
+
+    def test_skips_code_fences(self):
+        self.assertIsNone(self.stage_of("what is this?\n```\ndeploy now\n```"))
+        self.assertEqual(self.stage_of("```\nmerge\n```\nplease review"), "review")
+
+    def test_skips_tag_wrapped_blocks(self):
+        self.assertIsNone(self.stage_of("<pasted_content id=1>deploy and release</pasted_content>"))
+        self.assertIsNone(self.stage_of("hello <log>rollback happened</log> ok"))
+        self.assertEqual(self.stage_of("<foo>release</foo> then review"), "review")
+
+    def test_skips_log_and_code_lines(self):
+        for line in ("2026-11-16 10:00:01 deploy failed", "10:00:01 deploy failed",
+                     "ERROR deploy failed", "WARN restart needed", "INFO release",
+                     "Traceback (most recent call last): deploy", ">>> deploy()",
+                     "$ git push", "def deploy():", "    deploy()", "\tdeploy()"):
+            self.assertIsNone(self.stage_of("what does this mean\n" + line), line)
+
+    def test_git_status_ignored_but_not_git_push_merge(self):
+        self.assertIsNone(self.stage_of("run git status"))
+        self.assertEqual(self.stage_of("git status then review"), "review")
+        self.assertEqual(self.stage_of("git merge it"), "merge")
+        self.assertEqual(self.stage_of("git push it"), "merge")
+        self.assertEqual(self.stage_of("what is the status"), "report")
+
+    def test_command_name_wrapper_stripped(self):
+        self.assertEqual(self.stage_of("<command-name>/plan-layer</command-name> status"), "report")
+        self.assertIsNone(self.stage_of("<command-name>/review</command-name>"))
+
+    def test_new_words(self):
+        cases = {"prod": "deploy", "production": "deploy", "is it live": "deploy",
+                 "go-live": "deploy", "roll back": "deploy", "rolling back": "deploy",
+                 "rolled back": "deploy", "re-deploy": "deploy", "unit-tests": "test",
+                 "test-suite": "test", "pr": "merge", "open a pull request": "merge",
+                 "commit": "merge", "pytest": "test", "debug": "build"}
+        for text, stage in cases.items():
+            self.assertEqual(self.stage_of(text), stage, text)
+
+    def test_still_whole_word(self):
+        for text in ("planet", "contest", "livestock", "prayer", "debugger"):
+            self.assertIsNone(self.stage_of(text), text)
+
+    def test_brief_reference_paths(self):
+        text = context(self.start("startup"))
+        self.assertIn("deploy -> references/live-system-changes.md", text)
+        self.assertIn("review -> superpowers:requesting-code-review -> references/review-loop.md", text)
+        self.assertNotIn("-> - ->", text)
 
 
 class Wiring(unittest.TestCase):

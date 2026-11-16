@@ -11,7 +11,7 @@ Two modes, wired to two events (see hooks/hooks.json):
                     stakes tiers and the stage map. Also resets the
                     per-session stage memory.
   --prompt          every user prompt: if the prompt moves to a stage of work
-                    different from the last one announced in this session,
+                    not yet announced in this session,
                     say which skill and references apply. Otherwise silent.
 
 STAGES below is the single source of the stage map; both modes read it.
@@ -39,7 +39,7 @@ STAGES = [
     {"stage": "build",
      "words": ["build", "builds", "building", "built", "implement", "implements",
                "implementing", "implemented", "fix", "fixes", "fixing", "fixed",
-               "refactor", "refactors", "refactoring", "refactored"],
+               "refactor", "refactors", "refactoring", "refactored", "debug", "debugging"],
      "skill": "superpowers:test-driven-development",
      "references": ["model-routing-and-cost.md", "parallel-and-worktrees.md"]},
     {"stage": "review",
@@ -48,17 +48,18 @@ STAGES = [
      "references": ["review-loop.md"]},
     {"stage": "test",
      "words": ["test", "tests", "testing", "tested", "bench", "benchmark", "eval", "evals",
-               "verify", "verifies", "verifying", "verified"],
+               "verify", "verifies", "verifying", "verified", "pytest"],
      "skill": "superpowers:verification-before-completion",
      "references": ["measurement-and-state-claims.md", "behaviour-evals.md"]},
     {"stage": "deploy",
      "words": ["deploy", "deploys", "deploying", "deployed", "rollout", "rollouts",
                "rollback", "rollbacks", "restart", "restarts", "restarting", "restarted",
-               "migrate", "migrates", "migrating", "migrated"],
+               "migrate", "migrates", "migrating", "migrated", "prod", "production", "live"],
      "skill": None,
      "references": ["live-system-changes.md"]},
     {"stage": "merge",
-     "words": ["merge", "merges", "merging", "merged", "push", "pushes", "pushing", "pushed"],
+     "words": ["merge", "merges", "merging", "merged", "push", "pushes", "pushing", "pushed", "pr", "prs", "commit", "commits",
+               "committing", "committed"],
      "skill": "superpowers:finishing-a-development-branch",
      "references": ["live-system-changes.md"]},
     {"stage": "release",
@@ -74,9 +75,20 @@ STAGES = [
 
 FALLBACK_BRIEF = "engineering-method active; load the skill before acting"
 
+# Two-word phrases that name a stage (matched on adjacent words).
+PHRASES = {("roll", "back"): "deploy", ("rolling", "back"): "deploy",
+           ("rolled", "back"): "deploy", ("pull", "request"): "merge",
+           ("pull", "requests"): "merge"}
+
 # word -> stage lookup, derived from STAGES (never edited by hand)
+_BY_NAME = {s["stage"]: s for s in STAGES}
 _WORD_TO_STAGE = {w: s for s in STAGES for w in s["words"]}
-_WORD_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)*")
+_WORD_RE = re.compile(r"[A-Za-z]+")  # hyphens split tokens: re-deploy, unit-tests
+_FENCE_RE = re.compile(r"```.*?(?:```|\Z)", re.S)
+_TAG_RE = re.compile(r"<([A-Za-z][\w:-]*)\b[^>]*>.*?</\1\s*>", re.S)
+_NOISE_LINE_RE = re.compile(
+    r"^(?:[ ]{4,}|\t|\s*\d{4}-\d{2}-\d{2}|\s*\d{1,2}:\d{2}:\d{2}"
+    r"|\s*(?:ERROR|WARN|WARNING|INFO|DEBUG|Traceback)\b|\s*>>>|\s*\$ |\s*def )")
 
 
 def read_stdin_json():
@@ -120,7 +132,7 @@ def load_state():
     """Read the stage memory, dropping entries older than seven days.
 
     Why: the file must not grow forever, and a damaged file must not matter.
-    Inputs: none. Output: {session_id: {"stage", "at"}}; {} if missing or
+    Inputs: none. Output: {session_id: {"stages": [...], "at"}}; {} if missing or
     corrupt. Side effects: none.
     """
     try:
@@ -152,35 +164,71 @@ def save_state(state):
         pass
 
 
-def set_stage(session_id, stage):
-    """Remember (or forget, when stage is None) the last stage announced.
+def announced(session_id):
+    """Return the set of stages already announced in this session.
 
-    Why: speaking only on a change keeps the reminder from becoming noise.
-    Inputs: session id, stage name or None. Output: none. Side effects:
-    rewrites the state file.
+    Why: each stage speaks at most once per session, so alternating between
+    two stages cannot make the hook flap. Inputs: session id. Output: set of
+    stage names. Side effects: none.
+    """
+    stages = load_state().get(session_id, {}).get("stages")
+    return set(stages) if isinstance(stages, list) else set()
+
+
+def set_stage(session_id, stage):
+    """Record a stage as announced, or forget the session when stage is None.
+
+    Why: the set is reset by SessionStart, because a new context no longer
+    holds earlier announcements. Inputs: session id, stage name or None.
+    Output: none. Side effects: rewrites the state file.
     """
     state = load_state()
     if stage is None:
         state.pop(session_id, None)
     else:
-        state[session_id] = {"stage": stage, "at": time.time()}
+        seen = announced(session_id) | {stage}
+        state[session_id] = {"stages": sorted(seen), "at": time.time()}
     save_state(state)
+
+
+def clean_prompt(prompt):
+    """Strip the parts of a prompt that are not the user's own words.
+
+    Why: pasted logs, code and tool wrappers contain stage words that say
+    nothing about what the user is asking for. Removes ``` fences, any
+    <tag>...</tag> block (pasted_content, command-name, ...) and lines that
+    look like logs or code. Inputs: prompt text. Output: cleaned text.
+    Side effects: none.
+    """
+    text = _FENCE_RE.sub("\n", prompt)
+    prev = None
+    while prev != text:  # nested tags
+        prev = text
+        text = _TAG_RE.sub(" ", text)
+    return "\n".join(l for l in text.split("\n") if not _NOISE_LINE_RE.match(l))
 
 
 def detect_stage(prompt):
     """Find the stage of the earliest stage word in a prompt.
 
-    Why: the first verb usually names the work being asked for. A leading
-    slash-command token is skipped, so "/plan-layer status" is not "plan".
-    Matching is whole-word and case-insensitive over an explicit word list.
+    Why: the first verb usually names the work being asked for. The prompt is
+    cleaned first, a leading slash-command token is skipped ("/plan-layer
+    status" is not "plan"), and "git status" is ignored because it is a
+    command, not a request for a report. Matching is whole-word and
+    case-insensitive over an explicit word list; hyphens split words.
     Inputs: prompt text. Output: a STAGES entry, or None. Side effects: none.
     """
-    text = prompt.lstrip()
+    text = clean_prompt(prompt).lstrip()
     if text.startswith("/"):
         parts = text.split(None, 1)
         text = parts[1] if len(parts) > 1 else ""
-    for m in _WORD_RE.finditer(text):
-        stage = _WORD_TO_STAGE.get(m.group(0).lower())
+    words = [m.lower() for m in _WORD_RE.findall(text)]
+    for i, w in enumerate(words):
+        if i + 1 < len(words) and (w, words[i + 1]) in PHRASES:
+            return _BY_NAME[PHRASES[(w, words[i + 1])]]
+        if w == "status" and i > 0 and words[i - 1] == "git":
+            continue
+        stage = _WORD_TO_STAGE.get(w)
         if stage:
             return stage
     return None
@@ -205,8 +253,9 @@ def session_brief(source):
     its shape. Inputs: the SessionStart source. Output: text. Side effects:
     none.
     """
-    stages = "; ".join("%s -> %s -> %s" % (s["stage"], s["skill"] or "-",
-                                           ", ".join(s["references"])) for s in STAGES)
+    stages = "; ".join(" -> ".join([s["stage"]] + ([s["skill"]] if s["skill"] else [])
+                                   + [", ".join("references/" + r for r in s["references"])])
+                       for s in STAGES)
     lines = [
         "engineering-method is active in this session.",
         "First name the stakes tier: (a) exploration: throwaway, keep it light; "
@@ -251,8 +300,7 @@ def prompt_mode():
     stage = detect_stage(prompt)
     if stage is None:
         return
-    last = load_state().get(sid, {}).get("stage")
-    if last == stage["stage"]:
+    if stage["stage"] in announced(sid):
         return
     set_stage(sid, stage["stage"])
     emit("UserPromptSubmit", stage_message(stage))
