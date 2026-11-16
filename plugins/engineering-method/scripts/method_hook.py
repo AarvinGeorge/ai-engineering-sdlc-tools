@@ -29,6 +29,7 @@ import time
 
 STATE_FILE = "method-stage.json"
 STATE_TTL_SECONDS = 7 * 24 * 3600
+MAX_SCAN_CHARS = 4096  # stage intent sits at the start of a prompt
 
 STAGES = [
     {"stage": "plan",
@@ -52,7 +53,7 @@ STAGES = [
      "skill": "superpowers:verification-before-completion",
      "references": ["measurement-and-state-claims.md", "behaviour-evals.md"]},
     {"stage": "deploy",
-     "words": ["deploy", "deploys", "deploying", "deployed", "rollout", "rollouts",
+     "words": ["deploy", "deploys", "deploying", "deployed", "deployment", "deployments", "rollout", "rollouts",
                "rollback", "rollbacks", "restart", "restarts", "restarting", "restarted",
                "migrate", "migrates", "migrating", "migrated", "prod", "production", "live"],
      "skill": None,
@@ -84,10 +85,9 @@ PHRASES = {("roll", "back"): "deploy", ("rolling", "back"): "deploy",
 _BY_NAME = {s["stage"]: s for s in STAGES}
 _WORD_TO_STAGE = {w: s for s in STAGES for w in s["words"]}
 _WORD_RE = re.compile(r"[A-Za-z]+")  # hyphens split tokens: re-deploy, unit-tests
-_FENCE_RE = re.compile(r"```.*?(?:```|\Z)", re.S)
-_TAG_RE = re.compile(r"<([A-Za-z][\w:-]*)\b[^>]*>.*?</\1\s*>", re.S)
+_OPEN_TAG_RE = re.compile(r"<([A-Za-z][\w:-]*)[^<>]*>")  # anchored, no backtracking
 _NOISE_LINE_RE = re.compile(
-    r"^(?:[ ]{4,}|\t|\s*\d{4}-\d{2}-\d{2}|\s*\d{1,2}:\d{2}:\d{2}"
+    r"^(?:(?:[ ]{4,}|\t)(?![-*]\s|\d+\.\s)|\s*\d{4}-\d{2}-\d{2}|\s*\d{1,2}:\d{2}:\d{2}"
     r"|\s*(?:ERROR|WARN|WARNING|INFO|DEBUG|Traceback)\b|\s*>>>|\s*\$ |\s*def )")
 
 
@@ -191,20 +191,59 @@ def set_stage(session_id, stage):
     save_state(state)
 
 
+def strip_blocks(text):
+    """Remove ``` fences and <tag>...</tag> blocks in linear time.
+
+    Why: a regex with a backreference backtracks quadratically on unclosed
+    tags. This uses str.find only: each opening tag is matched by an
+    anchored regex, and its closing tag is searched for once. An unclosed
+    tag is left in place. Inputs: text. Output: text with blocks replaced by
+    a space. Side effects: none.
+    """
+    out, i = [], 0
+    while True:  # code fences; an unclosed fence runs to the end
+        j = text.find("```", i)
+        if j < 0:
+            out.append(text[i:])
+            break
+        out.append(text[i:j] + " ")
+        k = text.find("```", j + 3)
+        if k < 0:
+            break
+        i = k + 3
+    text, out, i = "".join(out), [], 0
+    while True:
+        j = text.find("<", i)
+        if j < 0:
+            out.append(text[i:])
+            break
+        m = _OPEN_TAG_RE.match(text, j)
+        if not m:
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        close = text.find("</%s>" % m.group(1), m.end())
+        if close < 0:
+            out.append(text[i:m.end()])
+            i = m.end()
+        else:
+            out.append(text[i:j] + " ")
+            i = close + len(m.group(1)) + 3
+    return "".join(out)
+
+
 def clean_prompt(prompt):
     """Strip the parts of a prompt that are not the user's own words.
 
     Why: pasted logs, code and tool wrappers contain stage words that say
-    nothing about what the user is asking for. Removes ``` fences, any
-    <tag>...</tag> block (pasted_content, command-name, ...) and lines that
-    look like logs or code. Inputs: prompt text. Output: cleaned text.
-    Side effects: none.
+    nothing about what the user is asking for. Scans only the first
+    MAX_SCAN_CHARS characters (stage intent sits at the start, and the cap
+    bounds the work). Removes fences, tag blocks (pasted_content,
+    command-name, ...) and lines that look like logs or code, but not
+    indented list items. Inputs: prompt text. Output: cleaned text. Side
+    effects: none.
     """
-    text = _FENCE_RE.sub("\n", prompt)
-    prev = None
-    while prev != text:  # nested tags
-        prev = text
-        text = _TAG_RE.sub(" ", text)
+    text = strip_blocks(prompt[:MAX_SCAN_CHARS])
     return "\n".join(l for l in text.split("\n") if not _NOISE_LINE_RE.match(l))
 
 

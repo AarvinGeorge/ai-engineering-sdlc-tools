@@ -250,6 +250,40 @@ class FixRound(Base):
         self.assertNotIn("-> - ->", text)
 
 
+class Robustness(Base):
+    """Round 2: bounded, linear-time scanning; list lines are not code."""
+
+    def timed(self, text):
+        import time
+        t = time.time()
+        p = self.prompt(text)
+        return p, time.time() - t
+
+    def test_megabyte_of_unclosed_tags_is_fast(self):
+        for chunk in ("<a> ", "<li>x\n"):
+            p, secs = self.timed(chunk * (1024 * 1024 // len(chunk)) + " deploy")
+            self.assertEqual(p.returncode, 0)
+            self.assertLess(secs, 1.0, repr(chunk))
+
+    def test_many_unclosed_tags_then_stage_word_near_start(self):
+        p, secs = self.timed("deploy it\n" + "<li>item text here\n" * 50000)
+        self.assertLess(secs, 1.0)
+        self.assertIn("stage deploy", context(p))
+
+    def test_stage_word_after_4096_chars_ignored(self):
+        self.assertEqual(self.prompt("x " * 2100 + "deploy").stdout, "")
+        self.assertIn("stage deploy", context(self.prompt("x " * 100 + "deploy", session="n")))
+
+    def test_deployment_words(self):
+        for i, w in enumerate(("deployment", "deployments")):
+            self.assertIn("stage deploy", context(self.prompt(w, session="d%d" % i)))
+
+    def test_indented_list_lines_are_not_code(self):
+        for i, line in enumerate(("    - deploy it", "    * deploy it", "    1. deploy it")):
+            self.assertIn("stage deploy", context(self.prompt("steps:\n" + line, session="l%d" % i)), line)
+        self.assertEqual(self.prompt("steps:\n    deploy()", session="c").stdout, "")
+
+
 class Wiring(unittest.TestCase):
     def setUp(self):
         with open(HOOKS_JSON) as fh:
