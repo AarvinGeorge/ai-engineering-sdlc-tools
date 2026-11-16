@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/method_hook.py\" --session-start 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 10,
+            "async": false,
+            "statusMessage": "Loading the engineering method"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/method_hook.py\" --prompt 2>/dev/null || true",
+            "shell": "bash",
+            "timeout": 5,
+            "async": false,
+            "statusMessage": "Checking the stage of work"
+          }
+        ]
+      }
+    ]
+  }
+}
