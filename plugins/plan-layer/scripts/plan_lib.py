@@ -334,6 +334,19 @@ TRACKER_RECENT_DONE_DEFAULT = 5
 _REQUIRED_FIELDS = ("name", "status")
 
 
+def nfc_text(text):
+    """Text in Unicode NFC with runs of whitespace collapsed to one space.
+
+    Why: a tracker may hand back the same name in decomposed form (NFD); it
+    looks identical, so comparing raw would never converge. Every comparison of
+    names, titles and values goes through this one helper. Non-strings pass through.
+    """
+    import unicodedata
+    if not isinstance(text, str):
+        return text
+    return " ".join(unicodedata.normalize("NFC", text).split())
+
+
 def utc_now():
     """The current UTC time as ISO-8601 with a Z, read from the clock. The one formatter."""
     from datetime import datetime, timezone

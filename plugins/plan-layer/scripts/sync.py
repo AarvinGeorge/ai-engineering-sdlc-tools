@@ -63,6 +63,9 @@ def main():
         print("  sync: usage: sync.py --tracker --actual <file> (--actual only goes with --tracker)")
         return 2
     if not L.has_plan():
+        if "--tracker" in sys.argv:
+            print("  sync: --tracker needs a plan (plan/plan.json); there is none in this project")
+            return 2
         return 0
     p = L.paths()
     if "--live-revision" in sys.argv:

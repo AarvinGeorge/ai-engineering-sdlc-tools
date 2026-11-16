@@ -369,6 +369,30 @@ class TestFixRound(TrackerBase):
         self.assertIn("give them work ids", r.stdout)
         self.assertNotIn("archive all but one", r.stdout)
 
+    def test_nfd_and_nfc_spellings_are_the_same_name(self):
+        import unicodedata
+        nfc = "E-01.S3 \u2014 Caf\u00e9 na\u00efve search"
+        self.d["plans"]["next"] = [item(nfc, "planned")]
+        self.write()
+        keep = [r for r in self.good() if r["Name"].startswith("E-01.S2")]
+        for form in ("NFD", "NFC"):
+            name = unicodedata.normalize(form, nfc)
+            rows = keep + [{"Name": name, "Status": "Planned", "Stage": "planned"}]
+            r = self.tracker("diff", "--actual", self.actual_file(rows))
+            self.assertEqual(r.returncode, 0, (form, r.stdout))
+        rows = keep + [{"Name": "Caf\u00e9 na\u00efve search".replace("\u00e9", "e\u0301"),
+                        "Status": "Planned", "Stage": "planned"}]
+        r = self.tracker("diff", "--actual", self.actual_file(rows))
+        self.assertEqual(r.stdout.count("rename"), 1, r.stdout)
+        self.assertIn("start with its work id", r.stdout)
+
+    def test_sync_actual_with_no_plan_is_2(self):
+        import shutil
+        shutil.rmtree(os.path.join(self.dir, "plan"))
+        r = run("sync.py", "--tracker", "--actual", os.path.join(self.dir, "x.json"), project=self.dir)
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("plan", r.stdout)
+
     def test_utc_now_lives_in_plan_lib_only(self):
         import plan_lib
         self.assertRegex(plan_lib.utc_now(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")

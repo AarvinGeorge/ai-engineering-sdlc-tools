@@ -22,7 +22,6 @@ import hashlib
 import json
 import os
 import sys
-import unicodedata
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
@@ -33,7 +32,7 @@ _SEPARATORS = " \t:\u00b7,;-\u2014\u2013"
 
 def _norm(text):
     """Unicode-normalised, case-folded, whitespace-collapsed text, for matching titles across trackers."""
-    return " ".join(unicodedata.normalize("NFC", str(text or "")).split()).casefold()
+    return L.nfc_text(str(text or "")).casefold()
 
 
 def _title(name):
@@ -220,10 +219,10 @@ def diff_rows(expected, actual, cfg, known):
         shown = r[f["name"]]
         if no_id_match:
             out.append("rename '%s' to start with its work id: '%s'" % (shown, e[f["name"]]))
-        elif " ".join(shown.split()) != " ".join(e[f["name"]].split()):
+        elif L.nfc_text(shown) != L.nfc_text(e[f["name"]]):
             out.append("rename '%s' to '%s'" % (shown, e[f["name"]]))
         for k in ("status", "stage"):
-            if f.get(k) and r.get(f[k]) != e[f[k]]:
+            if f.get(k) and L.nfc_text(r.get(f[k])) != L.nfc_text(e[f[k]]):
                 out.append("set %s of '%s' to '%s'" % (f[k], shown, e[f[k]]))
     for r in actual:
         if any(r is u for u in used):
