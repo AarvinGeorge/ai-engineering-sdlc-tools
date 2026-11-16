@@ -145,6 +145,17 @@ class Prompt(Base):
     def test_case_insensitive(self):
         self.assertIn("stage review", context(self.prompt("REVIEW this")))
 
+    def test_message_points_at_skill_row(self):
+        text = context(self.prompt("review this", session="row"))
+        self.assertEqual(text, "engineering-method: stage review \u2014 re-read SKILL.md \u00a73 row "
+                               "'review', load superpowers:requesting-code-review, read "
+                               "references/review-loop.md before acting; keep the stakes tier you named.")
+
+    def test_message_without_skill_points_at_row(self):
+        text = context(self.prompt("rollback the change", session="row2"))
+        self.assertIn("re-read SKILL.md \u00a73 row 'deploy', read references/live-system-changes.md", text)
+        self.assertNotIn("load ", text)
+
     def test_message_within_limit(self):
         for i, w in enumerate(("plan", "build", "review", "test", "deploy", "merge", "release", "report")):
             text = context(self.prompt(w, session="m%d" % i))

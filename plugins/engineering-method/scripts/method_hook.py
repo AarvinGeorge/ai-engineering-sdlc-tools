@@ -288,13 +288,14 @@ def detect_stage(prompt):
 def stage_message(stage):
     """Compose the short per-stage reminder (at most 400 characters).
 
-    Why: it names exactly what to load, nothing more. Inputs: a STAGES
+    Why: it names exactly what to re-read and load, nothing more. Inputs: a STAGES
     entry. Output: text. Side effects: none.
     """
-    skill = "load %s and " % stage["skill"] if stage["skill"] else ""
+    skill = "load %s, " % stage["skill"] if stage["skill"] else ""
     refs = ", ".join("references/" + r for r in stage["references"])
-    return ("engineering-method: stage %s — %sread %s before acting; "
-            "keep the stakes tier you named." % (stage["stage"], skill, refs))[:400]
+    return ("engineering-method: stage %s — re-read SKILL.md §3 row '%s', %sread %s before "
+            "acting; keep the stakes tier you named."
+            % (stage["stage"], stage["stage"], skill, refs))[:400]
 
 
 def session_brief(source):

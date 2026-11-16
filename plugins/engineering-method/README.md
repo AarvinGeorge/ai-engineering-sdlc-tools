@@ -19,7 +19,7 @@ procedure makes an agent worse on the small task and no better on the large one.
 - **A thin layer over [Superpowers](https://github.com/obra/superpowers).** Brainstorming, plans,
   TDD, code review, debugging, worktrees and verification are Superpowers' job; this skill points to
   them by name and adds only what they do not say.
-- **Short body, detail on demand.** `SKILL.md` stays under 150 lines; the detail lives in
+- **Short body, detail on demand.** `SKILL.md` stays within 2,200 words, and a test enforces it; the detail lives in
   `references/` and loads only when a task needs it.
 
 ## Install
@@ -61,3 +61,6 @@ claude plugin eval plugins/engineering-method    # spends model calls; run delib
 The cases check behaviour, not wording: a prototype must not get live-system ceremony; a test
 report must show the command and its output; the reviewer must be a different model from the
 implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled. Each case also carries a skill-fired indicator (not scored).
+
+Every new rule ships with its case, written first: it fails on the skill without the rule and
+passes with it (`references/behaviour-evals.md`). `evals/COVERAGE.md` maps each rule to its case.

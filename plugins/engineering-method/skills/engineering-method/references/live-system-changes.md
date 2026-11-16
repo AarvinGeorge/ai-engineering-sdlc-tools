@@ -16,6 +16,9 @@ outage.
 | Back up the state the change touches, then verify the backup | A backup not read back is a hope; a code-only change records the rollback revision instead and says so. |
 | Prove before production | On a laptop, a throwaway container, or a separate test stack. Never run a test suite inside the live system (a guard test enforces it; below). |
 | No secrets in artifacts | Name a credential, never its value — not in documents, commits or transcripts. |
+| One naming scheme for credentials | Every key, at every vendor, is named `<org>-<instance>-<service>` (e.g. `example-store2-email`), and the provisioning script generates the names rather than a person typing them. *Why:* ad hoc key names left it unclear which key belonged to which instance. *Test:* every key in the vendor consoles parses by the scheme, and the script is the only place a name is formed. |
+| No test traffic on a pre-launch instance | An instance real users are about to meet (configured with their real address, channel or account) gets no test messages. Prove it read-only (config, health, connectivity, which keys are present), prove behaviour on a different instance built for testing, and treat its first live conversation as first contact: read it back afterwards. *Why:* an automatic notice reached a real user before launch because a setup step ran out of order. *Test:* the setup record shows no send from the instance before launch, and a read-back of the first live turn. |
+| Behaviour the diff does not show | New configuration is set explicitly before the switch, never left to a code default; existing data under a changed key, format or schema is migrated or handled, and the choice is written in the deploy file. *Why:* configuration and stored data change behaviour at the switch with nothing in the diff to show it. *Test:* the preconditions list each new configuration item and each changed key or schema with its handling. |
 
 ## The deploy standard
 
@@ -44,7 +47,8 @@ The template's sections, in order — adapt the content, keep the shape:
 12. **Record** — decision log, plan state, index.
 
 **Stop and report** if a precondition fails, a red check is green against the old system, or a
-read-back fails: do not improvise past the file.
+read-back fails: do not improvise past the file. A fault in a deploy *helper* is split by what the
+step does (below, "Helper faults").
 
 ## The deploy file is code
 
@@ -58,6 +62,22 @@ read-back fails: do not improvise past the file.
   test in the normal suite fails on any deploy-file step that runs a test, a shell or an ad hoc
   script inside the live container (`docker exec <live> pytest …`), and a planted violation turns it
   red.
+- **Deploy helpers are code with tests, pre-flighted before the bench.** Count, parse and check
+  scripts carry unit tests, and a pre-flight runs every helper on a laptop or a throwaway against
+  saved real output (captured command, API or log output from the last run) before the next bench
+  run. The runbook keeps the state-changing steps; mechanical checks live in the tested helpers.
+  *Why:* most bench stops on one release were faults in read-only helpers, and a laptop pre-flight
+  then found several more before the bench saw them (Continuous Delivery: the deploy pipeline is
+  code; SRE: toil is automated and tested). *Test:* each helper has a test, and the pre-flight's
+  output against the saved fixtures is in the record before the bench run.
+- **Helper faults: read-only is fixed in place, state-changing stops.** The baseline is ITIL's
+  standard versus normal change. A fault in a read-only measurement step (a count, a parse, a
+  health read) is a standard change: fix it in place on the bench, re-run that step, carry on, and
+  review the fix (with a test) afterwards. A fault in a step that changes state (schema, data,
+  config, a send) is a normal change: stop there and wait for a reviewed fix before running it again; never
+  improvise it in place. *Why:* sending every read-only helper fault through the whole pull-request-and-review path cost a bench day each and found nothing; a state-changing improvisation cannot be taken
+  back. *Test:* the bench record marks each stop read-only or state-changing, and only the
+  read-only ones were fixed in place, each with its after-review row.
 - **Re-read against the final head before each gate.** *Why:* a fix round after the file was written
   changes what it must check. *Test:* the gate record names the head the file was re-read against.
 
@@ -113,6 +133,22 @@ read-back fails: do not improvise past the file.
   push on a hit. *Why:* work only on a laptop is one disk from lost, and a push is permanent.
   *Test:* the guard is installed as the pre-push hook, and a control run with a planted fake value
   shows it refusing (a scan that has never fired is not shown able to).
+- **The guard's list covers every party's identifiers, the operator's own included.** Names (with
+  their spelling variants), email addresses, handles, phone numbers and domains of the client, the
+  client's contacts and the person doing the work. The list itself lives outside every repository.
+  *Why:* the operator's own address sat in committed files because the list held only the client's
+  identifiers (secret scanning, as in gitleaks or GitHub push protection, works the same way: the
+  rule set is only as wide as what it names). *Test:* each party has rows in the list, and a planted
+  fake of each kind is refused.
+- **At session start, confirm the guard is installed in every repository you push from.** That is
+  the main repository, each submodule, and each worktree of each submodule: a submodule's worktree
+  has its own git dir that gets no hooks from the parent. List them
+  (`git worktree list`, `git submodule foreach --recursive 'git worktree list'`), then read the
+  hook path each one uses (`git -C <dir> rev-parse --git-path hooks` and
+  `git -C <dir> config core.hooksPath`); a shared `core.hooksPath` pointing at one guarded directory
+  is the simplest fix. Then run the control push in each. *Why:* one repository had no hook for
+  days, and submodule worktree git dirs start with none. *Test:* the session-start note lists each
+  git dir, its hook path and its control-push refusal.
 - **Never push tags or refs that preserve rewritten history.** When a rewrite removed data and
   backup refs of the old history still exist locally, push the branches you name
   (`git push origin main feature-x`), never `--all`, `--tags` or `--mirror`, which carry the backups

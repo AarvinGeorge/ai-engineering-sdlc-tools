@@ -28,6 +28,73 @@ updated: YYYY-MM-DD
 Purpose: a later reader judges relevance from the header instead of reading the whole document. The
 header describes; it never replaces reading the body when the task depends on the detail.
 
+## A header on every module, class and function a task touches (tier b and c)
+
+The same idea for code; tier a (exploration) skips it. Every new or changed module, class and
+function carries a header (a docstring or comment block) with these labelled fields, each present
+even when it is "none":
+
+- `What:` it does, in one sentence;
+- `Use when:` why and when to use it (and when not to);
+- `Inputs:` and `Output:`;
+- `Side effects:` writes, sends, network, or "none";
+- `Role:` its place in the module or system.
+
+Added when a task creates or changes the code, never in a sweep over untouched code; a sweep is a
+separate, planned task. **A check enforces it, and the first change that adds a header adds the
+check if the repository has none:** a test in the normal suite (or a lint rule) fails when a module,
+class or function added or changed against the base has no header, and a planted header-less one
+turns it red. *Why:* code could not be found or reused without reading the bodies, and a header
+rule kept only in prose was not kept. *Test:* the diff's new and changed code all has headers,
+untouched code is unchanged, and the check is in the suite.
+
+A minimal check (Python; adapt the idea to the language). The base is passed in, defaulting to the
+merge-base with the default branch:
+
+```python
+# test_headers.py
+"""What: fails when a module, class or function changed against the base lacks a header.
+Use when: in the normal suite, on tier b and c work. Inputs: HEADER_BASE (env, optional).
+Output: test result. Side effects: runs git read-only. Role: enforces the code-header rule."""
+import ast, os, re, subprocess
+FIELDS = ("What:", "Use when:", "Inputs:", "Output:", "Side effects:", "Role:")
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+def base_ref():
+    if os.environ.get("HEADER_BASE"):
+        return os.environ["HEADER_BASE"]
+    default = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")  # e.g. origin/main
+    return git("merge-base", "HEAD", default)
+def changed_lines(base):
+    lines, path = {}, None
+    for row in git("diff", "-U0", base, "--", "*.py").splitlines():
+        if row.startswith("+++ "):
+            path = row[6:] if row.startswith("+++ b/") else None
+        elif row.startswith("@@") and path:
+            start, _, count = re.search(r"\+(\d+)(,(\d+))?", row).groups()
+            n = int(count) if count is not None else 1
+            lines.setdefault(path, set()).update(range(int(start), int(start) + n))
+    return lines
+def test_changed_code_has_headers():
+    missing = []
+    for path, touched in changed_lines(base_ref()).items():
+        tree = ast.parse(open(path).read())
+        nodes = [tree] + [n for n in ast.walk(tree) if isinstance(
+            n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+        for node in nodes:
+            span = (set(range(node.lineno, node.end_lineno + 1))
+                    if hasattr(node, "lineno") else touched)  # the module counts if any line changed
+            if touched & span and not all(f in (ast.get_docstring(node) or "") for f in FIELDS):
+                missing.append(f"{path}:{getattr(node, 'lineno', 1)} {getattr(node, 'name', '<module>')}")
+    assert not missing, missing
+```
+
+Only code whose lines the diff touches is checked, so untouched code is never forced into a sweep.
+
+The same pattern answers any rule that has been missed more than once (a changelog entry, a version
+bump, an index line): a check that fails without it (CI, a pre-push hook or a test), not another line in
+the instructions file (SKILL.md principle 7).
+
 ## Decision log
 
 - **Append-only and chronological.** Newest at the bottom; past entries are never rewritten. A
@@ -44,6 +111,22 @@ header describes; it never replaces reading the body when the task depends on th
   never defend it as settled. *Why:* a two-month-old rule nobody recalled was cited as binding and
   shaped a deferred list built on it. *Test:* every decision cited as a reason carries its id and
   date, and a deferred item names the decision it rests on.
+- **A settled owner ruling is not re-raised without new evidence of real harm.** Before carrying
+  any proposal (a gap list, a review finding, a backlog item), check it against the owner's stated
+  design and the decision log. One that contradicts a ruling or the design is not carried, as
+  written or reworded into the backlog; name the ruling (id and date) and drop it. It comes back only
+  with new evidence of harm (an incident, a measurement), and then as a question to the owner, not a
+  backlog item. This is the counterpart of the currency rule above: currency asks whether later
+  direction overtook a decision; it never treats age alone as a reason to reopen one. *Why:* the
+  owner had to restate the same rulings again and again and called the re-asks regressive. *Test:*
+  each proposal carries "consistent with" or "contradicts D-NNN", and every contradicting one that
+  is carried names its new evidence.
+- **"Did we decide this before?" is answered by searching under every synonym.** List the terms
+  first (for a data-retention question: retention, keep, delete, purge, expiry, TTL, archive,
+  backup window), search the log and the design for each, and say which terms were searched and
+  which entry matched. *Why:* a prior decision was missed because only one term was searched, and it
+  was worded differently. *Test:* the answer lists the terms searched beside the entry found, or
+  says none matched.
 - **Search the record before recommending a removal or giving a step.** The decision log and the
   setup records hold rulings and proven forms. *Why:* removals of things kept on purpose, and
   commands the records had already corrected, were proposed from memory. *Test:* the
@@ -57,6 +140,23 @@ header describes; it never replaces reading the body when the task depends on th
 - **Keep a lessons register.** One table: what failed, what works, its source, whether it still
   holds; a row is added the turn the lesson is learned, and searched before any setup or deploy
   step. *Why:* lessons scattered across records were relearned. *Test:* the step cites its row.
+- **Setup records are append-only, written right after each part completes.** One record per
+  instance or environment being provisioned. Never write a section ahead of the work: a part not yet
+  done has no entry (a to-do list is a plan, kept elsewhere). Each entry, written the moment its part
+  completes:
+
+  | Field | Content |
+  |---|---|
+  | when | date and time, read from the clock |
+  | part | what was set up |
+  | order that worked | the steps in the order they actually ran, commands included |
+  | values | names, regions, sizes, ids, key *names* (never secret values) |
+  | pitfalls | what failed first and what fixed it |
+  | automate | what the provisioning script should do next time |
+
+  A correction is a new entry that names the one it corrects, never an edit. *Why:* sections written
+  before the work described the intent, not what happened. *Test:* every entry's time is after its
+  part completed, no entry describes undone work, and no secret value appears.
 - **Record each platform assumption with the version it was checked on,** pinned by a boundary
   test. *Why:* an upgrade silently changes behaviour the code relied on. *Test:* the upgrade
   rehearsal reads the list and every entry has its test.
@@ -92,7 +192,9 @@ a name says what kind of thing it is.
 Tier b: a short decision note, and a numbered plan only when the work spans sessions. Tier c: a
 numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
-moves, not afterwards. **Every finding has a home before a plan is called complete:** a coverage
+moves, not afterwards. **A plan for a fix carries a "Fit with what exists" section** holding
+SKILL.md principle 17's five steps, one row each, plus a row per stated quality goal. *Test:* the
+section exists and has every row. **Every finding has a home before a plan is called complete:** a coverage
 table maps each finding from the traces and reviews to the story that fixes it, or to a stated
 deferral. *Why:* fixes were dropped between the trace and the plan. *Test:* the table has no
 finding without a row.
