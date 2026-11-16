@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.18.0 — 2026-11-16
+
+**External-tracker mirror (plan-layer owns it).** A plan may declare `meta.tracker` (`kind`, `target`).
+The expected tracker rows are derived from the plan (now, next, the last few done items);
+`tracker.py expected` prints them and `tracker.py diff --actual <file>` compares them with the rows the
+agent fetched through the tracker's own connector, printing each drift as an exact fix (create, set
+status, rename to start with the work id, archive a stray, mark old finished work done). Exit 0 clean,
+1 drift, 2 unreadable input or no tracker: unparseable input never counts as clean, and the shape
+`expected` prints is refused so the gate cannot be cleared without the tracker. Names are compared in
+full after Unicode NFC normalisation. Adapters are data: `trackers/notion.json` first, `generic.json`, and a
+project may add or override one at `plan/trackers/<kind>.json`; optional fields are compared only when the
+adapter declares them (`trackers/README.md` shows a Linear example). `sync.py --tracker [--actual <file>]`
+runs the reconcile after the normal sync. The gate raises DRIFT when the last reconcile is missing, left
+differences open, or its hash of the expected rows differs from now; a malformed `meta.tracker` FAILs;
+names reuse the existing `meta.naming` check. Absent `meta.tracker`: output byte-identical to 0.17.0.
+
+**Pause and handoff.** `pause.py` (`/plan-layer pause`) writes `plan/HANDOFF.md`, a fresh-session start
+with states measured now (UTC clock, git branch, HEAD and uncommitted count, the gate), active work,
+resume order, open questions and traps, and a line saying when its numbers were read. It sets
+`meta.paused`; active items then show as the adapter's Paused status, the session brief opens with a
+PAUSED line, and the output reminds the agent to stop the work's recurring loops and run
+`sync.py --tracker`. `--resume` clears it. Unknown arguments print usage (exit 2).
+
+**Showing the plan.** Anything presented as "the plan" is drawn from the plan file, shows every active
+track, and names which go/no-go is meant.
+
+Tests: 68 new (`tests/test_tracker.py`, `tests/test_pause.py`), written red first; 246 passed, 0
+skipped (base 178). Review: a different model reviewed with executed probes over three rounds (five
+Medium findings, then one Low regression; all closed; final verdict READY).
+
 ## 0.17.0 — 2026-11-13
 
 **Opt-in work-id naming.** A plan may declare `meta.naming: "work-ids"`; the gate then FAILs on
