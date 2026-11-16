@@ -42,7 +42,8 @@ The template's sections, in order — adapt the content, keep the shape:
 7. **Read-backs** — named checks against the new system, each turning green.
 8. **Push and record** — remotes, the running revision recorded from the system itself.
 9. **Acceptance** — the real-use check, from the user's seat where possible.
-10. **Rollback** — the exact commands and the trigger that fires them, written before step 1.
+10. **Rollback** — the exact commands and the trigger that fires them, written before step 1. They
+    return to the step 2 rollback point and put the step 2 backup back when one exists.
 11. **Known limits, stated.**
 12. **Record** — decision log, plan state, index.
 

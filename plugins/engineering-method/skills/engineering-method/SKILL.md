@@ -6,23 +6,22 @@ when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "writ
 
 # engineering-method
 
-A method for building with coding agents, learnt the expensive way: each rule, *Why:*, *Test:*.
+A method for building with coding agents: each rule, its *Why:*, its *Test:*.
 
-**These are defaults, not a cage.** Propose a better approach when you see one, say what it replaces
-and why. **Read the intent and deliver all of it:** the working thing as asked, complete, saying what
+**These are defaults, not a cage.** Propose a better approach when you see one, and what it replaces. **Read the intent and deliver all of it:** the working thing as asked, complete, saying what
 was left out and why. State assumptions and proceed; ask only what blocks the next step. Push back
 once, briefly, then do it as asked unless it is unsafe (principle 13); the asked-for behaviour is
 what ships. Recommend one approach and deliver it; alternatives get a sentence each, never a second
 full version for the person to choose from. *Why:* literal readings and question-only replies
 delivered less than the intent. *Test:* the thing as asked, its assumptions, one pushback, one pick.
 
-**Superpowers does the procedure.** This skill points to its skills (section 3, plus `brainstorming`,
-`subagent-driven-development`, `using-git-worktrees`, `systematic-debugging`) and adds only what they
-do not say. If the two seem to disagree, say so rather than silently picking one.
+**Superpowers does the procedure** (section 3, plus `brainstorming`, `subagent-driven-development`,
+`using-git-worktrees`, `systematic-debugging`); this skill adds what it does not say, and names any
+disagreement.
 
 ## 1. Decide the stakes first
 
-The process scales with what a mistake costs. Name the tier at the start; ceremony the tier does not
+The process scales with what a mistake costs. Name the tier at the start (after the update, in an update for someone else); ceremony the tier does not
 need is itself a defect (principle 7). **Tier a answers look light:** the thing asked for, plus one
 quick check the person can run. No process sections, no plan, no review pipeline.
 
@@ -72,6 +71,10 @@ money or touches credentials; the lower one otherwise.
    not a consequence to park. *Test:* no gate is red "by design" between releases.
 9. **Every failure becomes a test, before the fix.** *Why:* a fix with no failing case first cannot
    show it fixed anything. *Test:* the test was red on the old code and is green on the new.
+   **Code headers (tier b/c):** every function, class or module the diff adds or edits gets a
+   docstring with six REQUIRED labelled fields, `What:` `Use when:` `Inputs:` `Output:` `Side effects:`
+   `Role:` ("none" allowed, never omitted); untouched code gets none; the reply ships a suite check
+   that goes red on a header missing a field, unless the repository has one (docs-and-decisions.md).
 
 **Agents and review**
 10. **Reviewer ≠ implementer, at least as strong, and it executes.** Different model family where
@@ -86,33 +89,41 @@ money or touches credentials; the lower one otherwise.
     needs. *Test:* references/parallel-and-worktrees.md.
 
 **Live systems and permission**
-13. **Read-only by default on anything real people use.** Ask before mutating; never restart blind
-    (check in-flight work first, and again right before switching); back up the state the change
-    touches and read it back (code-only: record the rollback revision); rollback commands and trigger
-    written BEFORE the change; then read back the running revision and a real health path; prove on
-    a copy; no tests inside live, no test traffic to an instance users are about to meet. *Test:*
-    references/live-system-changes.md.
+13. **Read-only by default on anything real people use; ask before mutating.** Steps for a live change
+    fill every REQUIRED slot with this system's actual command or condition, never a restatement:
+    **Proven off live** (suite or CI green on the exact revision, or a staging run; never tests inside
+    live). **Rollback point** (running revision saved). **What ships** (log and diff of the incoming
+    change; data, schema or config it touches backed up and the backup read back, or "code-only,
+    checked"). **Rollback** (commands that return to the saved revision and restore any backup, plus a concrete
+    trigger, ready before starting). **Settings and data** (each new setting set to a stated value;
+    data under a changed key or format handled, the choice written). **In-flight** (a command, the last
+    step before the switch). **Read-backs** (running revision, health, one real use). No test traffic
+    to an instance users are about to meet. *Test:* references/live-system-changes.md.
 14. **A declined permission means stop.** No retry, narrower form or move to a path that does not
     prompt; mark it unverified. *Why:* a workaround defeats the decision. *Test:* the report lists it.
 
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
-    indexed the same day. The plan's stage (its own cycle, e.g. plan-layer's) and a configured tracker move at each stage change, at
-    pause or handoff and at release, and are reconciled at every progress report (with plan-layer:
-    `/plan-layer sync --tracker`, and `/plan-layer pause` before stopping; it owns how, this skill
-    when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
+    indexed the same day. The plan's stage and a configured tracker move at each stage change, pause, handoff and
+    release, reconciled at every progress report (plan-layer: `/plan-layer sync --tracker`;
+    `/plan-layer pause` before stopping; it owns how, this skill when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; the real technical name,
     defined once; words whose plain meaning matches ("tested on the bench", never "benched", which
     reads as sidelined); on tier c (or when asked) the ladder or release tree, measured, with a caveat
-    line and the promotion grid; one naming hierarchy (E-01.S2, R-04, D-001). *Test:* progress-ladder.md.
+    line and the promotion grid; one naming hierarchy (E-01.S2, R-04, D-001). An update for
+    someone not in the session: the reply's first line is `**Needs you**` (no tier, note or preface
+    above it); each decision with options, deadline, why it matters; each item with plain meaning,
+    `since <last update's time>:` and its source in brackets; every id glossed in every section;
+    notes to the asker last. *Test:* progress-ladder.md.
 
 **Delivery (tier c; tier b where it applies)**
-17. **Root cause, not symptom; the fix fits what exists.** Before any fix: (1) run the system on the
-    case (replay it) and call the cause a hypothesis until it has run; (2) inventory every mechanism
-    on the concept; (3) extend the smallest one, where the property must hold; (4) say what it
-    unlocks beyond this case ("only this case" means a patch); (5) check it against every stated
-    quality goal. The plan holds this as "Fit with what exists"; a repeat fault changes the mechanism.
-    *Why:* symptom fixes came back. *Test:* the fix names its root and what it unlocks.
+17. **Root cause, not symptom; the fix fits what exists.** Replay the case through the system first;
+    the cause is a hypothesis until it has run. A fix plan then has a "Fit with what exists" section
+    with four REQUIRED lines: **Exists:** every mechanism already on the concept, absent ones named
+    absent. **Extends:** the smallest one, where the property must hold (no mechanism beside it).
+    **Unlocks:** what it makes possible beyond this case (a change that covers only this case, proposed or yours, is named a patch). **Goals:**
+    one line per stated goal, met and how. A repeat fault changes the mechanism. *Why:* symptom
+    fixes came back. *Test:* the four lines are there.
 18. **No regression is a hard gate.** Settle "is this a regression?" by the same check on what
     production runs; an unexplained base-vs-head difference stops the release. *Test:* both runs shown.
 19. **Rehearse the procedure, test once, promote the artifact.** Dry-run the deploy file on a
@@ -128,8 +139,7 @@ money or touches credentials; the lower one otherwise.
 22. **Agentic products: code holds the safety floor; meaning goes to the model.** Code enforces only
     provenance, authority, what leaves unconfirmed (irreversible actions, sends), secrets and spend;
     meaning is a tool or fact for the model (one tool per action, a lookup, clear descriptions), which
-    asks when unsure (the guardrails pattern: deterministic checks around a model that chooses among
-    well-described tools). *Why:* keyword branches for meaning grew a brittle adapter that missed the
+    asks when unsure (the guardrails pattern). *Why:* keyword branches for meaning grew a brittle adapter that missed the
     next phrasing. *Test:* every rule in code is on the floor list.
 
 ## 3. The stage map
@@ -151,11 +161,10 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 
 ## 4. References (load at their stage, or when the task needs them)
 
-- `references/review-loop.md` — cross-model reviewer, probes, review per stage, fix rounds, the executor's brief, autonomy
-- `references/model-routing-and-cost.md` — which model for which job, review capacity, cheap ticks, how agents stay cheap
-- `references/measurement-and-state-claims.md` — exit codes, suite results and skips, counts, base checks, negatives and time, state words
-- `references/progress-ladder.md` — the ladder, the release tree, the promotion grid, standalone updates, a checklist the person runs
-- `references/parallel-and-worktrees.md` — when to fan out, bottleneck first, who may write where, supervising lanes
-- `references/live-system-changes.md` — the deploy standard, the deploy file as code, proving a release, pre-launch instances, pushing
-- `references/docs-and-decisions.md` — numbered docs, headers on docs and code, the decision log, using the record, setup records, names
-- `references/behaviour-evals.md` — evals as a dataset: layers, cost cap, repeats, contamination, baselines, one eval per new rule
+`references/`: `review-loop.md` (reviewer, probes, fix rounds, briefs, autonomy),
+`model-routing-and-cost.md` (models, capacity, cheap ticks), `measurement-and-state-claims.md` (exit
+codes, skips, counts, negatives, state words), `progress-ladder.md` (ladder, release tree, grid,
+updates, checklists), `parallel-and-worktrees.md` (fan-out, who writes where, lanes),
+`live-system-changes.md` (deploy standard and file, proving a release, pre-launch, pushing),
+`docs-and-decisions.md` (docs, headers and their check, decision log, the record, names),
+`behaviour-evals.md` (evals as a dataset, cost cap, contamination, baselines).
