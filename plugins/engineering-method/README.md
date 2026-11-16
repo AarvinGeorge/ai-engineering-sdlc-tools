@@ -32,12 +32,23 @@ claude plugin install engineering-method@ai-engineering-sdlc-tools
 Works best with Superpowers installed (`superpowers@claude-plugins-official` or its own
 marketplace). Without it the skill still reads correctly; the pointers name skills that are absent.
 
+## Hooks
+
+The plugin ships two hooks (`hooks/hooks.json`, script `scripts/method_hook.py`) so the method is re-applied without a reminder:
+
+- **SessionStart** (`startup`, `clear`, `compact`): injects a short brief with the stakes tiers and the stage map. After compaction it adds a line telling the agent to re-read the skill.
+- **UserPromptSubmit**: when your prompt moves to a new stage of work (plan, build, review, test, deploy, merge, release, report), injects one line naming the skill and references to load. It stays silent while the stage is unchanged; the memory resets on session start.
+
+Both never fail loudly: on any error they print nothing (or a one-line brief) and exit 0. To turn them off, disable the plugin; there is no separate switch.
+
 ## Layout
 
 ```
 .claude-plugin/plugin.json
 skills/engineering-method/SKILL.md          principles, stakes tiers, pointer table
 skills/engineering-method/references/       detail, loaded on demand
+hooks/hooks.json + scripts/method_hook.py   session-start and per-prompt reminders
+tests/test_method_hook.py                   unit tests for the hooks
 evals/<case>/prompt.md + graders/           claude plugin eval cases
 ```
 

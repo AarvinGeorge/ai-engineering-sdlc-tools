@@ -1,0 +1,217 @@
+"""Tests for the engineering-method hooks (scripts/method_hook.py, hooks/hooks.json).
+
+The script is run as a subprocess, the way the harness runs it: JSON on stdin,
+hook JSON (or nothing) on stdout, always exit 0. State goes to a temp
+CLAUDE_PLUGIN_DATA so tests never touch real session memory.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PLUGIN = os.path.dirname(HERE)
+SCRIPT = os.path.join(PLUGIN, "scripts", "method_hook.py")
+HOOKS_JSON = os.path.join(PLUGIN, "hooks", "hooks.json")
+REFS = os.path.join(PLUGIN, "skills", "engineering-method", "references")
+
+
+def run(mode, payload, data_dir, raw_stdin=None):
+    env = dict(os.environ)
+    if data_dir is None:
+        env.pop("CLAUDE_PLUGIN_DATA", None)
+    else:
+        env["CLAUDE_PLUGIN_DATA"] = data_dir
+    stdin = raw_stdin if raw_stdin is not None else json.dumps(payload)
+    return subprocess.run([sys.executable, SCRIPT, mode], input=stdin, env=env,
+                          capture_output=True, text=True)
+
+
+def context(proc):
+    """The additionalContext string, or None when the hook was silent."""
+    if not proc.stdout.strip():
+        return None
+    return json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="methodhook-")
+        self.addCleanup(self._tmp.cleanup)
+        self.data = self._tmp.name
+
+    def prompt(self, text, session="s1"):
+        return run("--prompt", {"prompt": text, "session_id": session}, self.data)
+
+    def start(self, source="startup", session="s1"):
+        return run("--session-start", {"source": source, "session_id": session}, self.data)
+
+
+class SessionStart(Base):
+    def test_valid_hook_json_for_each_source(self):
+        for source in ("startup", "clear", "compact", "resume"):
+            p = self.start(source)
+            self.assertEqual(p.returncode, 0)
+            out = json.loads(p.stdout)
+            hso = out["hookSpecificOutput"]
+            self.assertEqual(hso["hookEventName"], "SessionStart")
+            self.assertTrue(hso["additionalContext"])
+            self.assertIn("engineering-method", hso["additionalContext"])
+
+    def test_compact_line_only_for_compact(self):
+        self.assertIn("context was just compacted", context(self.start("compact")))
+        for source in ("startup", "clear", "resume"):
+            self.assertNotIn("compacted", context(self.start(source)))
+
+    def test_brief_names_tiers_and_loading_rule(self):
+        text = context(self.start("startup"))
+        for needle in ("exploration", "internal", "live", "plan", "deploy", "references"):
+            self.assertIn(needle, text)
+
+    def test_brief_within_limit(self):
+        for source in ("startup", "clear", "compact"):
+            self.assertLessEqual(len(context(self.start(source))), 1500)
+
+    def test_session_start_resets_stage_memory(self):
+        self.assertIsNotNone(context(self.prompt("please review this")))
+        self.assertIsNone(context(self.prompt("review again")))
+        self.start("clear")
+        self.assertIsNotNone(context(self.prompt("review once more")))
+
+    def test_broken_stdin_still_emits_fallback(self):
+        p = run("--session-start", None, self.data, raw_stdin="not json{")
+        self.assertEqual(p.returncode, 0)
+        self.assertNotIn("Traceback", p.stderr + p.stdout)
+        self.assertIn("engineering-method", context(p))
+
+
+class Prompt(Base):
+    def test_no_stage_words_is_silent(self):
+        p = self.prompt("what time is it in Tokyo")
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(p.stdout, "")
+
+    def test_announces_once_then_silent(self):
+        first = context(self.prompt("let's review the change"))
+        self.assertIn("stage review", first)
+        self.assertIn("superpowers:requesting-code-review", first)
+        self.assertIn("review-loop.md", first)
+        self.assertIsNone(context(self.prompt("review it again")))
+
+    def test_hook_event_name(self):
+        out = json.loads(self.prompt("deploy it").stdout)
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
+
+    def test_new_stage_speaks(self):
+        self.prompt("plan the work")
+        text = context(self.prompt("now implement it"))
+        self.assertIn("stage build", text)
+
+    def test_stage_without_skill_omits_skill(self):
+        text = context(self.prompt("rollback the change"))
+        self.assertIn("stage deploy", text)
+        self.assertNotIn("superpowers", text)
+        self.assertIn("live-system-changes.md", text)
+
+    def test_new_session_speaks_again(self):
+        self.assertIsNotNone(context(self.prompt("review this", session="a")))
+        self.assertIsNone(context(self.prompt("review this", session="a")))
+        self.assertIsNotNone(context(self.prompt("review this", session="b")))
+
+    def test_earliest_stage_word_wins(self):
+        self.assertIn("stage plan", context(self.prompt("plan it, then deploy it")))
+
+    def test_inflections(self):
+        cases = {"planning": "plan", "we built it": "build", "reviewing": "review",
+                 "deployed": "deploy", "merged": "merge", "releasing": "release",
+                 "shipped": "release", "tests": "test"}
+        for i, (text, stage) in enumerate(cases.items()):
+            self.assertIn("stage %s" % stage, context(self.prompt(text, session="i%d" % i)), text)
+
+    def test_slash_command_name_ignored(self):
+        # command name "plan-layer" must not count as plan; "status" is a report word
+        text = context(self.prompt("/plan-layer status"))
+        self.assertIn("stage report", text)
+        self.assertIsNone(context(self.prompt("/review", session="x")))
+        self.assertIn("stage build", context(self.prompt("/plan fix the bug", session="y")))
+
+    def test_whole_word_only(self):
+        for i, text in enumerate(("the planet is big", "pushing-away", "contest", "prereview")):
+            self.assertEqual(self.prompt(text, session="w%d" % i).stdout, "", text)
+
+    def test_case_insensitive(self):
+        self.assertIn("stage review", context(self.prompt("REVIEW this")))
+
+    def test_message_within_limit(self):
+        for i, w in enumerate(("plan", "build", "review", "test", "deploy", "merge", "release", "report")):
+            text = context(self.prompt(w, session="m%d" % i))
+            self.assertLessEqual(len(text), 400)
+
+    def test_broken_stdin_silent(self):
+        for raw in ("", "not json{", "[]", '{"prompt": 5}', "null"):
+            p = run("--prompt", None, self.data, raw_stdin=raw)
+            self.assertEqual((p.returncode, p.stdout), (0, ""), raw)
+            self.assertNotIn("Traceback", p.stderr)
+
+    def test_missing_data_dir_never_crashes(self):
+        for data in (None, os.path.join(self.data, "does", "not", "exist")):
+            p = run("--prompt", {"prompt": "review", "session_id": "q"}, data)
+            self.assertEqual(p.returncode, 0)
+            self.assertNotIn("Traceback", p.stderr)
+            self.assertLess(len(p.stdout), 10000)
+
+    def test_corrupt_state_file_never_crashes(self):
+        with open(os.path.join(self.data, "method-stage.json"), "w") as fh:
+            fh.write("{broken")
+        p = self.prompt("review")
+        self.assertEqual(p.returncode, 0)
+        self.assertIn("stage review", context(p))
+
+    def test_old_entries_pruned(self):
+        path = os.path.join(self.data, "method-stage.json")
+        with open(path, "w") as fh:
+            json.dump({"old": {"stage": "plan", "at": 1}}, fh)
+        self.prompt("review")
+        with open(path) as fh:
+            state = json.load(fh)
+        self.assertNotIn("old", state)
+        self.assertIn("s1", state)
+
+
+class Wiring(unittest.TestCase):
+    def setUp(self):
+        with open(HOOKS_JSON) as fh:
+            self.hooks = json.load(fh)["hooks"]
+
+    def test_session_start_entry(self):
+        entry = self.hooks["SessionStart"][0]
+        self.assertEqual(entry["matcher"], "startup|clear|compact")
+        cmd = entry["hooks"][0]["command"]
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", cmd)
+        self.assertIn("--session-start", cmd)
+        self.assertTrue(cmd.endswith("2>/dev/null || true"))
+
+    def test_prompt_entry(self):
+        entry = self.hooks["UserPromptSubmit"][0]
+        self.assertNotIn("matcher", entry)
+        cmd = entry["hooks"][0]["command"]
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", cmd)
+        self.assertIn("--prompt", cmd)
+        for h in (self.hooks["SessionStart"][0]["hooks"][0], entry["hooks"][0]):
+            self.assertLessEqual(h["timeout"], 10)
+            self.assertEqual(h["shell"], "bash")
+            self.assertTrue(h["statusMessage"])
+
+    def test_every_stage_reference_exists(self):
+        sys.path.insert(0, os.path.join(PLUGIN, "scripts"))
+        import method_hook
+        missing = [r for s in method_hook.STAGES for r in s["references"]
+                   if not os.path.isfile(os.path.join(REFS, r))]
+        self.assertEqual(missing, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
