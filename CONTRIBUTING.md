@@ -18,7 +18,7 @@ plugins/<name>/
   .claude-plugin/plugin.json       the plugin manifest (name, version, license)
   skills/<skill>/SKILL.md          what the agent reads
   scripts/, hooks/, templates/     what the skills and hooks call (where the plugin has them)
-  tests/                           unit tests (plan-layer, work-log)
+  tests/                           unit tests (plan-layer, work-log, engineering-method hooks)
   evals/                           behaviour evals (engineering-method, work-log)
   README.md, CHANGELOG.md          user docs and release notes
 docs/                              design notes and plans
@@ -37,9 +37,12 @@ Python 3.10 or newer. Run from the repository root.
 # work-log: pytest; openpyxl is needed for the workbook read-back test
 python3 -m pip install pytest openpyxl
 python3 -m pytest plugins/work-log/tests -q
+
+# engineering-method hooks: standard library only
+python3 -m unittest discover -s plugins/engineering-method/tests -v
 ```
 
-`engineering-method` has no unit tests; it is a skill, checked by the cases under `plugins/engineering-method/evals/`. The same suites run in CI on every pull request (`.github/workflows/tests.yml`).
+`engineering-method` is mostly a skill, checked by the cases under `plugins/engineering-method/evals/`; only its hooks (`scripts/method_hook.py`) have unit tests. The same suites run in CI on every pull request (`.github/workflows/tests.yml`).
 
 ## Versioning and changelogs
 

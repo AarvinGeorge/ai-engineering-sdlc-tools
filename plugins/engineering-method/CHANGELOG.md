@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.3.0 — 2026-11-16
+
+**The method re-applies itself.** The main failure in long sessions was activation, not content: the
+skill was loaded once and lost at compaction. New `hooks/hooks.json` (the plan-layer pattern):
+SessionStart on `startup|clear|compact` injects a short brief (name the stakes tier, the stage map,
+load the stage's reference; after compaction, re-read the skill); UserPromptSubmit names the skill and
+reference when a prompt moves to a new stage (plan, build, review, test, deploy, merge, release,
+report), at most once per stage per session, silent otherwise. Code fences and pasted blocks are
+stripped first, only the first 4,096 characters are scanned, and every path is linear time; it never
+blocks a session. `scripts/method_hook.py` holds the one stage map; `SKILL.md` §3 must match it
+(enforced by test).
+
+**New and extended rules**, each rule / why / test with its industry baseline, evidence summarised:
+- Principle 7 gains enforcement over instruction (a missed rule moves into a hook, gate or test) and
+  code headers on touched code with a check (tier b/c); principle 22 (new): in agentic products code
+  holds the safety floor and judgement goes to the model.
+- Bottleneck first: a blocked release goes first and alone, lanes capped by reviewer capacity
+  (`parallel-and-worktrees.md`, with lane supervision: ping and stop thresholds, patch and respawn).
+- Review capacity is a budget: usage read before launching reviews, re-reviews cover the delta only;
+  recurring status ticks run on a cheap agent; agents report the model id they ran as
+  (`model-routing-and-cost.md`, `review-loop.md`).
+- Deploy helpers are tested code, pre-flighted against saved real output; a read-only measurement fault
+  is fixed in place and reviewed after, a state-changing step stops (ITIL standard vs normal change);
+  behaviour the diff does not show (new settings, data under changed keys) is handled before the
+  switch; a pre-launch instance gets no test traffic; one credential-naming scheme; the push guard
+  covers every party's identifiers, the operator's own included, in every git dir pushed from
+  (`live-system-changes.md`).
+- Counts are read entry by entry from the record (`measurement-and-state-claims.md`).
+- Settled rulings are not re-raised without new evidence; the record is searched under synonyms;
+  setup records are written after each part; a plan carries "fit with what exists"
+  (`docs-and-decisions.md`, principle 17's Exists / Extends / Unlocks / Goals lines).
+- Updates stand alone and open with what needs the owner; a release is reported as a tree; a step
+  list the person runs is reprinted with its ticks; plain verbs ("tested on the bench")
+  (`progress-ladder.md`, principle 16).
+- Principle 15 says when the record moves: plan stage and a configured tracker move at each stage
+  change, at pause and at release, and are reconciled at every progress report
+  (`/plan-layer sync --tracker`, `/plan-layer pause`; plan-layer owns how).
+- New `references/behaviour-evals.md`: evals as a dataset (layers per stage, a cost plan and cap
+  before any run, repeats only where they decide something, contamination controls, a fail-closed
+  recipient guard, a stored base per artifact); every new rule ships with a case that fails first.
+
+**Size is enforced, not stated.** `tests/test_skill_budget.py`: SKILL.md body ≤ 2,200 words (2,178),
+§3 cells ≤ 25 words, frontmatter ≤ 1,536 characters, §3 rows equal the hook's stage map. The
+"under 150 lines" rule is retired.
+
+**Tests:** 55 (`tests/`, stdlib unittest, run in CI), written red first.
+
+**Evals:** 14 new cases with one grader per criterion (`evals/COVERAGE.md` maps rule → case →
+grader). Opus agent, Sonnet judge, 3 runs, ablation none. New cases: base 0.2.0 71/144
+criterion-runs, head 119/144. The 7 original cases: base 17/21, head 17/21 (no regression;
+`live-deploy-safeguards` fails on both and predates this release). Still red on head 0/3:
+headers-when-touched (c2), eval plan "agent never sees graders" (c4), owner update stands alone
+(c1), pre-launch setup record and credential naming (c2, c3). Criteria that already passed on base
+(settled ruling, skill loads without trigger words) are regression guards, not evidence for this
+release.
+
+**Review:** a different model (Fable 5.2) reviewed every lane with executed probes and re-reviewed each
+fix; the eval suite itself was reviewed (NOT READY, rewritten). One reviewer probe batch on the hooks
+was declined and not re-run; the next commit was reviewed in a narrower scope.
+
 ## 0.2.0 — 2026-11-13
 
 **Lessons from a run of live promotions, made general.** Twenty-one principles (five new); every

@@ -43,6 +43,12 @@ review. This file says who reviews, what they must do, and when to stop.
   implementer's report shows red, then green. **This is a deliberate departure from Superpowers**,
   which re-reviews every fix round: it trades a small risk on low-stakes fix diffs for cost. On tier c
   work, or when unsure, follow Superpowers and re-review every round.
+- **A re-review covers the delta, not the branch.** Brief it with the fix commit, its diff, the
+  finding it answers and what the fix touches; a whole-branch pass is a separate, scheduled review,
+  never a re-review, and never while a release is held. Read the reviewer's usage before launching
+  it (model-routing-and-cost.md, "Review capacity is a budget"). *Why:* whole-branch re-reviews
+  spent the reviewer's weekly limit on code already reviewed. *Test:* the re-review brief names the
+  fix commit and its line count.
 - **Code the reviewer wrote gets its own re-review.** When a fix is taken as code from the review
   (not as a finding the implementer then fixes), the reviewer is its author, so someone else reads
   it, whatever its severity. *Why:* a fix taken as written from a review
@@ -66,6 +72,11 @@ mark it unverified".
 
 An agent that runs a procedure (a deploy file, a bench, a migration) needs more than a reviewer:
 
+- **Short foreground steps.** Each command runs in the foreground and is seen to finish; only the
+  full suite the brief names may run in the background. The brief states the supervision thresholds
+  (parallel-and-worktrees.md, "Supervising lanes") and asks for the model id in the first line of
+  the report. *Why:* agents stalled behind a backgrounded long step. *Test:* the brief names the one
+  background command.
 - **Full output, never a tail.** It returns the complete output of each check. *Why:* a summary
   hides which line failed. *Test:* the report carries each check's output.
 - **The shell, named.** Say which shell runs the commands (zsh does not split a variable into

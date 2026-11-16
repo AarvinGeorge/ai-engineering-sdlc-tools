@@ -48,6 +48,90 @@ YOURS    1. cap value: 50 MB per user/day — not given
          2. ship behind no flag (on for everyone) — given 13:05
 ```
 
+## The release tree
+
+When a release spans several tasks, or the person asks where a release stands, the ladder's rows
+are a tree in the naming hierarchy (docs-and-decisions.md, "Names"), not a flat list. Its parts, in
+order:
+
+1. **Epic → story → task**, indented, each with its plain-words name beside its id.
+2. **On each task:** builder model → reviewer model, its state and commit.
+3. **The active row marked** (`▶`).
+4. **Each review round indented** under its task (round, verdict, fix commit).
+5. **Parked items with their home** (the epic or story that now owns them).
+6. **The stages still to come**, after the last one passed (gate, production, watch, limited bench,
+   wider rollout), from the promotion grid below.
+
+```
+R-12 · E-07 Team calendars (shared rota per team) · read 09:40 from the plan and deploy log
+E-07.S1 rota view → R-12
+  T1 rota table and API            m1 → m2    DONE 3c9e1a0
+     · review r1: 2 Minor — fixed 7f2b5d4
+▶ T2 week grid in the web app      m1 → m2    in progress
+     · review r1: Important (time zone of the week start), fix in progress
+  T3 export to calendar file       m1 → m2    not started
+E-07.S2 swap requests              PARKED → home: E-09 (notifications epic)
+Stages: build (T2, T3 open) · review · suite · bench · gate · production · watch · rollout
+```
+
+*Why:* a flat list hid where each task sat. *Test:* every task line names builder and reviewer, and
+the stages after the current one are listed.
+
+## An update that stands on its own
+
+An update to someone who was not in the session (an owner, a team) is read cold. Its shape:
+
+1. **"Needs you" first:** each open decision, numbered, with its options and the deadline it
+   gates. Nothing comes before it, not even a correction or a note to the person who asked: those
+   go after the update.
+2. **Each item gets a plain gloss:** its plain meaning, its importance, where it sits, and a "since
+   <time>:" clause saying what changed since the last update (name that update's time).
+3. **A source for every fact:** "(deploy log, read 09:40 UTC)", "(incident list, four entries
+   counted one by one)". Counts are read entry by entry (measurement-and-state-claims.md, "Counts"); a figure that
+   corrects an earlier one says so.
+4. **No bare id.** Every `E-07.S1`, `R-12`, `T2` has its plain meaning beside it, every time it
+   first appears in a section.
+5. **Status verbs in plain meaning:** "ran on the bench and came through clean", never "benched"; "on hold
+   at the gate", never "gated". A word copied from the ledger is rewritten if a stranger would read
+   it differently.
+
+*Why:* the owner lost context across many concurrent items, and a jargon verb read as its opposite.
+*Test:* the first block is the decisions; no id stands without its gloss; each number has a source.
+
+## A checklist the person runs
+
+While a person works through a numbered step list (a migration, a setup), each reply that follows a
+progress report is this, in order:
+
+1. **Next step, at the top:** "Next: step N — <what it does>" (the lowest unticked step that is
+   not blocked).
+2. **The whole list, reprinted**, every step, each with `[x]` done or `[ ]` not done, the original
+   numbers and the commands in place, grouped under where they run (laptop, console, server).
+3. **Tick only what was reported done or measured.** An expectation that a step will work, or
+   that it matches an earlier one, is not a report: the step stays `[ ]`, with a one-line note on
+   how to check it.
+4. **A new step keeps the numbering:** insert it as `6a`, never renumber; a step done out of order
+   is ticked where it sits.
+5. **Notes after the list**, short: what failed and how it was fixed, what to check.
+
+```
+Next: step 3 — turn on the new sign-up form for 10% of visitors
+
+In the repository (your laptop)
+  [x] 1. make release VERSION=2.4.0
+  [x] 2. ./scripts/smoke.sh --target staging
+In the feature-flag console
+  [ ] 3. Set signup_v2 to 10%
+  [ ] 4. Watch the sign-up error chart for 30 minutes
+In the analytics console
+  [x] 5. Create the "signup_v2 completions" dashboard   (done early)
+  [ ] 6. Compare completions against the old form after a day
+```
+
+*Why:* steps were lost while the person switched between consoles, and a reply with only the next
+step dropped the rest. *Test:* every original step appears with its number, and only reported steps
+are ticked. Plan-layer's task columns are the same idea for the planning page.
+
 ## The promotion pipeline grid
 
 The ladder shows one piece of work; the grid shows every release on every stage of the promotion

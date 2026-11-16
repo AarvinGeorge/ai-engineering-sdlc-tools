@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
+import tracker  # noqa: E402
 
 VALID_BUILD = {"done", "active", "partial", "not-started"}
 VALID_PLAN = {"planned", "partial", "none"}
@@ -713,6 +714,30 @@ def run(root=None):
                                      "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
                                      % (bucket, p.get("name")))
 
+    # External-tracker mirror (opt-in via meta.tracker). A malformed block FAILs;
+    # a mirror that was never reconciled, or not since the plan last changed,
+    # or reconciled with differences left, DRIFTs. Work-id naming for tracker
+    # rows is the naming check above (meta.naming), not a second copy of it.
+    tcfg, terr = L.tracker_config(d, root)
+    if terr:
+        fails.append(terr)
+    elif tcfg:
+        st = L.tracker_state(root)
+        if not st or not st.get("at"):
+            drifts.append("tracker mirror (%s) was never reconciled — fetch its rows and run "
+                          "tracker.py diff --actual <file>" % tcfg["kind"])
+        elif st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg), tcfg):
+            drifts.append("tracker mirror (%s): the rows the plan now expects differ from those last "
+                          "reconciled (%s) — fetch the rows and reconcile again" % (tcfg["kind"], st["at"]))
+        elif st.get("drift"):
+            drifts.append("tracker mirror (%s): the last reconcile (%s) left %s difference(s) — "
+                          "apply them and diff again" % (tcfg["kind"], st["at"], st["drift"]))
+
+    # Pause (meta.paused): present means paused, so it must be well formed.
+    if "paused" in meta_ and L.paused_at(d) is None:
+        fails.append("meta.paused is %r — it must be {\"at\": an ISO-8601 UTC time}; "
+                     "pause.py writes it" % (meta_["paused"],))
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"
@@ -872,7 +897,7 @@ def main():
             # alarms. Read from the clock, never from memory.
             d = L.load()
             d.setdefault("meta", {})["assertions_verified"] = \
-                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                L.utc_now()
             L.save(d)
             print("  assertions_verified stamped %s" % d["meta"]["assertions_verified"])
         return 1 if bad else 0
