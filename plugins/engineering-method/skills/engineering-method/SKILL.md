@@ -1,7 +1,7 @@
 ---
 name: engineering-method
-description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering even when it looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or asks to add, change, plan, build, review or ship code of any size, even a one-line "add caching to X" or a quick script where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, proven zeros, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
-when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress", "looks done, get it out", "what now?" on a step list, "eval plan", "setup notes", "the owner update", "personal data in a commit", "pre-push guard", "we decided this before", "just add X", "add caching".
+description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering even when it looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or asks to add, change, plan, build, review or ship code of any size, even a terse one-line request or a quick script where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, proven zeros, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
+when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress", "wrap it up and hand it over", "which step is next" on a step list, "eval plan", "setup notes", "the owner update", "personal data in a commit", "pre-push guard", "we decided this before", "just add X".
 ---
 
 # engineering-method
@@ -11,10 +11,10 @@ A method for building with coding agents, learnt the expensive way: each rule, *
 **These are defaults, not a cage.** Propose a better approach when you see one, say what it replaces
 and why. **Read the intent and deliver all of it:** the working thing as asked, complete, saying what
 was left out and why. State assumptions and proceed; ask only what blocks the next step. Push back
-once, briefly, then do it as asked: the asked-for behaviour stays the default (a safer option may be
-a setting left at the asked value). Recommend one and deliver it; alternatives get a sentence each,
-never a second version or "tell me which you want". *Why:* literal readings and question-only
-replies delivered less than the intent. *Test:* the thing as asked, assumptions, one pushback, one pick.
+once, briefly, then do it as asked unless it is unsafe (principle 13); the asked-for behaviour is
+what ships. Recommend one approach and deliver it; alternatives get a sentence each, never a second
+full version for the person to choose from. *Why:* literal readings and question-only replies
+delivered less than the intent. *Test:* the thing as asked, its assumptions, one pushback, one pick.
 
 **Superpowers does the procedure.** This skill points to its skills (section 3, plus `brainstorming`,
 `subagent-driven-development`, `using-git-worktrees`, `systematic-debugging`) and adds only what they
@@ -29,7 +29,7 @@ quick check the person can run. No process sections, no plan, no review pipeline
 | Tier | Typical work | What applies |
 |---|---|---|
 | **a. Exploration** | prototype, spike, notebook, throwaway script | Principles 1–4 (evidence, state claims, vendor docs, proven zeros). One review before anyone relies on it. No deploy file, no numbered docs, no ladder unless asked. |
-| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious; a plan document only when the work spans sessions. |
+| **b. Internal** | internal tool, take-home, single-user app, library | Tier a, plus: TDD on logic; every failure becomes a test; reviewer is a different model and executes (references/review-loop.md); a short decision note for anything non-obvious; a plan document only when the work spans sessions; a header on code the task touches (references/docs-and-decisions.md). |
 | **c. Live** | a system real people use today | Everything: plan reviewed against the running code before building; per-task cross-model review plus a whole-branch pass; a deploy file from a template with a guard test; in-flight check, verified backup, read-backs, rollback, record (references/live-system-changes.md). |
 
 Unsure between two tiers? Take the higher one for anything that writes data, sends messages, spends
@@ -65,9 +65,8 @@ money or touches credentials; the lower one otherwise.
    it is symmetric (it does not bind the trusted while sparing the untrusted). A switch nobody should
    flip, or a guard that stops the system doing its job, is over-engineering too. A written rule that
    has been missed moves into a hook, gate, CI check or test that fails; a prose line may go with
-   it, never instead. Code headers are enforced the same way: new or changed functions get the
-   six-field header (section 3, build), and the change ships the test that fails without one. *Why:*
-   prose-only rules were skipped. *Test:* the three answers come first; a missed rule names its check.
+   it, never instead. *Why:* rules kept only in prose were skipped; gated ones held. *Test:* the
+   three answers are written before building; a missed rule names its check.
 8. **A red gate is evidence against the design.** A control that leaves your own gate permanently
    red, or guards only against people who already hold everything, is a design defect to challenge,
    not a consequence to park. *Test:* no gate is red "by design" between releases.
@@ -129,24 +128,26 @@ money or touches credentials; the lower one otherwise.
 22. **Agentic products: code holds the safety floor; meaning goes to the model.** Code enforces only
     provenance, authority, what leaves unconfirmed (irreversible actions, sends), secrets and spend;
     meaning is a tool or fact for the model (one tool per action, a lookup, clear descriptions), which
-    asks when unsure. *Why:* keyword branches for meaning grew a brittle adapter that missed the next
-    phrasing. *Test:* every rule in code is on the floor list.
+    asks when unsure (the guardrails pattern: deterministic checks around a model that chooses among
+    well-described tools). *Why:* keyword branches for meaning grew a brittle adapter that missed the
+    next phrasing. *Test:* every rule in code is on the floor list.
 
 ## 3. The stage map
 
-**At every stage change and after compaction, re-load this skill and that stage's reference.** The
-plugin's hooks remind you; if they did not fire, do it anyway ("looks done, get it out" is a release).
+**At each stage change, re-read that stage's row and load its skill and references; after
+compaction or `/clear`, re-load this whole skill.** The plugin's hooks remind you; if they did not
+fire, do it anyway. A stage needs no trigger word: handing finished work to users is a release.
 
 | Stage | Skill | References | What this method adds |
 |---|---|---|---|
-| plan | `superpowers:writing-plans` | docs-and-decisions.md, parallel-and-worktrees.md | out-of-scope list; EXTENDS/NEW per capability; a fix plan replays the case first (cause = hypothesis until run), lists every existing mechanism on the concept, extends the smallest, says what it unlocks beyond this case ("only this case" = a patch) and checks each stated goal; tier c: a fresh reviewer reads it against the running code |
-| build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; every new or changed function gets a header with all six fields (`What:`, `Use when:`, `Inputs:`, `Output:`, `Side effects:`, `Role:`), never a sweep of untouched code; and the reply always delivers a header check beside the code (a `test_headers` test that walks functions added or changed against the base and fails on a missing field) unless the repository already has one; a rule already missed goes in a CI check, not only a prose line; the FULL suite once before reporting; a held release first |
-| review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; read usage before launching; a re-review covers only the fix delta; no whole-branch review or new lanes while a release is held |
-| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts read entry by entry from the record; behaviour evals: cost arithmetic and a cap first, layers per stage, the agent never sees the graders, a fail-closed recipient allow-list on any case that sends |
-| deploy | (none) | live-system-changes.md | written BEFORE the change: rollback point (running revision) with commands and trigger, a backup of the touched data read back, schema undo; new settings set to a stated value; state under moved keys handled; in-flight check; after: read back the running revision and a real use. A pre-launch instance gets no test traffic (prove it read-only, test on another instance, read back first contact); keys named `<org>-<instance>-<service>` (org = the operator's company, instance = the customer deployment), generated by the provisioning script; setup record appended after each part. Helper fault: read-only fixed in place, state-changing stops |
-| merge | `superpowers:finishing-a-development-branch` | live-system-changes.md | the push guard lists every party's identifiers, the operator's own included, and is installed in every repository, submodule and worktree git dir pushed from |
-| release | (none) | live-system-changes.md, progress-ladder.md | a summary is not proof: full suite on the current head and a different-model review, then every deploy-row item |
-| report | (none) | progress-ladder.md, measurement-and-state-claims.md | updates open with "Needs you" (numbered decisions) before anything else; every id glossed, every fact sourced, each item says what changed since the last update; the release tree; every number read now. A step list the person is running: "Next: step N" on top, then the WHOLE list reprinted, every step with `[x]`/`[ ]`, original numbers, commands and groups kept, ticked only where reported |
+| plan | `superpowers:writing-plans` | docs-and-decisions.md, parallel-and-worktrees.md | out-of-scope list; EXTENDS/NEW per capability; a fix plan follows principle 17; tier c: a fresh reviewer reads it against the running code |
+| build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; tier b/c: headers on touched code, with their check (docs-and-decisions.md); the full suite once before reporting; a held release first |
+| review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; usage read before launching; re-reviews cover the delta; nothing competes with a held release |
+| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts read entry by entry; behaviour evals: a cost cap first, layered, isolated, sends fail closed |
+| deploy | (none) | live-system-changes.md | principle 13; what the diff does not show, handled first; pre-launch instances get no test traffic; helper faults split read-only from state-changing |
+| merge | `superpowers:finishing-a-development-branch` | live-system-changes.md | the push guard covers every party's identifiers and every git dir pushed from |
+| release | (none) | live-system-changes.md, progress-ladder.md | a summary is not proof: full suite on the current head and a different-model review, then the deploy row |
+| report | (none) | progress-ladder.md, measurement-and-state-claims.md | "needs you" first, every id glossed and sourced; the release tree; a step list in progress is reprinted whole with its ticks |
 
 ## 4. References (load at their stage, or when the task needs them)
 

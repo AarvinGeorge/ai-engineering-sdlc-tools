@@ -43,13 +43,13 @@ negatives and time, state words and labels.
 
 - **A count is read entry by entry from the record each time it is stated, never carried from
   memory or from an earlier message.** Open the log, list the entries that match, and count those;
-  say what was excluded and why (a note line, a reboot, a duplicate is not a run). When the fresh
+  say what was excluded and why (a comment line or a duplicate entry is not an event). When the fresh
   count differs from one stated earlier, say the earlier figure was wrong and give the new one with
   its source and read time. *Why:* a count stated from memory was wrong twice before anyone read it
   from the log. *Test:* the count names the record, the read time and the exclusion rule, and a
   corrected figure says what it corrects.
-- **Do not reconcile a wrong figure into a plausible story.** "Nine was probably the runs before
-  noon" is a guess about a guess; state the fresh count and drop the old one. *Test:* no figure in
+- **Do not reconcile a wrong figure into a plausible story.** Explaining how an earlier figure
+  might have been right is a guess about a guess; state the fresh count and drop the old one. *Test:* no figure in
   the report rests on an earlier message.
 
 ## Negatives and time

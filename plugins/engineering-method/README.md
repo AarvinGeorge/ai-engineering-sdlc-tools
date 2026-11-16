@@ -19,7 +19,7 @@ procedure makes an agent worse on the small task and no better on the large one.
 - **A thin layer over [Superpowers](https://github.com/obra/superpowers).** Brainstorming, plans,
   TDD, code review, debugging, worktrees and verification are Superpowers' job; this skill points to
   them by name and adds only what they do not say.
-- **Short body, detail on demand.** `SKILL.md` stays at 160 lines or fewer; the detail lives in
+- **Short body, detail on demand.** `SKILL.md` stays within 2,200 words, and a test enforces it; the detail lives in
   `references/` and loads only when a task needs it.
 
 ## Install

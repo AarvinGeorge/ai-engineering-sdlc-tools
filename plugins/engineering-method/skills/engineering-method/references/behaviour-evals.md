@@ -15,7 +15,7 @@ disagree.
   run = the spend per trigger; multiply by how often it fires (per commit, per pull request, per
   release) for the week. Each stage gets a budget, passed to the runner as a cap that stops the run
   (`--max-cost-usd` or equivalent), never a number in a note. *Why:* an eval runner built ad hoc had
-  no cap, and one proposed scheme cost over a hundred dollars a commit. *Test:* the plan shows the
+  no cap, and the first per-change estimate written down was many times what anyone expected. *Test:* the plan shows the
   sum and the cap per stage, and the runner's command line carries the cap.
 - **The judge runs on a mid-tier-or-better model; the agent under test runs on the model that will
   use it** (model-routing-and-cost.md).
@@ -38,8 +38,7 @@ disagree.
 
 ## Every new rule ships with its eval
 
-- **Test-first, as for code.** Each new rule gets a case that runs first against today's
-  instructions and fails, then passes with the change; both results are kept. A case that passes
+- **Test-first, as for code.** Each new rule comes with a case, run on the current instructions, where it must fail, and on the changed ones, where it must pass; both results are kept. A case that passes
   on the old instructions tests nothing new: rewrite it until it fails. *Why:* most rules added
   without one could not be shown to have changed anything. *Test:* each rule in the change has its
   case, with a red result on the old version and a green one on the new.
@@ -59,8 +58,7 @@ disagree.
 - **Per-lane isolation.** Each run gets a fresh workspace and no shared memory or cache with
   other runs or with the session that wrote the cases.
 - **A fail-closed recipient guard on anything that can send.** A case that can send email, chat or
-  any outbound message runs behind a guard that allows only listed sandbox recipients; anything else
-  blocks the send and fails the run, including when the list is missing or empty. *Why:* a test
+  any outbound message runs behind a guard that allows only allow-listed test addresses; any other address stops the send and fails the run, including when the list is missing or empty. *Why:* a test
   send cannot be unsent (live-system-changes.md, "List side effects first"). *Test:* a planted
   non-listed recipient in a control case is blocked, and an empty list blocks everything.
 

@@ -28,10 +28,11 @@ updated: YYYY-MM-DD
 Purpose: a later reader judges relevance from the header instead of reading the whole document. The
 header describes; it never replaces reading the body when the task depends on the detail.
 
-## A header on every module and function a task touches
+## A header on every module, class and function a task touches (tier b and c)
 
-The same idea for code. Every new or changed module, class and function carries a header (a
-docstring or comment block) that says:
+The same idea for code; tier a (exploration) skips it. Every new or changed module, class and
+function carries a header (a docstring or comment block) with these labelled fields, each present
+even when it is "none":
 
 - `What:` it does, in one sentence;
 - `Use when:` why and when to use it (and when not to);
@@ -39,27 +40,34 @@ docstring or comment block) that says:
 - `Side effects:` writes, sends, network, or "none";
 - `Role:` its place in the module or system.
 
-All six fields, labelled, even when one is "none": a one-line docstring is not a header.
-
 Added when a task creates or changes the code, never in a sweep over untouched code; a sweep is a
-separate, planned task. **A test enforces it, and the first change that adds a header adds the
-test if the repository has none:** a check in the normal suite (or a lint rule) fails
-when a function added or changed against the base branch has no header, and a planted header-less
-function turns it red. *Why:* code could not be found or reused without reading the bodies, and a
-header rule kept only in prose was not kept. *Test:* the diff's new and changed functions all have
-headers, untouched functions are unchanged, and the check is in the suite.
+separate, planned task. **A check enforces it, and the first change that adds a header adds the
+check if the repository has none:** a test in the normal suite (or a lint rule) fails when a module,
+class or function added or changed against the base has no header, and a planted header-less one
+turns it red. *Why:* code could not be found or reused without reading the bodies, and a header
+rule kept only in prose was not kept. *Test:* the diff's new and changed code all has headers,
+untouched code is unchanged, and the check is in the suite.
 
-A minimal check (Python; adapt the idea to the language):
+A minimal check (Python; adapt the idea to the language). The base is passed in, defaulting to the
+merge-base with the default branch:
 
 ```python
-# test_headers.py: fail when a function added or changed against the base lacks the header fields
-import ast, re, subprocess
+# test_headers.py
+"""What: fails when a module, class or function changed against the base lacks a header.
+Use when: in the normal suite, on tier b and c work. Inputs: HEADER_BASE (env, optional).
+Output: test result. Side effects: runs git read-only. Role: enforces the code-header rule."""
+import ast, os, re, subprocess
 FIELDS = ("What:", "Use when:", "Inputs:", "Output:", "Side effects:", "Role:")
-def changed_lines(base="origin/main"):
-    diff = subprocess.run(["git", "diff", "-U0", base, "--", "*.py"],
-                          capture_output=True, text=True, check=True).stdout
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+def base_ref():
+    if os.environ.get("HEADER_BASE"):
+        return os.environ["HEADER_BASE"]
+    default = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD")  # e.g. origin/main
+    return git("merge-base", "HEAD", default)
+def changed_lines(base):
     lines, path = {}, None
-    for row in diff.splitlines():
+    for row in git("diff", "-U0", base, "--", "*.py").splitlines():
         if row.startswith("+++ "):
             path = row[6:] if row.startswith("+++ b/") else None
         elif row.startswith("@@") and path:
@@ -67,23 +75,24 @@ def changed_lines(base="origin/main"):
             n = int(count) if count is not None else 1
             lines.setdefault(path, set()).update(range(int(start), int(start) + n))
     return lines
-def test_changed_functions_have_headers():
+def test_changed_code_has_headers():
     missing = []
-    for path, touched in changed_lines().items():
-        for node in ast.walk(ast.parse(open(path).read())):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if touched & set(range(node.lineno, node.end_lineno + 1)):
-                    doc = ast.get_docstring(node) or ""
-                    if not all(f in doc for f in FIELDS):
-                        missing.append(f"{path}:{node.lineno} {node.name}")
+    for path, touched in changed_lines(base_ref()).items():
+        tree = ast.parse(open(path).read())
+        nodes = [tree] + [n for n in ast.walk(tree) if isinstance(
+            n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+        for node in nodes:
+            span = (set(range(node.lineno, node.end_lineno + 1))
+                    if hasattr(node, "lineno") else touched)  # the module counts if any line changed
+            if touched & span and not all(f in (ast.get_docstring(node) or "") for f in FIELDS):
+                missing.append(f"{path}:{getattr(node, 'lineno', 1)} {getattr(node, 'name', '<module>')}")
     assert not missing, missing
 ```
 
-Only functions whose lines the diff touches are checked, so untouched code is never forced into a
-sweep.
+Only code whose lines the diff touches is checked, so untouched code is never forced into a sweep.
 
 The same pattern answers any rule that has been missed more than once (a changelog entry, a version
-bump, an index line): a CI check, pre-push hook or test that fails without it, not another line in
+bump, an index line): a check that fails without it (CI, a pre-push hook or a test), not another line in
 the instructions file (SKILL.md principle 7).
 
 ## Decision log
@@ -183,12 +192,9 @@ a name says what kind of thing it is.
 Tier b: a short decision note, and a numbered plan only when the work spans sessions. Tier c: a
 numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
-moves, not afterwards. **A plan for a fix carries a "Fit with what exists" section** (SKILL.md
-principle 17): the case replayed first (the cause stays a hypothesis until it has run); every
-mechanism on the concept listed; the smallest one extended; what the change unlocks beyond this case
-(if only this case, it is a patch, and the plan says so); and a row per stated quality goal saying
-how the fix meets it. *Why:* symptom fixes came back on several occasions, and one concept grew two
-parallel mechanisms. *Test:* the section exists and has every row. **Every finding has a home before a plan is called complete:** a coverage
+moves, not afterwards. **A plan for a fix carries a "Fit with what exists" section** holding
+SKILL.md principle 17's five steps, one row each, plus a row per stated quality goal. *Test:* the
+section exists and has every row. **Every finding has a home before a plan is called complete:** a coverage
 table maps each finding from the traces and reviews to the story that fixes it, or to a stated
 deferral. *Why:* fixes were dropped between the trace and the plan. *Test:* the table has no
 finding without a row.

@@ -17,8 +17,8 @@ outage.
 | Prove before production | On a laptop, a throwaway container, or a separate test stack. Never run a test suite inside the live system (a guard test enforces it; below). |
 | No secrets in artifacts | Name a credential, never its value — not in documents, commits or transcripts. |
 | One naming scheme for credentials | Every key, at every vendor, is named `<org>-<instance>-<service>` (e.g. `example-store2-email`), and the provisioning script generates the names rather than a person typing them. *Why:* ad hoc key names left it unclear which key belonged to which instance. *Test:* every key in the vendor consoles parses by the scheme, and the script is the only place a name is formed. |
-| No test traffic on a pre-launch instance | An instance real users are about to meet (configured with their real address, channel or account) gets no test messages. Prove it read-only (config, health, connectivity, which keys are present), prove behaviour on a separate test instance, and treat its first live conversation as first contact: read it back afterwards. *Why:* an automatic notice reached a real user before launch because a setup step ran out of order. *Test:* the setup record shows no send from the instance before launch, and a read-back of the first live turn. |
-| Settings and stored state the change moves | A new setting is set, with its stated value, before the switch (never left to the code's fallback); state stored under an old key or format (counters, sessions, locks, queued jobs) is migrated, expired or knowingly dropped, and the choice is written in the deploy file. *Why:* an unset setting or an orphaned key changes behaviour at the switch with nothing in the diff to show it. *Test:* the preconditions list each new setting with its value, and each moved key with its plan. |
+| No test traffic on a pre-launch instance | An instance real users are about to meet (configured with their real address, channel or account) gets no test messages. Prove it read-only (config, health, connectivity, which keys are present), prove behaviour on a different instance built for testing, and treat its first live conversation as first contact: read it back afterwards. *Why:* an automatic notice reached a real user before launch because a setup step ran out of order. *Test:* the setup record shows no send from the instance before launch, and a read-back of the first live turn. |
+| Behaviour the diff does not show | New configuration is set explicitly before the switch, never left to a code default; existing data under a changed key, format or schema is migrated or handled, and the choice is written in the deploy file. *Why:* configuration and stored data change behaviour at the switch with nothing in the diff to show it. *Test:* the preconditions list each new configuration item and each changed key or schema with its handling. |
 
 ## The deploy standard
 
@@ -64,7 +64,7 @@ step does (below, "Helper faults").
   red.
 - **Deploy helpers are code with tests, pre-flighted before the bench.** Count, parse and check
   scripts carry unit tests, and a pre-flight runs every helper on a laptop or a throwaway against
-  saved real output (captured `psql`, API or log output from the last run) before the next bench
+  saved real output (captured command, API or log output from the last run) before the next bench
   run. The runbook keeps the state-changing steps; mechanical checks live in the tested helpers.
   *Why:* most bench stops on one release were faults in read-only helpers, and a laptop pre-flight
   then found several more before the bench saw them (Continuous Delivery: the deploy pipeline is
@@ -74,9 +74,8 @@ step does (below, "Helper faults").
   standard versus normal change. A fault in a read-only measurement step (a count, a parse, a
   health read) is a standard change: fix it in place on the bench, re-run that step, carry on, and
   review the fix (with a test) afterwards. A fault in a step that changes state (schema, data,
-  config, a send) is a normal change: stop there and take a reviewed fix before re-running; never
-  improvise it in place. *Why:* sending every read-only helper fault through a full pull request
-  and review cost a bench day each and found nothing; a state-changing improvisation cannot be taken
+  config, a send) is a normal change: stop there and wait for a reviewed fix before running it again; never
+  improvise it in place. *Why:* sending every read-only helper fault through the whole pull-request-and-review path cost a bench day each and found nothing; a state-changing improvisation cannot be taken
   back. *Test:* the bench record marks each stop read-only or state-changing, and only the
   read-only ones were fixed in place, each with its after-review row.
 - **Re-read against the final head before each gate.** *Why:* a fix round after the file was written

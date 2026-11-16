@@ -23,8 +23,8 @@ exactly where the stronger model pays for itself.
 2. **Escalate on failure** by Superpowers' fix rounds (`subagent-driven-development`): early rounds
    resume the implementer; later rounds go to a fresh implementer at least one tier up.
 3. **The model does not fix independence.** See `review-loop.md`.
-4. **Name the model on every dispatch, and have every agent report the model id it actually ran
-   as.** An omitted model inherits the session's and silently defeats the routing. The report's
+4. **Name the model on every dispatch, and have every agent report the model
+   identifier its runtime gave it.** An omitted model inherits the session's and silently defeats the routing. The report's
    first line carries the model id the agent read from its own runtime; the ledger records that, not
    the brief's intent. *Why:* role assignments flipped between notes, and the model that actually ran
    could not be shown. *Test:* every ledger row names the reported model id, and a disagreement
@@ -55,8 +55,7 @@ every request.
   them.** The usual cost driver is context length × turns, so save by fresh sessions and tight
   briefs before downgrading models.
 - **Recurring ticks run on a cheap agent, never in the main session.** A status check, poll or
-  `/loop` that repeats (every 15 minutes, every hour) goes to a cheapest-tier agent or a small script
-  plus a cheap model: it reads the state (worktree file times, processes, commits, logs) and writes a
+  `/loop` that repeats (every 15 minutes, every hour) goes to a cheapest-tier agent, or a script whose output a cheap model formats: it reads the state (worktree file times, processes, commits, logs) and writes a
   short report to a file; the main strong-model session reads only that report, and only when it
   flags something. *Why:* each tick in the main session re-sends its whole context; one 15-minute tick
   cost about a million tokens a run across dozens of runs. *Test:* no recurring job is scheduled in

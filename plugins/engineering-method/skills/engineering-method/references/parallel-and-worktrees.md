@@ -28,8 +28,7 @@ throughput of the whole is the throughput of its tightest stage, and here that s
 strongest reviewer. When a release is held (blocked at a stage):
 
 1. **The held release goes first and alone.** The day starts with what unblocks it (the fix's
-   re-review, the bench re-run, the gate), and nothing that needs the same reviewer is scheduled
-   ahead of it or alongside it. *Why:* five lanes once ran while one release sat blocked, and the
+   re-review, the bench re-run, the gate), and no other work claims that reviewer until it clears. *Why:* five lanes once ran while one release sat blocked, and the
    strongest reviewer ran out of its weekly limit before the release was cleared. *Test:* the plan's
    first rows are the held release's stages, and no other row claims its reviewer before the gate.
 2. **New lanes wait.** Do not start lanes whose reviews compete for that reviewer while the release
@@ -65,11 +64,10 @@ The controller supervises every dispatched agent; a lane left alone can stall si
 - **Watch the work, not the chat.** Read file modification times in the worktree, the agent's
   processes and its commits, on a cheap tick (model-routing-and-cost.md, "Recurring ticks").
 - **Thresholds, stated in the brief.** About 30 minutes with no file change and no commit: one
-  status ping. About 45 minutes, or no answer to the ping: stop the agent, save its uncommitted
-  diff as a patch (`git -C <worktree> diff > <lane>-<time>.patch`, plus `git status` for new
+  status ping. About 45 minutes, or no answer to the ping: stop the agent, write its uncommitted changes to a patch file (`git -C <worktree> diff > <lane>-<time>.patch`, plus `git status` for new
   files), and dispatch a fresh agent into the same worktree with the patch, the brief and the last
   completed step. Do not wait longer or ping again. *Why:* a stalled agent does not recover, and
   waiting costs the lane the time it was meant to save. *Test:* each stall in the record shows the
   ping time, the stop time, the patch path and the new agent's model.
-- **Every agent reports the model id it actually ran as** (model-routing-and-cost.md, rule 4). When
+- **Every agent reports the model identifier its runtime gave it** (model-routing-and-cost.md, rule 4). When
   notes disagree about which model held a role, that report settles it, never a pick between notes.
