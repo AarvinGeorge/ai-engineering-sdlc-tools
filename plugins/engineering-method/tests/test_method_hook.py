@@ -71,6 +71,11 @@ class SessionStart(Base):
         for needle in ("exploration", "internal", "live", "plan", "deploy", "references"):
             self.assertIn(needle, text)
 
+    def test_brief_tier_rule_matches_owner_update_exception(self):
+        """SKILL.md §1 lets an owner update open with "Needs you"; the brief must not contradict it."""
+        text = context(self.start("startup"))
+        self.assertIn("owner update", text)
+
     def test_brief_within_limit(self):
         for source in ("startup", "clear", "compact"):
             self.assertLessEqual(len(context(self.start(source))), 1500)
