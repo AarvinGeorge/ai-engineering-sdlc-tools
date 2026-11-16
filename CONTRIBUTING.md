@@ -18,7 +18,7 @@ plugins/<name>/
   .claude-plugin/plugin.json       the plugin manifest (name, version, license)
   skills/<skill>/SKILL.md          what the agent reads
   scripts/, hooks/, templates/     what the skills and hooks call (where the plugin has them)
-  tests/                           unit tests (plan-layer, work-log)
+  tests/                           unit tests (plan-layer, work-log, engineering-method hooks)
   evals/                           behaviour evals (engineering-method, work-log)
   README.md, CHANGELOG.md          user docs and release notes
 docs/                              design notes and plans

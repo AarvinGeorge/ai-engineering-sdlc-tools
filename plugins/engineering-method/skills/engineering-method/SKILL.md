@@ -97,7 +97,7 @@ money or touches credentials; the lower one otherwise.
 
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
-    indexed the same day. The plan's stage and any external tracker move at each stage change, at
+    indexed the same day. The plan's stage (its own cycle, e.g. plan-layer's) and a configured tracker move at each stage change, at
     pause or handoff and at release, and are reconciled at every progress report (with plan-layer:
     `/plan-layer sync --tracker`, and `/plan-layer pause` before stopping; it owns how, this skill
     when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
