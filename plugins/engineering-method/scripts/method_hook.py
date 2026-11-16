@@ -310,7 +310,7 @@ def session_brief(source):
                        for s in STAGES)
     lines = [
         "engineering-method is active in this session.",
-        "First name the stakes tier: (a) exploration: throwaway, keep it light; "
+        "First name the stakes tier (an owner update opens with what needs the owner, then the tier): (a) exploration: throwaway, keep it light; "
         "(b) internal: others rely on it, show evidence; "
         "(c) live: real users or data, backup, rollback and read-backs first.",
         "Stage map (stage -> skill -> references): " + stages + ".",

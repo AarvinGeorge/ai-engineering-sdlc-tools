@@ -65,16 +65,15 @@ money or touches credentials; the lower one otherwise.
    flip, or a guard that stops the system doing its job, is over-engineering too. A written rule that
    has been missed moves into a hook, gate, CI check or test that fails; a prose line may go with
    it, never instead. *Why:* rules kept only in prose were skipped; gated ones held. *Test:* the
-   three answers are written before building; a missed rule names its check.
+   three answers are written before building; a missed rule names its check. **Code headers (tier
+   b/c)** are such a rule: what the diff adds or edits carries six labelled fields (`What:` `Use when:`
+   `Inputs:` `Output:` `Side effects:` `Role:`, "none" allowed), untouched code none, and a check
+   enforces it (docs-and-decisions.md).
 8. **A red gate is evidence against the design.** A control that leaves your own gate permanently
    red, or guards only against people who already hold everything, is a design defect to challenge,
    not a consequence to park. *Test:* no gate is red "by design" between releases.
 9. **Every failure becomes a test, before the fix.** *Why:* a fix with no failing case first cannot
    show it fixed anything. *Test:* the test was red on the old code and is green on the new.
-   **Code headers (tier b/c):** every function, class or module the diff adds or edits gets a
-   docstring with six REQUIRED labelled fields, `What:` `Use when:` `Inputs:` `Output:` `Side effects:`
-   `Role:` ("none" allowed, never omitted); untouched code gets none; the reply ships a suite check
-   that goes red on a header missing a field, unless the repository has one (docs-and-decisions.md).
 
 **Agents and review**
 10. **Reviewer ≠ implementer, at least as strong, and it executes.** Different model family where
