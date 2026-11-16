@@ -28,6 +28,28 @@ updated: YYYY-MM-DD
 Purpose: a later reader judges relevance from the header instead of reading the whole document. The
 header describes; it never replaces reading the body when the task depends on the detail.
 
+## A header on every module and function a task touches
+
+The same idea for code. Every new or changed module, class and function carries a header (a
+docstring or comment block) that says:
+
+- **what** it does, in one sentence;
+- **why and when** to use it (and when not to);
+- **inputs** and **output**;
+- **side effects** (writes, sends, network, or "none");
+- its **role** in the module or system.
+
+Added when a task creates or changes the code, never in a sweep over untouched code; a sweep is a
+separate, planned task. **A test enforces it:** a check in the normal suite (or a lint rule) fails
+when a function added or changed against the base branch has no header, and a planted header-less
+function turns it red. *Why:* code could not be found or reused without reading the bodies, and a
+header rule kept only in prose was not kept. *Test:* the diff's new and changed functions all have
+headers, untouched functions are unchanged, and the check is in the suite.
+
+The same pattern answers any rule that has been missed more than once (a changelog entry, a version
+bump, an index line): a CI check, pre-push hook or test that fails without it, not another line in
+the instructions file (SKILL.md principle 7).
+
 ## Decision log
 
 - **Append-only and chronological.** Newest at the bottom; past entries are never rewritten. A
@@ -44,6 +66,22 @@ header describes; it never replaces reading the body when the task depends on th
   never defend it as settled. *Why:* a two-month-old rule nobody recalled was cited as binding and
   shaped a deferred list built on it. *Test:* every decision cited as a reason carries its id and
   date, and a deferred item names the decision it rests on.
+- **A settled owner ruling is not re-raised without new evidence of real harm.** Before carrying
+  any proposal (a gap list, a review finding, a backlog item), check it against the owner's stated
+  design and the decision log. One that contradicts a ruling or the design is not carried, as
+  written or reworded into the backlog; name the ruling (id and date) and drop it. It comes back only
+  with new evidence of harm (an incident, a measurement), and then as a question to the owner, not a
+  backlog item. This is the counterpart of the currency rule above: currency asks whether later
+  direction overtook a decision; it never treats age alone as a reason to reopen one. *Why:* the
+  owner had to restate the same rulings again and again and called the re-asks regressive. *Test:*
+  each proposal carries "consistent with" or "contradicts D-NNN", and every contradicting one that
+  is carried names its new evidence.
+- **"Did we decide this before?" is answered by searching under every synonym.** List the terms
+  first (for a data-retention question: retention, keep, delete, purge, expiry, TTL, archive,
+  backup window), search the log and the design for each, and say which terms were searched and
+  which entry matched. *Why:* a prior decision was missed because only one term was searched, and it
+  was worded differently. *Test:* the answer lists the terms searched beside the entry found, or
+  says none matched.
 - **Search the record before recommending a removal or giving a step.** The decision log and the
   setup records hold rulings and proven forms. *Why:* removals of things kept on purpose, and
   commands the records had already corrected, were proposed from memory. *Test:* the
@@ -57,6 +95,23 @@ header describes; it never replaces reading the body when the task depends on th
 - **Keep a lessons register.** One table: what failed, what works, its source, whether it still
   holds; a row is added the turn the lesson is learned, and searched before any setup or deploy
   step. *Why:* lessons scattered across records were relearned. *Test:* the step cites its row.
+- **Setup records are append-only, written right after each part completes.** One record per
+  instance or environment being provisioned. Never write a section ahead of the work: a part not yet
+  done has no entry (a to-do list is a plan, kept elsewhere). Each entry, written the moment its part
+  completes:
+
+  | Field | Content |
+  |---|---|
+  | when | date and time, read from the clock |
+  | part | what was set up |
+  | order that worked | the steps in the order they actually ran, commands included |
+  | values | names, regions, sizes, ids, key *names* (never secret values) |
+  | pitfalls | what failed first and what fixed it |
+  | automate | what the provisioning script should do next time |
+
+  A correction is a new entry that names the one it corrects, never an edit. *Why:* sections written
+  before the work described the intent, not what happened. *Test:* every entry's time is after its
+  part completed, no entry describes undone work, and no secret value appears.
 - **Record each platform assumption with the version it was checked on,** pinned by a boundary
   test. *Why:* an upgrade silently changes behaviour the code relied on. *Test:* the upgrade
   rehearsal reads the list and every entry has its test.
@@ -92,7 +147,12 @@ a name says what kind of thing it is.
 Tier b: a short decision note, and a numbered plan only when the work spans sessions. Tier c: a
 numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
-moves, not afterwards. **Every finding has a home before a plan is called complete:** a coverage
+moves, not afterwards. **A plan for a fix carries a "Fit with what exists" section** (SKILL.md
+principle 17): the case replayed first (the cause stays a hypothesis until it has run); every
+mechanism on the concept listed; the smallest one extended; what the change unlocks beyond this case
+(if only this case, it is a patch, and the plan says so); and a row per stated quality goal saying
+how the fix meets it. *Why:* symptom fixes came back on several occasions, and one concept grew two
+parallel mechanisms. *Test:* the section exists and has every row. **Every finding has a home before a plan is called complete:** a coverage
 table maps each finding from the traces and reviews to the story that fixes it, or to a stated
 deferral. *Why:* fixes were dropped between the trace and the plan. *Test:* the table has no
 finding without a row.

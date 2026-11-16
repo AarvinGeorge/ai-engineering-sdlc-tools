@@ -1,22 +1,24 @@
 ---
 name: engineering-method
 description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering, even when the question looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or is planning, building, reviewing or shipping code of any size, including a quick script, where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, zeros proven able to be non-zero, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
-when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress".
+when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress", "looks done, get it out", "what now?" on a step list, "eval plan", "setup notes", "did we decide this?", "the owner update", "personal data in a commit", "pre-push guard", "we decided this before", "just add X".
 ---
 
 # engineering-method
 
-A method for building with coding agents, learnt the expensive way. Each principle is a rule, the
-reason in one line, and a test for whether it held.
+A method for building with coding agents, learnt the expensive way: each rule, *Why:*, *Test:*.
 
-**These are defaults, not a cage.** When you see a better approach for the task in front of you,
-propose it, say what it replaces and why, and use it once agreed. Producing something better than
-asked is the point; following this file to the letter while doing worse is not.
+**These are defaults, not a cage.** Propose a better approach when you see one, say what it replaces
+and why. **Read the intent and deliver all of it:** the working thing as asked, complete, saying what
+was left out and why. State assumptions and proceed; ask only what blocks the next step. Push back
+once, briefly, then do it as asked: the asked-for behaviour stays the default (a safer option may be
+a setting left at the asked value). Recommend one approach; alternatives get a sentence each, never a
+second full version. *Why:* literal readings and question-only replies delivered less than the
+intent. *Test:* the thing as asked, its assumptions, at most one pushback, one pick.
 
-**Superpowers does the procedure.** This skill does not restate brainstorming, plans, TDD, code
-review, debugging, worktrees or verification. It points to those skills (table below) and adds only
-what they do not say. If this file and a Superpowers skill seem to disagree, say so rather than
-silently picking one.
+**Superpowers does the procedure.** This skill points to its skills (section 3, plus `brainstorming`,
+`subagent-driven-development`, `using-git-worktrees`, `systematic-debugging`) and adds only what they
+do not say. If the two seem to disagree, say so rather than silently picking one.
 
 ## 1. Decide the stakes first
 
@@ -36,36 +38,35 @@ money or touches credentials; the lower one otherwise.
 ## 2. Principles
 
 **Truth**
-1. **Evidence before assertion.** Show the command and its output, not the conclusion. *Why:* a
-   claim that "it passes" has been wrong often enough to be worth nothing. *Test:* the reader can see
-   the run, and a piped test run kept its exit code (`set -o pipefail`, or gate on the `OK` line).
+1. **Evidence before assertion.** Show the command and its output, not the conclusion. *Why:* "it
+   passes" has been wrong often enough to be worth nothing. *Test:* the reader can see the run, and
+   a piped test run kept its exit code (`set -o pipefail`, or gate on the `OK` line).
 2. **A state claim is a measurement.** "Deployed", "merged", "parked", "live", "pre-existing",
    "unchanged since" are read in the same pass, command shown, never recalled. *Why:* recalled state
    in the tone of observed state is how a fix gets believed live when it is not. *Test:* each such
-   word sits next to the command that proved it (references/measurement-and-state-claims.md). For
-   "commit X is live": read the revision the running system reports, then check it is or descends
-   from X (`git merge-base --is-ancestor X <running>`); until then the status line says unverified.
+   word sits next to its command; "X is live" means the running revision descends from X
+   (`git merge-base --is-ancestor X <running>`), else unverified.
 3. **Vendor docs before vendor claims.** Read the tool's official docs and changelog in the same pass
-   and cite the page before designing around its behaviour. *Why:* a field read from the system
-   confirms or contradicts the docs; it never replaces them. *Test:* every vendor behaviour has a
-   citation or is labelled a hypothesis.
+   and cite the page. *Why:* a field read from the system confirms or contradicts the docs; it never
+   replaces them. *Test:* every vendor behaviour has a citation or is labelled a hypothesis.
 4. **The global measurement rules apply** (proven zeros, fail loudly, dates read in the same pass).
-   This skill adds exit codes, full-suite and skip counts, negatives with their window, clock-only
-   times, state words and labels (references/measurement-and-state-claims.md).
+   This skill adds exit codes, suite and skip counts, counts read entry by entry, negatives with their
+   window, clock-only times, state words and labels (references/measurement-and-state-claims.md).
 
 **Design**
 5. **Recommend the industry practice first, then adapt.** Name the standard way and who does it,
    then say how and why this project departs. *Why:* departures should be chosen, not stumbled into.
    *Test:* every process or design recommendation names its baseline.
 6. **Extend before adding.** Inventory what exists; extend it; a new tool, check or module must show
-   why nothing existing can carry the job. One shared check reused at every exit, never one per exit.
-   *Why:* duplicates drift and only one of them gets fixed. *Test:* the plan marks each capability
-   EXTENDS or NEW with a reason.
-7. **No over-engineering, in either direction.** Build only when all three hold: a real incident or
-   measured gap is behind it; nothing already solves it (read the platform's docs first); it is
-   symmetric (it does not bind the trusted while sparing the untrusted). A switch nobody should flip
-   is over-engineering with extra steps: delete it or ship it on. A guard that stops the system doing
-   its job is over-engineering too. *Test:* the three answers are written down before building.
+   why nothing existing can carry the job; one shared check at every exit. *Why:* duplicates drift
+   and only one gets fixed. *Test:* the plan marks each capability EXTENDS or NEW.
+7. **No over-engineering, in either direction; enforce what matters.** Build only when a real
+   incident or measured gap is behind it, nothing already solves it (read the platform's docs), and
+   it is symmetric (it does not bind the trusted while sparing the untrusted). A switch nobody should
+   flip, or a guard that stops the system doing its job, is over-engineering too. A written rule that
+   has been missed moves into a hook, gate, CI check or test that fails; a prose line may go with
+   it, never instead. *Why:* rules kept only in instructions files were skipped; gated ones held.
+   *Test:* the three answers are written before building; a missed rule names its enforcing check.
 8. **A red gate is evidence against the design.** A control that leaves your own gate permanently
    red, or guards only against people who already hold everything, is a design defect to challenge,
    not a consequence to park. *Test:* no gate is red "by design" between releases.
@@ -74,76 +75,86 @@ money or touches credentials; the lower one otherwise.
 
 **Agents and review**
 10. **Reviewer ≠ implementer, at least as strong, and it executes.** Different model family where
-    possible; the reviewer writes and runs probes; an unreproduced finding is a hypothesis.
-    *Why:* same-model review grades its own homework, and reading the diff misses what running it
-    finds. *Test:* each finding names the probe that reproduced it (references/review-loop.md).
-11. **Route models by what a mistake costs and whether a test would catch it.** Not by how hard the
-    task feels. Turn count beats token price; brief, never corpus; bounds enforced, not stated.
-    Always name the model when dispatching. *Test:* references/model-routing-and-cost.md.
+    possible; the reviewer writes and runs probes; an unreproduced finding is a hypothesis. *Why:*
+    same-model review grades its own homework. *Test:* each finding names its probe (review-loop.md).
+11. **Route models by what a mistake costs and whether a test would catch it.** Turn count beats token
+    price; brief, never corpus; bounds enforced; name the model on every dispatch, and each agent
+    reports the model it ran as; recurring ticks run on a cheap agent. *Test:* model-routing-and-cost.md.
 12. **One writer per worktree; parallel only when regions differ and neither needs the other's
-    output.** *Why:* two writers interleave commits; dependent lanes produce "my sibling moved"
-    defects. *Test:* references/parallel-and-worktrees.md.
+    output. A blocked release goes first and alone; work in progress is capped by reviewer capacity**
+    (Kanban WIP limits, Theory of Constraints). *Why:* new lanes starve the reviewer a held release
+    needs. *Test:* references/parallel-and-worktrees.md.
 
 **Live systems and permission**
 13. **Read-only by default on anything real people use.** Ask before mutating; never restart blind
-    (check in-flight work first, and again right before switching); back up the state the change touches and read the backup back (a code-only change records the rollback revision and says so)
-    before change; write the rollback commands and the trigger that fires them BEFORE the change;
-    after it, read back the running revision and a real health path; prove on a copy before
-    production; never run test suites inside the live system. *Test:*
+    (check in-flight work first, and again right before switching); back up the state the change
+    touches and read it back (code-only: record the rollback revision); rollback commands and trigger
+    written BEFORE the change; then read back the running revision and a real health path; prove on
+    a copy; no tests inside live, no test traffic to an instance users are about to meet. *Test:*
     references/live-system-changes.md.
-14. **A declined permission means stop.** No retry, no narrower form, no moving the same action to a
-    path that does not prompt. Say plainly that it was declined, mark the check unverified and report. *Why:* a workaround defeats the
-    decision the person just made. *Test:* the report lists what was declined and left unverified.
+14. **A declined permission means stop.** No retry, narrower form or move to a path that does not
+    prompt; mark it unverified. *Why:* a workaround defeats the decision. *Test:* the report lists it.
 
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
-    indexed the same day; the plan's stage moves when the work moves. *Why:* the next session
-    re-derives whatever this one did not write down. *Test:* references/docs-and-decisions.md.
-16. **Plain words, exact terms, progress as a ladder.** Short sentences; keep the real technical name
-    and define it once; on tier c (or when asked) report progress as the ladder with measured numbers,
-    a caveat line and the promotion grid; name work from one hierarchy that never renames (E-01.S2,
-    R-04, D-001). *Test:* references/progress-ladder.md, references/docs-and-decisions.md.
+    indexed the same day. The plan's stage and any external tracker move at each stage change, at
+    pause or handoff and at release, and are reconciled at every progress report (with plan-layer:
+    `/plan-layer sync --tracker`, and `/plan-layer pause` before stopping; it owns how, this skill
+    when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
+16. **Plain words, exact terms, progress as a ladder.** Short sentences; the real technical name,
+    defined once; words whose plain meaning matches ("tested on the bench", never "benched", which
+    reads as sidelined); on tier c (or when asked) the ladder or release tree, measured, with a caveat
+    line and the promotion grid; one naming hierarchy (E-01.S2, R-04, D-001). *Test:* progress-ladder.md.
 
 **Delivery (tier c; tier b where it applies)**
-17. **Root cause, not symptom; a repeat fault changes the mechanism.** Run the case, inventory every
-    mechanism on the concept, extend the one where the property must hold. *Why:* symptom fixes came
-    back. *Test:* the fix names the root it closes; a repeat names the mechanism changed.
-18. **No regression is a hard gate.** Pin what works first; "is this a regression?" is settled by
-    running the same check on what production runs; an unexplained base-vs-head difference stops the
-    release. *Why:* without the base run, "already broken" and "we broke it" are both guesses.
-    *Test:* both runs are shown (references/measurement-and-state-claims.md).
+17. **Root cause, not symptom; the fix fits what exists.** Before any fix: (1) run the system on the
+    case (replay it) and call the cause a hypothesis until it has run; (2) inventory every mechanism
+    on the concept; (3) extend the smallest one, where the property must hold; (4) say what it
+    unlocks beyond this case ("only this case" means a patch); (5) check it against every stated
+    quality goal. The plan holds this as "Fit with what exists"; a repeat fault changes the mechanism.
+    *Why:* symptom fixes came back. *Test:* the fix names its root and what it unlocks.
+18. **No regression is a hard gate.** "Is this a regression?" is settled by running the same check on
+    what production runs; an unexplained base-vs-head difference stops the release. *Why:* without
+    the base run, both answers are guesses. *Test:* both runs are shown.
 19. **Rehearse the procedure, test once, promote the artifact.** Dry-run the deploy file on a
     production-shaped bench; a real-model bench precedes production; the tested digest ships. *Why:*
     faked-model goldens miss timing and retries. *Test:* references/live-system-changes.md.
-20. **The record is re-tested before it is cited, and guarded before it leaves.** *Why:* a stale rule
-    or a pushed secret cannot be taken back. *Test:* references/docs-and-decisions.md ("Using the
-    record"), references/live-system-changes.md ("Pushing and backups").
+20. **The record is searched and re-tested before it is cited, and guarded before it leaves.** *Why:*
+    a missed ruling gets re-argued, and a pushed secret cannot be taken back. *Test:*
+    references/docs-and-decisions.md ("Using the record"), live-system-changes.md ("Pushing").
 21. **Under a standing go, decide engineering calls and keep moving; ask only true owner gates.**
     Sort each question: mine (decide, log the reason), the owner's later (park with a trigger), the
     owner's now (spend, credentials, irreversible sends, scope). Never idle or defer on your own.
-    *Why:* asking what you could decide stalls the work. *Test:* references/review-loop.md ("Autonomy").
+    *Why:* asking what you could decide stalls the work. *Test:* review-loop.md ("Autonomy").
+22. **Agentic products: code holds the safety floor; meaning goes to the model.** Code enforces only
+    provenance, authority, what leaves unconfirmed (irreversible actions, sends), secrets and spend;
+    meaning is a tool or fact for the model (one tool per action, a lookup, clear descriptions), which
+    asks when unsure. *Why:* keyword branches for meaning grew a brittle adapter that missed the next
+    phrasing. *Test:* every rule in code is on the floor list.
 
-## 3. Which Superpowers skill, when
+## 3. The stage map
 
-| Moment | Skill | What this method adds |
-|---|---|---|
-| Intent is fuzzy | `superpowers:brainstorming` | name the stakes tier; principle 5 |
-| Writing the plan | `superpowers:writing-plans` | an out-of-scope list; EXTENDS/NEW per capability; tier c: a fresh reviewer reads it against the running code before building |
-| Building | `superpowers:test-driven-development` | principle 9; builders run the FULL suite once before reporting (not only touched modules), never loop on a long run |
-| Many tasks in one session | `superpowers:subagent-driven-development` | principles 10–12 |
-| Independent work at once | `superpowers:dispatching-parallel-agents` | the parallel test in references/parallel-and-worktrees.md |
-| Isolation | `superpowers:using-git-worktrees` | one writer per worktree; reviewers get their own |
-| Review | `superpowers:requesting-code-review` / `receiving-code-review` | references/review-loop.md; a reviewer-written fix is re-reviewed |
-| Something broke | `superpowers:systematic-debugging` | principle 8; principle 2 for every "it was already broken" |
-| Before saying done | `superpowers:verification-before-completion` | principles 1, 2, 4 |
-| Merging | `superpowers:finishing-a-development-branch` | tier c: references/live-system-changes.md |
+**At every stage change and after compaction, re-load this skill and that stage's reference.** The
+plugin's hooks remind you; if they did not fire, do it anyway ("looks done, get it out" is a release).
 
-## 4. References (load when the task needs them)
+| Stage | Skill | References | What this method adds |
+|---|---|---|---|
+| plan | `superpowers:writing-plans` | docs-and-decisions.md, parallel-and-worktrees.md | out-of-scope list; EXTENDS/NEW per capability; "Fit with what exists"; tier c: a fresh reviewer reads it against the running code |
+| build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; the FULL suite once before reporting, never a long run looped; a held release first |
+| review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; usage read first; a re-review covers the delta |
+| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts read entry by entry; behaviour evals with a cost cap |
+| deploy | (none) | live-system-changes.md | rollback first, verified backup, in-flight, read-backs; helper faults split read-only vs state-changing |
+| merge | `superpowers:finishing-a-development-branch` | live-system-changes.md | the push guard in every repository, with every party's identifiers |
+| release | (none) | live-system-changes.md, progress-ladder.md | a summary is not proof: full suite on the current head and a different-model review, then the deploy file |
+| report | (none) | progress-ladder.md, measurement-and-state-claims.md | what needs the person first; the release tree; every number read now |
 
-- `references/review-loop.md` — cross-model reviewer, probes, review at every stage, re-review of reviewer fixes, the executor's brief
-- `references/model-routing-and-cost.md` — which model for which job, and how agents stay cheap
-- `references/measurement-and-state-claims.md` — exit codes, suite results and skips, base checks, negatives and time, state words, labels
-- `references/progress-ladder.md` — the progress format, the promotion pipeline grid, honest-report rules
-- `references/parallel-and-worktrees.md` — when to fan out, and who may write where
-- `references/live-system-changes.md` — the deploy standard, the deploy file as code, proving a release, pushing and backups
-- `references/docs-and-decisions.md` — numbered docs, headers, the decision log, using the record, the naming hierarchy
+## 4. References (load at their stage, or when the task needs them)
+
+- `references/review-loop.md` — cross-model reviewer, probes, review per stage, fix rounds, the executor's brief, autonomy
+- `references/model-routing-and-cost.md` — which model for which job, review capacity, cheap ticks, how agents stay cheap
+- `references/measurement-and-state-claims.md` — exit codes, suite results and skips, counts, base checks, negatives and time, state words
+- `references/progress-ladder.md` — the ladder, the release tree, the promotion grid, standalone updates, a checklist the person runs
+- `references/parallel-and-worktrees.md` — when to fan out, bottleneck first, who may write where, supervising lanes
+- `references/live-system-changes.md` — the deploy standard, the deploy file as code, proving a release, pre-launch instances, pushing
+- `references/docs-and-decisions.md` — numbered docs, headers on docs and code, the decision log, using the record, setup records, names
+- `references/behaviour-evals.md` — evals as a dataset: layers, cost cap, repeats, contamination, baselines, one eval per new rule

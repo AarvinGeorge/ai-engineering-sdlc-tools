@@ -48,6 +48,90 @@ YOURS    1. cap value: 50 MB per user/day — not given
          2. ship behind no flag (on for everyone) — given 13:05
 ```
 
+## The release tree
+
+When a release spans several tasks, or the person asks where a release stands, the ladder's rows
+are a tree in the naming hierarchy (docs-and-decisions.md, "Names"), not a flat list. Its parts, in
+order:
+
+1. **Epic → story → task**, indented, each with its plain-words name beside its id.
+2. **On each task:** builder model → reviewer model, its state and commit.
+3. **The active row marked** (`▶`).
+4. **Review rounds as sub-rows** under their task (round, verdict, fix commit).
+5. **Parked items with their home** (the epic or story that now owns them).
+6. **The stages still to come**, after the last one passed (gate, production, watch, limited bench,
+   wider rollout), from the promotion grid below.
+
+```
+R-07 · E-03 Invoice export (customers download their invoices) · read 10:05 UTC from the ledger
+E-03.S1 CSV export → R-07
+  T1 export query + index        mid → strong-B    DONE 1a2b3c4
+     · review r1: 1 Important (unbounded query) — fixed 5d6e7f8
+  T2 streaming writer            mid → strong-B    DONE 9a8b7c6
+     · review r1: Critical (row split on a quoted newline)
+     · review r2: clean
+▶ T3 download button             mid → strong-B    in progress
+E-03.S2 PDF export               PARKED → home: E-06 (documents epic)
+Stages: build ✓ · review ✓ · suite ✓ · tested on the bench ✓ (4 runs) · gate next · production · watch
+```
+
+*Why:* a flat list hid where each task sat. *Test:* every task line names builder and reviewer, and
+the stages after the current one are listed.
+
+## An update that stands on its own
+
+An update to someone who was not in the session (an owner, a team) is read cold. Its shape:
+
+1. **"Needs you" first:** each open decision, numbered, with its options and the deadline it
+   gates.
+2. **Each item gets a plain gloss:** what it is, why it matters, where it sits, and what changed
+   since the last update (name that update's time).
+3. **A source for every fact:** "(ledger, read 15:02 UTC)", "(bench log, 11 runs counted entry by
+   entry)". Counts are read entry by entry (measurement-and-state-claims.md, "Counts"); a figure that
+   corrects an earlier one says so.
+4. **No bare id.** Every `E-02.S1`, `R-03`, `T2` has its plain meaning beside it, every time it
+   first appears in a section.
+5. **Status verbs in plain meaning:** "tested on the bench and passed", never "benched"; "on hold
+   at the gate", never "gated". A word copied from the ledger is rewritten if a stranger would read
+   it differently.
+
+*Why:* the owner lost context across many concurrent items, and a jargon verb read as its opposite.
+*Test:* the first block is the decisions; no id stands without its gloss; each number has a source.
+
+## A checklist the person runs
+
+While a person works through a numbered step list (a migration, a setup), each reply that follows a
+progress report is this, in order:
+
+1. **Next step, at the top:** "Next: step 4 — restore the dump" (the lowest unticked step that is
+   not blocked).
+2. **The whole list, reprinted**, every step, each with `[x]` done or `[ ]` not done, the original
+   numbers and the commands in place, grouped under where they run (laptop, console, server).
+3. **Tick only what was reported done or measured.** "Should be fine" or "it's like the last
+   one" is an assumption: the step stays `[ ]`, with a one-line note on how to check it.
+4. **A new step keeps the numbering:** insert it as `6a`, never renumber; a step done out of order
+   is ticked where it sits.
+5. **Notes after the list**, short: what failed and how it was fixed, what to check.
+
+```
+Next: step 4 — restore the dump on db-new (not yet reported done)
+
+On the old database host (db-old)
+  [x] 1. sudo systemctl stop app-writer
+  [x] 2. pg_dump -Fc appdb > /tmp/appdb.dump
+  [x] 3. scp /tmp/appdb.dump db-new:/tmp/          (re-run after a key error; worked)
+On the new database host (db-new)
+  [ ] 4. pg_restore -d appdb /tmp/appdb.dump       ← "should be fine" is not a report
+  [ ] 5. psql -d appdb -c 'select count(*) from orders'
+In the DNS console
+  [x] 6. Lower the TTL on db.example.internal to 60s   (done ahead of 4)
+  [ ] 7. Point db.example.internal at db-new
+```
+
+*Why:* steps were lost while the person switched between consoles, and a reply with only the next
+step dropped the rest. *Test:* every original step appears with its number, and only reported steps
+are ticked. Plan-layer's task columns are the same idea for the planning page.
+
 ## The promotion pipeline grid
 
 The ladder shows one piece of work; the grid shows every release on every stage of the promotion
