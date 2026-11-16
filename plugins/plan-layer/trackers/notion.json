@@ -1,0 +1,22 @@
+{
+  "kind": "notion",
+  "description": "A Notion database with one row per work item. The Status and Stage columns are select (or status) properties; every value in status_map must exist as an option in the database.",
+  "fields": {
+    "name": "Name",
+    "status": "Status",
+    "stage": "Stage",
+    "updated": "Updated",
+    "link": "Link"
+  },
+  "status_map": {
+    "intent": "Idea",
+    "grounded": "Scoping",
+    "planned": "Planned",
+    "building": "In progress",
+    "verified": "Verifying",
+    "recorded": "Wrapping up",
+    "paused": "Paused",
+    "done": "Done"
+  },
+  "fetch": "With the Notion connector, fetch the database at meta.tracker.target and query every row (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names: Name (title), Status, Stage, Updated, Link; flatten every property to a plain string (a select or status as its option name, a date as ISO text, empty as an empty string), and save the rows as the tracker holds them: never build the list from the plan."
+}

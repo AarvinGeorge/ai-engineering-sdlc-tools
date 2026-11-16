@@ -342,6 +342,20 @@ Absent means full, so every existing plan is unchanged. Change the one field to 
 Works with **`engineering-method`** (optional), the sibling plugin that carries the engineering
 method; plan-layer stays a state tool.
 
+## Tracker mirror, and pause
+
+**Tracker mirror (opt-in).** Set `meta.tracker` (`{"kind": "notion", "target": "<database>"}`)
+and `scripts/tracker.py` derives the rows an external tracker should hold from the plan, diffs
+them against rows the agent fetched through that tracker's connector, and prints each fix as an
+instruction. `sync.py --tracker [--actual <file>]` runs it with the normal sync. The gate drifts
+when the last reconcile is missing or older than the plan. Adapters are data files in
+`trackers/` (Notion and a generic one ship; see `trackers/README.md` to add another). Absent,
+nothing changes.
+
+**Pause and handoff.** `scripts/pause.py` writes `plan/HANDOFF.md` (time, git state, gate
+result, active work, resume order, open questions, traps; all read at that moment) and sets
+`meta.paused`; the session brief then opens with a PAUSED line. `pause.py --resume` clears it.
+
 ## Configuration
 
 Optional `.plan-layer.json` in the project root, if the defaults do not suit:

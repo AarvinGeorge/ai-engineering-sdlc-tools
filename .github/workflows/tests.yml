@@ -23,3 +23,5 @@ jobs:
         run: python -m unittest tests/*.py
       - name: work-log
         run: python -m pytest plugins/work-log/tests -q
+      - name: engineering-method
+        run: python -m unittest discover -s plugins/engineering-method/tests -v

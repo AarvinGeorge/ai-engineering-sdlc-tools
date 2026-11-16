@@ -37,9 +37,12 @@ Python 3.10 or newer. Run from the repository root.
 # work-log: pytest; openpyxl is needed for the workbook read-back test
 python3 -m pip install pytest openpyxl
 python3 -m pytest plugins/work-log/tests -q
+
+# engineering-method hooks: standard library only
+python3 -m unittest discover -s plugins/engineering-method/tests -v
 ```
 
-`engineering-method` has no unit tests; it is a skill, checked by the cases under `plugins/engineering-method/evals/`. The same suites run in CI on every pull request (`.github/workflows/tests.yml`).
+`engineering-method` is mostly a skill, checked by the cases under `plugins/engineering-method/evals/`; only its hooks (`scripts/method_hook.py`) have unit tests. The same suites run in CI on every pull request (`.github/workflows/tests.yml`).
 
 ## Versioning and changelogs
 
