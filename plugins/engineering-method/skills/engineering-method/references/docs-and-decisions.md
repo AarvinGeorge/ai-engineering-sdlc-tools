@@ -33,18 +33,54 @@ header describes; it never replaces reading the body when the task depends on th
 The same idea for code. Every new or changed module, class and function carries a header (a
 docstring or comment block) that says:
 
-- **what** it does, in one sentence;
-- **why and when** to use it (and when not to);
-- **inputs** and **output**;
-- **side effects** (writes, sends, network, or "none");
-- its **role** in the module or system.
+- `What:` it does, in one sentence;
+- `Use when:` why and when to use it (and when not to);
+- `Inputs:` and `Output:`;
+- `Side effects:` writes, sends, network, or "none";
+- `Role:` its place in the module or system.
+
+All six fields, labelled, even when one is "none": a one-line docstring is not a header.
 
 Added when a task creates or changes the code, never in a sweep over untouched code; a sweep is a
-separate, planned task. **A test enforces it:** a check in the normal suite (or a lint rule) fails
+separate, planned task. **A test enforces it, and the first change that adds a header adds the
+test if the repository has none:** a check in the normal suite (or a lint rule) fails
 when a function added or changed against the base branch has no header, and a planted header-less
 function turns it red. *Why:* code could not be found or reused without reading the bodies, and a
 header rule kept only in prose was not kept. *Test:* the diff's new and changed functions all have
 headers, untouched functions are unchanged, and the check is in the suite.
+
+A minimal check (Python; adapt the idea to the language):
+
+```python
+# test_headers.py: fail when a function added or changed against the base lacks the header fields
+import ast, re, subprocess
+FIELDS = ("What:", "Use when:", "Inputs:", "Output:", "Side effects:", "Role:")
+def changed_lines(base="origin/main"):
+    diff = subprocess.run(["git", "diff", "-U0", base, "--", "*.py"],
+                          capture_output=True, text=True, check=True).stdout
+    lines, path = {}, None
+    for row in diff.splitlines():
+        if row.startswith("+++ "):
+            path = row[6:] if row.startswith("+++ b/") else None
+        elif row.startswith("@@") and path:
+            start, _, count = re.search(r"\+(\d+)(,(\d+))?", row).groups()
+            n = int(count) if count is not None else 1
+            lines.setdefault(path, set()).update(range(int(start), int(start) + n))
+    return lines
+def test_changed_functions_have_headers():
+    missing = []
+    for path, touched in changed_lines().items():
+        for node in ast.walk(ast.parse(open(path).read())):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if touched & set(range(node.lineno, node.end_lineno + 1)):
+                    doc = ast.get_docstring(node) or ""
+                    if not all(f in doc for f in FIELDS):
+                        missing.append(f"{path}:{node.lineno} {node.name}")
+    assert not missing, missing
+```
+
+Only functions whose lines the diff touches are checked, so untouched code is never forced into a
+sweep.
 
 The same pattern answers any rule that has been missed more than once (a changelog entry, a version
 bump, an index line): a CI check, pre-push hook or test that fails without it, not another line in

@@ -83,9 +83,10 @@ the stages after the current one are listed.
 An update to someone who was not in the session (an owner, a team) is read cold. Its shape:
 
 1. **"Needs you" first:** each open decision, numbered, with its options and the deadline it
-   gates.
-2. **Each item gets a plain gloss:** what it is, why it matters, where it sits, and what changed
-   since the last update (name that update's time).
+   gates. Nothing comes before it, not even a correction or a note to the person who asked: those
+   go after the update.
+2. **Each item gets a plain gloss:** what it is, why it matters, where it sits, and a "since
+   <time>:" clause saying what changed since the last update (name that update's time).
 3. **A source for every fact:** "(ledger, read 15:02 UTC)", "(bench log, 11 runs counted entry by
    entry)". Counts are read entry by entry (measurement-and-state-claims.md, "Counts"); a figure that
    corrects an earlier one says so.
