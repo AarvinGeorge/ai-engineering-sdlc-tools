@@ -378,6 +378,13 @@ class DebugStage(Base):
         self.assertIn("references/root-cause-investigation.md", text)
         self.assertLessEqual(len(text), 400)
 
+    def test_debug_message_puts_evidence_before_any_cause(self):
+        text = context(self.prompt("investigate this", session="dm2"))
+        self.assertIn("no cause, suspect list or fix until RC-1 to RC-4", text)
+        self.assertLessEqual(len(text), 400)
+        other = context(self.prompt("review this", session="dm3"))
+        self.assertNotIn("RC-1", other)
+
     def test_a_debug_word_outranks_an_earlier_fix_word(self):
         for text in ("fix the bug in the parser", "fix the bug in login",
                      "fix it, then investigate why it broke"):

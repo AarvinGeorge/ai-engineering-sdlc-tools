@@ -46,6 +46,15 @@ class RootCauseReference(unittest.TestCase):
         self.assertIn("superpowers:systematic-debugging", text)
         self.assertNotIn("NO FIXES WITHOUT ROOT CAUSE", text)
 
+    def test_opens_with_evidence_before_any_cause(self):
+        """The first lines under the title are the ordering rule, before anything else."""
+        body = read().split("\n", 1)[1].lstrip("\n")
+        first = body.split("\n\n", 1)[0]
+        self.assertTrue(first.startswith("**Evidence before any cause"), first[:80])
+        for step in ("RC-1", "RC-4", "RC-5", "RC-6", "RC-8"):
+            self.assertIn(step, first)
+        self.assertIn("requested", first)
+
     def test_names_its_departures(self):
         self.assertRegex(read(), r"(?m)^## Where this departs from systematic-debugging")
 

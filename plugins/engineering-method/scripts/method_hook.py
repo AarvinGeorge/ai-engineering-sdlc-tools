@@ -44,7 +44,9 @@ STAGES = [
                "investigating", "investigated", "investigation", "diagnose", "diagnoses",
                "diagnosing", "diagnosed", "diagnosis", "bug", "bugs"],
      "skill": "superpowers:systematic-debugging",
-     "references": ["root-cause-investigation.md", "measurement-and-state-claims.md"]},
+     "references": ["root-cause-investigation.md", "measurement-and-state-claims.md"],
+     "note": "evidence first: no cause, suspect list or fix until RC-1 to RC-4 have run or "
+             "been requested; "},
     {"stage": "build",
      "words": ["build", "builds", "building", "built", "implement", "implements",
                "implementing", "implemented", "fix", "fixes", "fixing", "fixed",
@@ -315,14 +317,17 @@ def detect_stage(prompt):
 def stage_message(stage):
     """Compose the short per-stage reminder (at most 400 characters).
 
-    Why: it names exactly what to re-read and load, nothing more. Inputs: a STAGES
-    entry. Output: text. Side effects: none.
+    What: names the stage's SKILL.md row, skill and references, plus the stage's
+    optional "note" (the debug stage carries its evidence-before-cause rule).
+    Why: it names exactly what to re-read and load, and the one rule a stage's
+    answers skipped in evals, nothing more.
+    Inputs: a STAGES entry. Output: text. Side effects: none. Role: routing text only.
     """
     skill = "load %s, " % stage["skill"] if stage["skill"] else ""
     refs = ", ".join("references/" + r for r in stage["references"])
     return ("engineering-method: stage %s — re-read SKILL.md §3 row '%s', %sread %s before "
-            "acting; keep the stakes tier you named."
-            % (stage["stage"], stage["stage"], skill, refs))[:400]
+            "acting; %skeep the stakes tier you named."
+            % (stage["stage"], stage["stage"], skill, refs, stage.get("note", "")))[:400]
 
 
 def session_brief(source):
