@@ -111,7 +111,7 @@ def apply(d, a):
             plans.setdefault("done", []).append(
                 {k: v for k, v in (("name", obj["name"]), ("period", today), ("outcome", a.outcome),
                                    ("file", obj.get("plan_file")), ("capability", obj.get("capability")),
-                                   ("stage", "recorded")) if v is not None})
+                                   ("tasks", obj.get("tasks")), ("stage", "recorded")) if v is not None})
         elif a.to != bucket:
             if a.to == "now" and not (obj.get("status") or "").strip():
                 raise Usage("--to now needs --status: an active item says where it stands")

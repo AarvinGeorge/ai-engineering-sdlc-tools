@@ -10,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from test_light_and_budget import Base, PLUGIN, SCRIPTS, run  # noqa: E402
 import plan_lib as L  # noqa: E402
+import controller  # noqa: E402
 
 
 def item(name, stage="intent", **kw):
@@ -100,7 +101,7 @@ class TestPlumbing(ControllerBase):
             self.assertTrue(w["writer"] and w["enforced"], w)
 
 
-class TestFixRound1(ControllerBase):
+class TestGateEdgeCases(ControllerBase):
     def test_write_stamp_refuses_an_unreadable_record(self):
         self.write()
         with open(L.controller_state_path(self.dir), "w") as fh:
@@ -134,7 +135,7 @@ class TestFixRound1(ControllerBase):
 
 
 def stamp_now(test):
-    """Stamp the plan as move.py would, without move.py (Task 3 builds it)."""
+    """Stamp the plan as move.py would, without move.py (move.py is the real writer)."""
     test.write()
     L.write_stamp(test.dir, test.d, "test")
 
@@ -171,7 +172,7 @@ class TestOneWriterGate(ControllerBase):
         self.d["plans"]["now"][0]["status"] = "rewritten by hand"
         self.write()
         _, fails, _ = self.gate()
-        self.assertEqual(ctl(fails), [], "prose status is not controlled (ruling 2)")
+        self.assertEqual(ctl(fails), [], "prose status is not controlled")
         self.d["plans"]["now"][0]["tasks"][0]["state"] = "done"
         self.write()
         _, fails, _ = self.gate()
@@ -281,7 +282,7 @@ class TestDuplicates(ControllerBase):
         self.assertTrue(any("E-01.S2.T1 form" in f and "more than once" in f for f in fails), fails)
 
 
-class TestFixRound1Task2(ControllerBase):
+class TestGateEdgeCasesMore(ControllerBase):
     REMEDY = "revert the hand edit, or run move.py --adopt (with the owner's say-so)"
 
     def test_release_added_by_hand_fails(self):
@@ -419,7 +420,7 @@ class TestMove(ControllerBase):
         self.d["plans"]["now"][0]["stage"] = "verified"
         self.write()
         self.assertEqual(self.move("E-01.S2", "--stage", "verified").returncode, 1,
-                         "so the gate's message names revert or --adopt, never this move (N2)")
+                         "so the gate's message names revert or --adopt, never this move")
 
     def test_duplicate_ids_refusal_says_rename_and_adopt_refuses(self):
         self.d = self.read()
@@ -506,7 +507,7 @@ class TestMoveAdoptDuplicates(ControllerBase):
         self.assertIn("R-05", r.stdout)
 
 
-class TestMoveFixRound1(ControllerBase):
+class TestMoveEdgeCases(ControllerBase):
     def setUp(self):
         super().setUp()
         stamp_now(self)
@@ -875,7 +876,7 @@ class TestRules(ControllerBase):
         self.assertEqual(self.move("R-01", "--stage", "gate").returncode, 0)
 
 
-class TestRulesFixRound1(ControllerBase):
+class TestRulesEdgeCases(ControllerBase):
     """Silent passes: subdirectory project, non-ASCII path, full-ref base, git failure; soft base-branch case."""
 
     V = ("E-01.S2", "--stage", "verified")
@@ -995,6 +996,75 @@ class TestRulesFixRound1(ControllerBase):
         self.build()
         r = run("check.py", "--event", "stage:bogus", project=self.dir)
         self.assertEqual(r.returncode, 2, r.stdout)
+
+
+class TestFinalFixes(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        stamp_now(self)
+
+    def test_done_record_keeps_the_items_tasks(self):
+        r = self.move("E-01.S2", "--to", "done", "--outcome", "login works")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        rec = self.read()["plans"]["done"][-1]
+        self.assertEqual([t["name"] for t in rec["tasks"]], ["E-01.S2.T1 form"])
+
+    def test_item_with_no_tasks_gets_no_tasks_key_in_done(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0].pop("tasks")
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        self.assertEqual(self.move("E-01.S2", "--to", "done", "--outcome", "o").returncode, 0)
+        self.assertNotIn("tasks", self.read()["plans"]["done"][-1])
+
+    def test_detached_head_at_the_base_tip_measures_nothing_and_fails(self):
+        git(self.dir, "checkout", "-q", "-b", "main")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "base")
+        git(self.dir, "checkout", "-q", "--detach")
+        self.assertEqual(controller.changed_files(self.dir, "main")[0], None)
+        why = controller.changed_files(self.dir, "main")[1]
+        self.assertTrue(why.startswith(controller.ON_BASE), why)
+
+    def test_detached_head_ahead_of_the_base_is_still_measured(self):
+        git(self.dir, "checkout", "-q", "-b", "main")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "base")
+        git(self.dir, "checkout", "-q", "--detach")
+        open(os.path.join(self.dir, "x.txt"), "w").write("x")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "work")
+        files, why = controller.changed_files(self.dir, "main")
+        self.assertIsNone(why)
+        self.assertIn("x.txt", files)
+
+    def test_session_brief_names_move_py_only_when_one_writer_is_on(self):
+        run("render.py", project=self.dir)
+        on = json.loads(run("brief.py", "--session-start", project=self.dir).stdout
+                        )["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("with move.py", on)
+        self.assertNotIn("Move the item's stage in the plan", on)
+        self.d = self.read()
+        del self.d["meta"]["controller"]
+        self.write()
+        off = json.loads(run("brief.py", "--session-start", project=self.dir).stdout
+                         )["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("Move the item's stage in the plan as it advances, and finish the turn by "
+                      "re-rendering and running the check (see the plan-layer skill).", off)
+
+    def test_json_prints_controller_once(self):
+        out = json.loads(run("check.py", "--json", project=self.dir).stdout)
+        self.assertIn("controller", out)
+        self.assertNotIn("controller", out["summary"])
+
+    def test_json_without_a_controller_has_no_controller_key(self):
+        self.d = self.read()
+        del self.d["meta"]["controller"]
+        self.write()
+        out = json.loads(run("check.py", "--json", project=self.dir).stdout)
+        self.assertNotIn("controller", out)
+        self.assertNotIn("controller", out["summary"])
+
 
 
 class TestDocs(unittest.TestCase):

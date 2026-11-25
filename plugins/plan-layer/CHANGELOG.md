@@ -46,7 +46,8 @@ or the last tracker reconcile). Each gap FAILs naming the missing items; an unre
 list FAILs; an exemption needs `item`, `list` and `why`. It needs no `meta.controller`.
 
 **Compatibility.** Everything here is opt-in. A plan without `meta.controller`, `inventory` or
-`meta.tracker.relational` gives output byte-identical to 0.18.0.
+`meta.tracker.relational` gives output byte-identical to 0.18.0. A flat 0.18 reconcile now also writes `actual_keys` into
+`plan/tracker-state.json` (same hash, output unchanged).
 
 Tests: 158 new (`tests/test_controller.py`, `tests/test_relational.py`, `tests/test_inventory.py`
 and additions to the existing suites), written red first; 404 passed, 0 skipped (base 246).

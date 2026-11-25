@@ -308,5 +308,19 @@ class TestRelationalDiff(RelBase):
         self.assertIsNone(self.state())
 
 
+class TestFinishedStoryTasks(RelBase):
+    def test_task_row_of_a_story_finished_with_move_py_is_set_done_not_orphaned(self):
+        self.write()
+        d = L.load(self.dir)
+        cfg, _ = L.tracker_config(d, self.dir)
+        live = [{k: v for k, v in r.items() if k != "key"}
+                for r in tracker.expected_rows(d, cfg, self.dir)]
+        r = run("move.py", "E-01.S2", "--to", "done", "--outcome", "login works", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = self.tracker("diff", "--actual", self.actual_file(live))
+        self.assertNotIn("not in the plan", out.stdout)
+        self.assertIn("set Status of 'E-01.S2.T1 form' to 'Done'", out.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,8 +10,8 @@ calls a network: the agent applies tracker fixes through its own connector.
   findings(root, d, event=None) -> [{"check", "level", "message"}]
 
 Checks: config (meta.controller well formed), one_writer (state changed only by
-move.py), tracker (Task 6), rule (Task 7, only on the rule's events),
-inventory (Task 9). Library only: there is no CLI; read it with check.py --json.
+move.py), tracker (the mirror's reconcile state), rule (only on the rule's events),
+inventory (a declared inventory against every list that must cover it). Library only: there is no CLI; read it with check.py --json.
 """
 import fnmatch
 import json
@@ -191,10 +191,11 @@ def changed_files(root, base):
         return None, "cannot measure changes: no merge-base between %r and HEAD" % base
     head_ref = _git_ok(root, "rev-parse", "--symbolic-full-name", "HEAD")
     base_ref = _git_ok(root, "rev-parse", "--symbolic-full-name", base)
-    if head_ref and head_ref == base_ref:
-        # On the base branch every commit is "the base", so committed work is
-        # invisible. A fresh branch off the base with no commit yet differs by
-        # name and is measured from its working tree.
+    if (head_ref and head_ref == base_ref) or (head_ref == "HEAD" and mb == _git_ok(root, "rev-parse", "HEAD")):
+        # On the base branch (or a detached HEAD sitting at its tip) every commit
+        # is "the base", so committed work is invisible. A fresh branch off the
+        # base with no commit yet differs by name and is measured from its
+        # working tree.
         return None, ("%s %r itself — work on a branch, or set meta.controller.base to a ref "
                       "behind HEAD" % (ON_BASE, base))
     tracked = _git_ok(root, "diff", "--name-only", "--relative", mb)

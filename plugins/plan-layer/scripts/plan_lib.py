@@ -561,7 +561,7 @@ def controlled(d):
     Items in plans.now and plans.next keyed by work id (an item without one is
     the naming check's FAIL, not this one's); releases[] keyed by id. Prose
     status is deliberately not controlled: nothing downstream reads it as
-    state (review ruling 2). Two live items with one id collapse here, so
+    state. Two live items with one id collapse here, so
     duplicate_ids() is checked first and FAILs.
     """
     out = {"items": {}, "releases": {}}

@@ -917,7 +917,7 @@ def main():
     if "--json" in sys.argv:
         out = {"fails": [f for _, f in fails],
                "drifts": [f for _, f in drifts],
-               "summary": summary}
+               "summary": {k: v for k, v in summary.items() if k != "controller"}}
         if "controller" in summary:
             out["controller"] = summary["controller"]
         print(json.dumps(out, indent=1))
