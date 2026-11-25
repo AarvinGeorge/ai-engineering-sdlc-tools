@@ -715,11 +715,6 @@ def run(root=None, event=None):
                                      "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
                                      % (bucket, p.get("name")))
 
-    # Pause (meta.paused): present means paused, so it must be well formed.
-    if "paused" in meta_ and L.paused_at(d) is None:
-        fails.append("meta.paused is %r — it must be {\"at\": an ISO-8601 UTC time}; "
-                     "pause.py writes it" % (meta_["paused"],))
-
     # The controller's diff (0.19.0): one function, read by the gate, the
     # handoff and the hooks, so nothing computes it twice. A crash inside it
     # is a FAIL, never silence: the Stop hook fails open on an exception, so
@@ -728,11 +723,16 @@ def run(root=None, event=None):
         found = controller.findings(root, d, event)
     except Exception as exc:
         found = [{"check": "config", "level": "FAIL",
-                  "message": "controller crashed (%s: %s) — the plan's controller inputs are malformed"
+                  "message": "controller or tracker check crashed (%s: %s) — the plan's controller inputs are malformed"
                              % (exc.__class__.__name__, exc)}]
     for f in found:
         (fails if f["level"] == "FAIL" else drifts).append(f["message"])
     controller_on = "controller" in d.get("meta", {}) or "inventory" in d
+
+    # Pause (meta.paused): present means paused, so it must be well formed.
+    if "paused" in meta_ and L.paused_at(d) is None:
+        fails.append("meta.paused is %r — it must be {\"at\": an ISO-8601 UTC time}; "
+                     "pause.py writes it" % (meta_["paused"],))
 
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
@@ -903,7 +903,10 @@ def main():
     event = None
     if "--event" in sys.argv:
         i = sys.argv.index("--event")
-        if i + 1 >= len(sys.argv) or sys.argv[i + 1].startswith("--"):
+        ev = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        known = ev in controller.EVENTS or any(ev.startswith(x) and ev[len(x):].strip()
+                                               for x in ("stage:", "release:"))
+        if not known:
             print("  usage: check.py --event <stop|session-start|sync|pause|stage:<id>|release:<stage>>")
             return 2
         event = sys.argv[i + 1]

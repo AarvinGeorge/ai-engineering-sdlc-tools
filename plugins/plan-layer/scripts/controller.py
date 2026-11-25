@@ -13,6 +13,7 @@ Checks: config (meta.controller well formed), one_writer (state changed only by
 move.py), tracker (Task 6), rule (Task 7, only on the rule's events),
 inventory (Task 9). Library only: there is no CLI; read it with check.py --json.
 """
+import fnmatch
 import os
 import sys
 
@@ -120,6 +121,110 @@ def one_writer_findings(root, d, cfg):
     return out
 
 
+_RULE_KEYS = ("name", "on", "if_changed", "then_changed", "why")
+
+
+def rule_faults(rules, stage_ids):
+    """Malformed rules as FAIL strings. Inputs: rules list, cycle stage ids. Output: strings. Side effects: none. Role: gate check.
+
+     A rule is a co-change rule: when any path
+    matching if_changed changed since the base, some path matching each
+    then_changed pattern must have changed too. Events: stop, session-start, sync,
+    pause, stage:<cycle stage id>, release:<stage>."""
+    out = []
+    for i, r in enumerate(rules):
+        where = "meta.controller.rules[%d]" % i
+        if not isinstance(r, dict):
+            out.append("%s is not an object" % where)
+            continue
+        where = "rule %r" % r.get("name", i)
+        for k in sorted(set(r) - set(_RULE_KEYS)):
+            out.append("%s has unknown key %r (known: %s)" % (where, k, ", ".join(_RULE_KEYS)))
+        for k in ("name", "why"):
+            if not (isinstance(r.get(k), str) and r[k].strip()):
+                out.append("%s needs %s (text)" % (where, k))
+        for k in ("on", "if_changed", "then_changed"):
+            v = r.get(k)
+            if not (isinstance(v, list) and v and all(isinstance(x, str) and x for x in v)):
+                out.append("%s needs %s (a non-empty list of text)" % (where, k))
+        for e in r.get("on") or []:
+            if not isinstance(e, str):
+                continue
+            ok = (e in EVENTS or (e.startswith("stage:") and e[6:] in stage_ids)
+                  or (e.startswith("release:") and e[8:].strip()))
+            if not ok:
+                out.append("%s: event %r is not one of %s, stage:<%s>, release:<stage>"
+                           % (where, e, ", ".join(EVENTS), "|".join(stage_ids)))
+    return out
+
+
+def changed_files(root, base):
+    """Paths changed since the merge-base with `base`, plus uncommitted and untracked.
+
+    Inputs: root, base ref. Side effects: reads git only. Role: gate check.
+    Returns (set, None) or (None, reason). A missing base, or HEAD sitting on the
+    base branch, is a reason, never an empty set: a rule that measured nothing
+    must not pass. Committed changes since the merge-base and the working tree
+    are both measured, so a branch with no commit of its own still counts.
+    """
+    mb = L.git(root, "merge-base", base, "HEAD")
+    if not mb:
+        return None, "cannot measure changes: no merge-base between %r and HEAD" % base
+    if L.git(root, "rev-parse", "--abbrev-ref", "HEAD") == base:
+        # On the base branch itself every commit is "the base", so committed
+        # work is invisible (review I2). A fresh branch off the base with no
+        # commit yet is fine: its working tree is measured (review N1).
+        return None, ("cannot measure changes: HEAD is on the base branch %r itself — work on a "
+                      "branch, or set meta.controller.base to a ref behind HEAD" % base)
+    files = set(L.git(root, "diff", "--name-only", mb).splitlines())
+    files |= set(L.git(root, "ls-files", "--others", "--exclude-standard").splitlines())
+    return {f for f in files if f}, None
+
+
+def stage_events(writes, d):
+    """Events implied by every stage in the plan that differs from the stamp's (for --adopt).
+
+    Inputs: the stamp's writes record, plan dict. Output: sorted event names. Side effects: none. Role: gate check.
+    """
+    cur = L.controlled(d)
+    old_i, old_r = (writes or {}).get("items") or {}, (writes or {}).get("releases") or {}
+    ev = ["stage:%s" % v["stage"] for k, v in sorted(cur["items"].items())
+          if (old_i.get(k) or {}).get("stage") != v["stage"]]
+    ev += ["release:%s" % s for k, s in sorted(cur["releases"].items()) if old_r.get(k) != s]
+    return sorted(set(ev))
+
+
+def rule_findings(root, cfg, event):
+    """FAIL for each rule bound to `event` whose co-change does not hold.
+
+    Inputs: root, controller config, event name. Output: findings. Side effects: reads git only. Role: gate check.
+    """
+    if not cfg or not event:
+        return []
+    mine = [r for r in cfg["rules"] if event in (r.get("on") or [])]
+    if not mine:
+        return []
+    files, why = changed_files(root, cfg["base"])
+    if why:
+        return [_f("rule", "rule %r on %s: %s" % (r["name"], event, why)) for r in mine]
+    out = []
+    for r in mine:
+        hit = sorted(f for f in files if any(fnmatch.fnmatch(f, p) for p in r["if_changed"]))
+        if not hit:
+            continue
+        missing = [p for p in r["then_changed"] if not any(fnmatch.fnmatch(f, p) for f in files)]
+        if missing:
+            out.append(_f("rule", "rule %r on %s: %s changed but nothing matching %s did (%s)"
+                          % (r["name"], event, ", ".join(hit[:3]) + (", …" if len(hit) > 3 else ""),
+                             ", ".join(missing), r["why"])))
+    return out
+
+
+def stage_ids(d):
+    """The cycle's stage ids. Inputs: plan dict. Output: list. Side effects: none. Role: helper."""
+    return [s["id"] for s in (d.get("cycle") or L.DEFAULT_CYCLE)["stages"]]
+
+
 def tracker_findings(root, d, level):
     """The tracker mirror's state as findings.
 
@@ -139,6 +244,8 @@ def tracker_findings(root, d, level):
     if tcfg.get("relational"):
         faults = tracker.relational_faults(d, root)
         if faults:
+            if level != "FAIL" and len(faults) > 10:
+                faults = faults[:10] + ["… and %d more relational problems" % (len(faults) - 10)]
             return [_f("tracker", m, level) for m in faults]
     st = L.tracker_state(root)
     if not st or not st.get("at"):
@@ -157,5 +264,8 @@ def findings(root, d, event=None):
     """The whole diff, in check order. Inputs: root, plan dict, event name or None. Pure reads."""
     cfg, err = L.controller_config(d)
     out = [_f("config", err)] if err else one_writer_findings(root, d, cfg)
+    if cfg:
+        bad = [_f("config", m) for m in rule_faults(cfg["rules"], stage_ids(d))]
+        out += bad or rule_findings(root, cfg, event)
     out += tracker_findings(root, d, "FAIL" if (cfg or err) else "DRIFT")
     return out

@@ -117,7 +117,7 @@ def main():
             sys.stdout.flush()
         argv = [sys.executable, os.path.join(HERE, script)]
         if script == "check.py":
-            argv += ["--event", "sync"]  # "sync"
+            argv += ["--event", "sync"]
         r = subprocess.run(argv)
         if script == "check.py":
             gate_rc = r.returncode or 0

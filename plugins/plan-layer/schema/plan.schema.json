@@ -126,7 +126,11 @@
             "one_writer": {"type": "boolean"},
             "base": {"type": "string"},
             "decision_log": {"type": "string"},
-            "rules": {"type": "array"}
+            "rules": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+              "required": ["name", "on", "if_changed", "then_changed", "why"],
+              "properties": {"name": {"type": "string"}, "on": {"type": "array", "items": {"type": "string"}},
+                "if_changed": {"type": "array", "items": {"type": "string"}},
+                "then_changed": {"type": "array", "items": {"type": "string"}}, "why": {"type": "string"}}}}
           },
           "description": "0.19.0, opt-in. The tracker controller: one writer (move.py) moves the state fields named in the writer matrix (plan_lib.WRITERS) and the gate FAILs on a hand edit. Keys: one_writer (needs meta.naming work-ids), base branch, decision_log path, rules. Absent means the feature is off."
         }

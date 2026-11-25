@@ -196,7 +196,11 @@ def not_mirrored(d):
 
 
 def relational_faults(d, root=None):
-    """Why a plan cannot be mirrored relationally, as FAIL strings; [] means it can."""
+    """Why a plan cannot be mirrored relationally, as plain strings; [] means it can.
+
+    The caller sets the level: tracker_findings makes them FAIL when meta.controller
+    is set and DRIFT otherwise (capped at ten lines). Pure reads.
+    """
     out = []
     if (d.get("meta") or {}).get("naming") != "work-ids":
         out.append("meta.tracker.relational keys rows by work id — set meta.naming to \"work-ids\"")

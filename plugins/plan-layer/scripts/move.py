@@ -15,7 +15,7 @@ event: rules bound to it run first and a failing rule refuses the move.
 Side effects: rewrites plan/plan.json (the field, the item's `updated`,
 meta.updated), plan/controller-state.json (the stamp), re-renders the page.
 Exit: 0 written (or no change), 1 refused (pending hand edits, duplicates, a second active
-item; Task 7: a rule on the event failed), 2 usage / unknown id / invalid value / unreadable
+item, a rule on the event failed), 2 usage / unknown id / invalid value / unreadable
 stamp / plan not writable.
 """
 import argparse
@@ -182,7 +182,20 @@ def main():
         except Exception:
             print(STAMP_UNREADABLE)
             return 2
-        # (Task 7 inserts the rule check for the accepted stage changes here.)
+        prior = (L.controller_state(p["root"]) or {}).get("writes")
+        if not prior:
+            # First opt-in: there is no earlier write to compare with, so every
+            # existing stage would read as a change and an item already at a
+            # rule-bound stage would block opting in at all.
+            print("  move: first opt-in: stamping the current state without firing stage rules")
+        elif cfg:
+            blocked = [f["message"] for ev in controller.stage_events(prior, d)
+                       for f in controller.rule_findings(p["root"], cfg, ev)]
+            if blocked:
+                print("  move: --adopt refused -- rules on the stages it would accept fail; nothing stamped:")
+                for msg in blocked:
+                    print("    - %s" % msg)
+                return 1
         st = dict(old, writes=dict(L.controlled(d), at=L.utc_now(), by="move.py --adopt"))
         st["adopted"] = list(old.get("adopted") or []) + [{"at": L.utc_now(), "changes": changes}]
         try:
@@ -231,6 +244,14 @@ def main():
     if not changed:
         print("  move: %s" % said)
         return 0
+    if event and cfg:
+        import controller
+        blocked = [f["message"] for f in controller.rule_findings(p["root"], cfg, event)]
+        if blocked:
+            print("  move: refused -- the %s rules fail; nothing written:" % event)
+            for msg in blocked:
+                print("    - %s" % msg)
+            return 1
     d["meta"]["updated"] = L.utc_now()
     try:
         L.save(d, p["root"])

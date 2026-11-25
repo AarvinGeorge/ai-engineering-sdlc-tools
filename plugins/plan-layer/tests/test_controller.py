@@ -197,7 +197,7 @@ class TestOneWriterGate(ControllerBase):
         with open(L.controller_state_path(self.dir), "w") as fh:
             json.dump({"writes": {"items": {"E-01.S2": "not-a-dict"}}}, fh)
         _, fails, _ = self.gate()
-        self.assertTrue(any("controller crashed" in f for f in fails), fails)
+        self.assertTrue(any("check crashed" in f for f in fails), fails)
 
     def test_new_idea_in_next_at_first_stage_is_planning_not_a_hand_move(self):
         stamp_now(self)
@@ -692,7 +692,7 @@ class TestTrackerRedGate(ControllerBase):
             fails, _, _ = check.run(self.dir)
         finally:
             controller.findings = real
-        self.assertTrue([m for _, m in fails if "controller crashed" in m], fails)
+        self.assertTrue([m for _, m in fails if "check crashed" in m], fails)
 
     def test_relational_fault_is_a_gate_fail(self):
         self.d["meta"]["tracker"]["relational"] = True
@@ -709,6 +709,167 @@ class TestTrackerRedGate(ControllerBase):
                       "tracker.py diff --actual <file>", drifts)
 
     def test_callers_pass_their_event(self):
-        for script, event in (("gate_hook.py", '"stop"'), ("brief.py", '"session-start"'),
-                              ("sync.py", '"sync"'), ("pause.py", '"pause"')):
-            self.assertIn(event, open(os.path.join(SCRIPTS, script)).read(), script)
+        self.d["meta"]["controller"]["base"] = "no-such-branch"  # a bound rule then reports its event
+        self.d["meta"]["controller"]["rules"] = [
+            dict(RULE, name="r-%s" % e, on=[e]) for e in ("stop", "session-start", "sync", "pause")]
+        self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
+        stamp_now(self)
+        run("render.py", project=self.dir)
+        self.assertIn("on stop:", stop_hook(self.dir)["reason"])
+        r = run("brief.py", "--session-start", project=self.dir)
+        self.assertIn("on session-start:", r.stdout)
+        r = run("sync.py", project=self.dir)
+        self.assertIn("on sync:", r.stdout)
+        self.assertNotIn("on session-start:", r.stdout)
+        run("pause.py", project=self.dir)
+        handoff = open(os.path.join(self.dir, "plan", "HANDOFF.md")).read()
+        self.assertIn("on pause:", handoff)
+
+    def test_unknown_or_empty_event_is_a_usage_error(self):
+        for ev in ("lunch", "", "stage:", "release:"):
+            r = run("check.py", "--event", ev, project=self.dir)
+            self.assertEqual(r.returncode, 2, (ev, r.stdout))
+            self.assertIn("usage", r.stdout)
+        self.assertEqual(run("check.py", "--event", "stage:verified", project=self.dir).returncode in (0, 1), True)
+
+    def test_paused_fail_comes_after_controller_fails(self):
+        self.d["meta"]["paused"] = "bad"
+        self.d["meta"]["controller"]["one_writer"] = True
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        _, fails, _ = self.gate()
+        i = [n for n, f in enumerate(fails) if "meta.paused" in f]
+        j = [n for n, f in enumerate(fails) if "by hand" in f]
+        self.assertTrue(i and j, fails)
+        self.assertGreater(i[0], j[0])
+
+    def test_relational_drift_lines_are_capped(self):
+        del self.d["meta"]["controller"]
+        self.d["meta"]["tracker"]["relational"] = True
+        self.d["epics"] = []
+        self.d["plans"]["next"] = [item("E-02.S%d x" % n) for n in range(15)]
+        self.write()
+        _, _, drifts = self.gate()
+        rel = [m for m in drifts if "not declared in epics" in m or "more" in m]
+        self.assertLessEqual(len(rel), 11, rel)
+        self.assertTrue([m for m in drifts if "… and " in m and "more" in m], drifts)
+
+
+def git(cwd, *a):
+    subprocess.run(["git", "-c", "user.email=t@example.com", "-c", "user.name=t"] + list(a),
+                   cwd=cwd, check=True, capture_output=True)
+
+
+RULE = {"name": "changelog with code", "on": ["stage:verified"], "if_changed": ["src/*.py"],
+        "then_changed": ["CHANGELOG.md"], "why": "a missed changelog entry was caught by hand twice"}
+
+
+class TestRules(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        self.d["meta"]["controller"]["rules"] = [dict(RULE)]
+        git(self.dir, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(self.dir, "src"))
+        open(os.path.join(self.dir, "src", "app.py"), "w").write("x = 1\n")
+        open(os.path.join(self.dir, "CHANGELOG.md"), "w").write("# log\n")
+        stamp_now(self)
+        run("render.py", project=self.dir)
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "base")
+        git(self.dir, "checkout", "-q", "-b", "feature")
+        open(os.path.join(self.dir, "src", "app.py"), "a").write("y = 2\n")
+
+    def test_rule_fires_only_on_its_event(self):
+        _, fails, _ = self.gate()
+        self.assertFalse([f for f in fails if "changelog with code" in f], fails)
+        r = run("check.py", "--json", "--event", "stage:verified", project=self.dir)
+        out = json.loads(r.stdout)
+        hit = [f for f in out["fails"] if "changelog with code" in f]
+        self.assertTrue(hit, out["fails"])
+        self.assertIn("CHANGELOG.md", hit[0])
+        self.assertIn("src/app.py", hit[0])
+
+    def test_failing_rule_refuses_the_move_and_writes_nothing(self):
+        before = open(os.path.join(self.dir, "plan", "plan.json")).read()
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("changelog with code", r.stdout)
+        self.assertEqual(open(os.path.join(self.dir, "plan", "plan.json")).read(), before)
+
+    def test_satisfied_rule_lets_the_move_through(self):
+        open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
+        self.assertEqual(self.move("E-01.S2", "--stage", "verified").returncode, 0)
+
+    def test_unmeasurable_base_fails_loudly_never_passes(self):
+        self.d = self.read()
+        self.d["meta"]["controller"]["base"] = "no-such-branch"
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("cannot measure", r.stdout)
+
+    def test_on_the_base_branch_itself_measures_nothing_and_fails(self):
+        git(self.dir, "checkout", "-q", "main")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("base branch", r.stdout)
+
+    def test_fresh_branch_with_no_commit_is_measured_from_the_working_tree(self):
+        # setUp's feature branch has no commit of its own: merge-base == HEAD.
+        open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_committed_change_on_the_branch_counts_too(self):
+        git(self.dir, "commit", "-q", "-am", "feature work")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, "src/app.py committed, CHANGELOG untouched")
+
+    def test_adopt_runs_the_rules_of_each_stage_it_accepts(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        before = self.stamp()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("changelog with code", r.stdout)
+        self.assertEqual(self.stamp(), before, "a refused adopt stamps nothing")
+        open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
+        self.assertEqual(self.move("--adopt").returncode, 0)
+
+    def test_first_opt_in_adopt_does_not_fire_rules(self):
+        os.remove(L.controller_state_path(self.dir))
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("first opt-in", r.stdout)
+
+    def test_rule_shape_faults(self):
+        import controller
+        stages = ["intent", "verified"]
+        self.assertEqual(controller.rule_faults([dict(RULE)], stages), [])
+        for bad, word in (({"on": ["lunch"]}, "lunch"), ({"on": ["stage:flying"]}, "flying"),
+                          ({"why": ""}, "why"), ({"then_changed": []}, "then_changed"),
+                          ({"extra": 1}, "extra")):
+            rule = dict(RULE, **bad)
+            faults = controller.rule_faults([rule], stages)
+            self.assertTrue(any(word in f for f in faults), (bad, faults))
+
+    def test_bad_rule_is_a_gate_fail_on_any_event(self):
+        self.d = self.read()
+        self.d["meta"]["controller"]["rules"] = [dict(RULE, on=["lunch"])]
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in fails if "lunch" in f], fails)
+
+    def test_release_event(self):
+        self.d = self.read()
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 x", "stage": "build", "stories": []}]
+        self.d["meta"]["controller"]["rules"] = [dict(RULE, on=["release:production"])]
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        self.assertEqual(self.move("R-01", "--stage", "production").returncode, 1)
+        self.assertEqual(self.move("R-01", "--stage", "gate").returncode, 0)
