@@ -24,6 +24,30 @@ drift.** **Session hooks brief the agent before the first word is typed.**
 - **You stop for the day, or hand the work to someone else.** `/plan-layer pause` writes
   `plan/HANDOFF.md` and marks the plan paused. The next session's brief tells the agent to read the
   handoff before anything else. `/plan-layer pause --resume` clears it.
+- **Someone moves a stage by hand while the tracker is mirrored.** With `meta.controller.one_writer`
+  on, only `move.py` may change a stage, so the hand edit turns the gate red. `/plan-layer check` prints:
+
+  ```
+  FAIL   stage of E-01.S2 is 'verified' but move.py last wrote 'building' — changed by hand; revert the hand edit, or run move.py --adopt (with the owner's say-so)
+  ```
+
+  Revert the edit and make the move with the one writer, `move.py E-01.S2 --stage verified`:
+
+  ```
+  move: E-01.S2 building -> verified
+  NEXT: run sync.py --tracker and reconcile the tracker
+  ```
+
+  Until the tracker is reconciled the gate stays red with
+  `tracker mirror (generic): the rows the plan now expects differ from those last reconciled`.
+- **A backup job lists five agents of ten.** Declare the agents once under `inventory` and name the
+  backup script as a list that must cover them. `/plan-layer check` prints:
+
+  ```
+  FAIL   inventory 'agents': list 'nightly backup' covers 5 of 10 — missing agent-06, agent-07, agent-08, agent-09, agent-10
+  ```
+
+  Add the five to the script, or exempt each one with a written `why`.
 - **A one-week take-home or a spike.** `/plan-layer init --light` gives you the state file, the page
   and the gate, without figures, archive or rolling.
 
@@ -364,19 +388,79 @@ Absent means full, so every existing plan is unchanged. Change the one field to 
 Works with **`engineering-method`** (optional), the sibling plugin that carries the engineering
 method; plan-layer stays a state tool.
 
-## Tracker mirror, and pause
+## Controller: one writer, tracker, rules, inventory, handoff
 
-**Tracker mirror (opt-in).** Set `meta.tracker` (`{"kind": "notion", "target": "<database>"}`)
-and `scripts/tracker.py` derives the rows an external tracker should hold from the plan, diffs
-them against rows the agent fetched through that tracker's connector, and prints each fix as an
-instruction. `sync.py --tracker [--actual <file>]` runs it with the normal sync. The gate drifts
-when the last reconcile is missing or older than the plan. Adapters are data files in
-`trackers/` (Notion and a generic one ship; see `trackers/README.md` to add another). Absent,
-nothing changes.
+All of this is opt-in; a plan without `meta.controller`, `meta.tracker` or `inventory` behaves
+exactly as in 0.18.0. The pattern is a reconcile loop: the plan is the declared state; git, the
+tracker and the files you name are observed; `scripts/controller.py` computes the one diff, and
+the gate, the handoff and the hooks all read it. Drift is a red gate, and a script or a hook
+fires the check, never the agent's memory.
+
+**One writer.** Set `meta.controller: {"one_writer": true}` (with `meta.naming: "work-ids"`) and
+run `scripts/move.py --adopt` once to stamp the current state. From then on `move.py` is the only
+writer of stage, task state, bucket and release stage (`--stage`, `--task <name> --state <s>`,
+`--to now|next|done`). The stamp lives in `plan/controller-state.json`; a field that differs from
+it is a hand edit and FAILs the gate, and `move.py` refuses to write until it is reverted or
+adopted. `--adopt` is for the owner's deliberate edits only. The skill lists every field and its
+one writer as a table checked against the code.
+
+**Tracker mirror.** Set `meta.tracker` (`{"kind": "notion", "target": "<database>"}`) and
+`scripts/tracker.py` derives the rows an external tracker should hold from the plan, diffs them
+against rows the agent fetched through that tracker's connector, and prints each fix as an
+instruction. `sync.py --tracker [--actual <file>]` runs it with the normal sync. With
+`meta.controller` set, an unreconciled tracker FAILs the gate; without it, it is DRIFT as before.
+`meta.tracker.relational: true` mirrors epics, stories, tasks and releases as linked rows.
+Adapters are data files in `trackers/` (Notion and a generic one ship; see `trackers/README.md`).
+
+**Rules on events.** `meta.controller.rules` holds co-change rules: when a file matching
+`if_changed` changed on the branch, a file matching each `then_changed` pattern must have changed
+too. Each rule names the events it runs on: `stop`, `session-start`, `sync`, `pause` (the hooks
+and scripts of those names) or a move, `stage:<id>` and `release:<stage>`. A failing rule refuses
+the move. Worked example, an approval recorded before live work:
+
+```json
+{"name": "approval before production", "on": ["release:production"],
+ "if_changed": ["deploy/*"], "then_changed": ["docs/approvals/*.md"],
+ "why": "live changes need a recorded approval"}
+```
+
+On a branch that changed `deploy/compose.yml` and no approval, `move.py R-01 --stage production`
+prints:
+
+```
+  move: refused -- the release:production rules fail; nothing written:
+    - rule 'approval before production' on release:production: deploy/compose.yml changed but nothing matching docs/approvals/*.md did (live changes need a recorded approval)
+```
+
+Add `docs/approvals/r-01.md` and the same command prints `move: R-01 bench -> production`. The
+rule proves that an approval file changed on the branch, not who wrote it or what it says; that
+stays a human check. On the base branch there is no branch to measure: a session event reports
+DRIFT ("measured nothing"), a move FAILs. A rule matches paths; it cannot run a check.
+
+**Inventory parity.** Declare a list once and name every list that must cover it. Worked example,
+ten agents and a backup script:
+
+```json
+"inventory": {"agents": {
+  "items": ["agent-01", "agent-02", "agent-03", "agent-04", "agent-05",
+            "agent-06", "agent-07", "agent-08", "agent-09", "agent-10"],
+  "covered_by": [{"list": "nightly backup", "file": "ops/backup.sh"}]}}
+```
+
+With five agents in `ops/backup.sh` the gate prints
+`FAIL   inventory 'agents': list 'nightly backup' covers 5 of 10 — missing agent-06, agent-07, agent-08, agent-09, agent-10`.
+A plain file is matched by whole word (`agent-1` is not covered by `agent-10`); `"json":
+"jobs[].host"` reads values from a JSON file; `{"list": "board", "tracker": true}` checks the rows
+of the last tracker reconcile; `"from": {"file", "json"}` reads the inventory itself from a file.
+An exemption is `{"item", "list", "why"}`, and the `why` is required. Inventory needs no
+`meta.controller`.
 
 **Pause and handoff.** `scripts/pause.py` writes `plan/HANDOFF.md` (time, git state, gate
 result, active work, resume order, open questions, traps; all read at that moment) and sets
-`meta.paused`; the session brief then opens with a PAUSED line. `pause.py --resume` clears it.
+`meta.paused`; the session brief then opens with a PAUSED line. With `meta.controller` the note
+adds the controller's diff, git per active item, and the decision ids added to
+`meta.controller.decision_log` since the last handoff. It never blocks on what it finds.
+`pause.py --resume` clears it.
 
 ## Configuration
 

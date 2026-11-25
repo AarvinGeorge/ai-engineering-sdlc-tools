@@ -995,3 +995,30 @@ class TestRulesFixRound1(ControllerBase):
         self.build()
         r = run("check.py", "--event", "stage:bogus", project=self.dir)
         self.assertEqual(r.returncode, 2, r.stdout)
+
+
+class TestDocs(unittest.TestCase):
+    def test_skill_writer_table_equals_the_code(self):
+        import re
+        text = open(os.path.join(PLUGIN, "skills", "plan-layer", "SKILL.md"), encoding="utf-8").read()
+        block = re.search(r"<!-- writer-matrix -->(.*?)<!-- /writer-matrix -->", text, re.S)
+        self.assertTrue(block, "SKILL.md has no writer-matrix block")
+        rows = [[c.strip().strip("`") for c in ln.strip().strip("|").split("|")]
+                for ln in block.group(1).splitlines()
+                if ln.startswith("|") and not re.match(r"^\|\s*(Field|-)", ln)]
+        self.assertEqual(rows, [[w["field"], w["writer"], w["enforced"]] for w in L.WRITERS])
+
+    def test_version_is_0_19_0_with_a_changelog_entry(self):
+        with open(os.path.join(PLUGIN, ".claude-plugin", "plugin.json")) as fh:
+            pl = json.load(fh)
+        self.assertEqual(pl["version"], "0.19.0")
+        with open(os.path.join(PLUGIN, "CHANGELOG.md"), encoding="utf-8") as fh:
+            self.assertTrue(fh.read().startswith("# Changelog\n\n## 0.19.0"))
+
+    def test_no_private_names_in_the_new_files(self):
+        """Generic examples only; the scan list itself is kept outside the repo."""
+        for rel in ("scripts/controller.py", "scripts/move.py", "tests/test_controller.py",
+                    "tests/test_relational.py", "tests/test_inventory.py"):
+            with open(os.path.join(PLUGIN, rel), encoding="utf-8") as fh:
+                text = fh.read()
+            self.assertNotRegex(text, r"https?://(www\.)?notion\.so/", rel)

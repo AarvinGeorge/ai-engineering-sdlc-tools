@@ -1,6 +1,6 @@
 ---
 name: plan-layer
-description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init [--light], status, check, render, sync [--tracker], pause [--resume], help.
+description: Use when a project has a plan/plan.json (or the user asks to start one, check plan drift, or update the planning page). Maintains shared state between the human and the coding agent - a JSON file rendered to a self-contained HTML page, with a gate that catches drift. Commands - /plan-layer init [--light], status, check, render, sync [--tracker], move <id> (the one writer of stage, task state and bucket when meta.controller is on), pause [--resume], help.
 ---
 
 # plan-layer
@@ -225,6 +225,7 @@ That property decays every time someone who knows the context writes a sentence.
 | `/plan-layer render` | Regenerate the page from the JSON |
 | `/plan-layer sync` | After ANY change: roll aged records into `plan/archive/` (lossless; `--no-roll` opts out), refresh view facts from disk, render, run the gate — the one command. `--live-revision <sha>` at the end of a deploy |
 | `/plan-layer sync --tracker [--actual <file>]` | The sync, then reconcile the tracker mirror (see "Tracker mirror") |
+| `/plan-layer move <id> --stage <s>` | Move plan state: `--stage`, `--task <name> --state <s>`, `--to now\|next\|done`, `--adopt` (see "Controller") |
 | `/plan-layer pause` | Write `plan/HANDOFF.md` and set `meta.paused`; `--resume` clears it |
 | `/plan-layer roll` | Move aged records into `plan/archive/` in full by hand — `sync` already does this; use `roll --dry-run` to preview |
 | `/plan-layer help` | This document |
@@ -348,6 +349,63 @@ with its own scripts and stylesheet. Keep them beside it and let the gate keep t
 **Parked is not dropped.** A question deferred goes in `parked` with a `trigger` naming when
 it must be answered.
 
+## Controller (opt-in)
+
+The plan is the declared state; git, the tracker and named files are observed; the gate prints
+the one diff (`controller.findings()`). Drift is a red gate, fired by scripts and hooks, never
+by the agent's memory. Opt in with `meta.controller`: `one_writer` (needs `meta.naming:
+"work-ids"`), `base` (default `main`), `decision_log` (a path), `rules`.
+
+**One writer.** Only `move.py` changes stage, task state, bucket and release stage:
+`move.py E-01.S2 --stage verified`, `--task <name> --state done`, `--to now|next|done`
+(`done` needs `--outcome`). A hand edit FAILs and `move.py` refuses until it is reverted.
+`move.py --adopt` accepts the current state: once to opt in (firing no rules), otherwise only
+on the human's say-so. Adding an item to `plans.next` at the first stage, all tasks `todo`,
+needs no `move.py`.
+
+<!-- writer-matrix -->
+| Field | Writer | Enforced |
+|---|---|---|
+| plans.now[] / plans.next[]: membership, stage, tasks[].state | move.py | stamp in plan/controller-state.json; the gate FAILs on a hand edit |
+| plans.done[] (an item finished from now) | move.py --to done | stamp |
+| releases[].stage | move.py | stamp |
+| meta.paused, plan/HANDOFF.md | pause.py | sole code path (test) |
+| views[].spec_sha256, views[].revision, facts.live_revision | sync.py | sole code path |
+| meta.assertions_verified | check.py --verify | sole code path |
+| plan/archive/*.json | plan_lib.roll (roll.py, sync.py) | sole code path |
+| plan/tracker-state.json | tracker.py diff, sync.py --tracker --actual | sole code path |
+| plan/controller-state.json | plan_lib.write_stamp (move.py) | sole code path |
+| plan/index.html | render.py | fingerprint |
+<!-- /writer-matrix -->
+
+**Events:** `stop` (Stop hook), `session-start` (brief), `sync`, `pause`, and `stage:<id>`,
+`release:<stage>` (`move.py`). Plain `check.py` fires none; `check.py --event <name>` fires one.
+
+**Rules** are co-change rules over paths changed since the merge-base with `base` (plus
+uncommitted and untracked); `fnmatch`'s `*` also matches `/`. A failing rule refuses the move.
+On the base branch a session event gives DRIFT, a move FAILs.
+
+```json
+{"name": "changelog with code", "on": ["stage:verified"], "if_changed": ["src/*.py"],
+ "then_changed": ["CHANGELOG.md"], "why": "users read the changelog"}
+```
+
+**Tracker.** Under `meta.controller`, tracker drift FAILs. `meta.tracker.relational: true`
+mirrors epics, stories, tasks and releases as linked rows (`trackers/README.md`).
+
+**Inventory** (no `meta.controller` needed): each item must appear in every covering list.
+
+```json
+"inventory": {"agents": {"items": ["agent-01", "agent-02"],
+  "covered_by": [{"list": "nightly backup", "file": "ops/backup.sh"}]}}
+```
+
+A plain file is matched by whole word; `"json": "jobs[].host"` reads values; `"tracker": true`
+reads the last reconciled rows. `exempt` entries need `item`, `list` and `why`.
+
+**Handoff.** Under `meta.controller`, `HANDOFF.md` adds the diff, git per active item and
+decision ids added to `decision_log`. `pause.py` never blocks.
+
 ## What the gate checks
 
 `check.py` separates two kinds of problem:
@@ -359,14 +417,15 @@ it must be answered.
   `meta.updated` in the future; the page out of sync with the JSON; `plan_version`
   disagreeing with the newest changelog entry; an unknown `meta.mode`; a `meta.size_budget_kb`
   that is not a positive whole number; an unknown `meta.naming`, or, with
-  `meta.naming: "work-ids"`, a now or next item not named from a work id; a malformed `meta.tracker` or `meta.paused`. Exit code 1.
+  `meta.naming: "work-ids"`, a now or next item not named from a work id; a malformed `meta.tracker` or `meta.paused`; under `meta.controller`, a hand edit, a
+  duplicate id, a failing rule or tracker drift; an inventory gap. Exit code 1.
 - **DRIFT** — heuristic. Uncommitted work outside the plan directory while the plan sits
   untouched; the last substantive commit newer than `meta.updated`; a plan older than
   fourteen days; a finished plan with no period or no outcome; `meta.version` disagreeing
   with `plan_version`; an item naming no capability; assertions declared but never verified,
   or verified over a week ago; a figure reading a fact the plan does not define; an active
   item where every unfinished task is blocked; records due to roll; `plan.json` over its size
-  budget (`meta.size_budget_kb`, default 200 KB); a tracker mirror never reconciled, or not since its expected rows last changed. Exit 0 unless `--strict`.
+  budget (`meta.size_budget_kb`, default 200 KB); a tracker mirror never reconciled, or not since its expected rows last changed; a rule that measured nothing on the base branch. Exit 0 unless `--strict`.
 - **Light mode** skips the full-only signals: figures and roll-due. Declared views are checked
   in both modes. Every FAIL above still applies.
 
