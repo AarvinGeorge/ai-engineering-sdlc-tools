@@ -17,6 +17,7 @@ meta.updated (the plan changed) and re-renders so the page is never stale.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -25,6 +26,7 @@ import plan_lib as L  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HANDOFF = "HANDOFF.md"
+DECISION_ID = re.compile(r"\bD-[0-9]{3,}\b")
 
 
 def git_facts(root):
@@ -43,8 +45,53 @@ def git_facts(root):
     return "branch %s, HEAD %s, %d uncommitted file(s)" % (branch, head_s, n)
 
 
-def render_handoff(d, git_line, read_at, fails, drifts):
-    """Compose the note. Inputs: plan dict, git line, clock reading, gate FAILs and DRIFTs. Returns text."""
+def git_per_item(root, d):
+    """What it does: for each active item in plans.now, names the branches whose name holds
+    its epic slug and the last commit whose message names its work id.
+    Use when: the handoff must say where each active item's code is, read now, never recalled.
+    Inputs: project root; the plan dict (only plans.now is read, plans.next is not).
+    Output: list of markdown bullet lines; "- nothing active" when plans.now has no work id.
+    Side effects: read-only git.
+    Role: fact for the reader of the handoff; decides nothing.
+    """
+    out = []
+    branches = L.git(root, "branch", "--list", "--format=%(refname:short)").splitlines()
+    for p in (d.get("plans") or {}).get("now") or []:
+        wid = L.work_id(p.get("name"))
+        if not wid:
+            continue
+        slug = wid.split(".")[0].lower()
+        mine = [b for b in branches if slug in b.lower()] or ["no branch names %s" % slug]
+        last = L.git(root, "log", "-1", "--format=%h %s", "--fixed-strings", "--grep=" + wid)
+        out.append("- %s: branches %s; last commit naming it: %s"
+                   % (wid, ", ".join(mine), last or "none"))
+    return out or ["- nothing active"]
+
+
+def decisions_since(root, cfg, since_head):
+    """What it does: lists decision ids on lines added to the decision log since the last
+    handoff's HEAD, else since the merge-base with the base branch.
+    Use when: the handoff must carry decisions made since the previous one.
+    Inputs: project root; resolved controller config; the previous handoff's HEAD or None.
+    Output: list of markdown bullet lines; a bullet saying why when it cannot measure.
+    Side effects: read-only git.
+    Role: fact for the reader of the handoff; decides nothing.
+    """
+    log = cfg.get("decision_log")
+    if not log:
+        return ["- no decision log configured (meta.controller.decision_log)"]
+    since = since_head or L.git(root, "merge-base", cfg["base"], "HEAD")
+    if not since:
+        return ["- cannot measure: no earlier handoff and no merge-base with %r" % cfg["base"]]
+    added = [ln[1:] for ln in L.git(root, "diff", since, "--", log).splitlines()
+             if ln.startswith("+") and not ln.startswith("+++")]
+    ids = sorted({m for ln in added for m in DECISION_ID.findall(ln)})
+    return ["- added to %s since %s: %s" % (log, since[:7], ", ".join(ids) or "none")]
+
+
+def render_handoff(d, git_line, read_at, fails, drifts, extra=None):
+    """Compose the note. Inputs: plan dict, git line, clock reading, gate FAILs and DRIFTs,
+    and optionally extra lines placed just before the Traps section. Returns text."""
     plans = d.get("plans") or {}
     meta = d.get("meta") or {}
     out = ["# Handoff: %s" % (meta.get("project") or "project"), "",
@@ -73,6 +120,8 @@ def render_handoff(d, git_line, read_at, fails, drifts):
         out.append("- %s %s (decide when: %s)" % (q.get("id"), q.get("q"), q.get("trigger")))
     if not parked:
         out.append("- none parked")
+    if extra:
+        out += [""] + list(extra)
     out += ["", "## Traps", ""]
     traps = ["Invariant not holding: %s (%s)" % (i.get("rule"), i.get("state"))
              for i in d.get("invariants") or [] if i.get("state") != "holding"]
@@ -88,14 +137,33 @@ def pause(p):
     at = L.utc_now()
     git_line = git_facts(root)
     d = L.load(root)
+    cfg, _ = L.controller_config(d)
+    head = L.git(root, "rev-parse", "HEAD")
     d.setdefault("meta", {})["paused"] = {"at": at}
     d["meta"]["updated"] = at
     L.save(d, root)
     subprocess.run([sys.executable, os.path.join(HERE, "render.py")], capture_output=True)
     import check
-    fails, drifts, _ = check.run(root, event="pause")
+    fails, drifts, summary = check.run(root, event="pause")
+    extra, found = None, []
+    if cfg:
+        found = summary.get("controller") or []
+        prev = ((L.controller_state(root) or {}).get("handoff") or {}).get("head")
+        extra = ["## Reconcile (the controller's diff at %s)" % at, ""]
+        extra += ["- [%s] %s: %s" % (f["level"], f["check"], f["message"]) for f in found] \
+            or ["- clean: nothing to reconcile"]
+        extra += ["", "## Git per active item", ""] + git_per_item(root, d)
+        extra += ["", "## Decisions since the last handoff", ""] + decisions_since(root, cfg, prev)
+        extra += ["- Agent step: search this session's transcript for decisions given in passing "
+                  "and append each to the decision log before ending.", ""]
+        st = L.controller_state(root) or {}
+        st["handoff"] = {"at": at, "head": head}
+        L.atomic_write(L.controller_state_path(root), json.dumps(st, indent=2) + "\n")
     L.atomic_write(os.path.join(p["dir"], HANDOFF),
-                   render_handoff(d, git_line, at, [m for _, m in fails], [m for _, m in drifts]))
+                   render_handoff(d, git_line, at, [m for _, m in fails], [m for _, m in drifts],
+                                  extra))
+    for f in found:
+        print("  CONTROLLER: [%s] %s" % (f["level"], f["message"]))
     print("  pause: wrote %s (paused at %s)" % (os.path.join(os.path.relpath(p["dir"], root), HANDOFF), at))
     print("  pause: the gate reads %d FAIL, %d DRIFT" % (len(fails), len(drifts)))
     print("  REMINDER: stop this work's recurring loops and scheduled tasks (cron, /loop, "

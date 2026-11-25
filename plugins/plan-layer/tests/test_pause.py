@@ -198,5 +198,67 @@ class TestBriefAndGate(PauseBase):
         self.assertEqual(rows[0]["Status"], "Paused")
 
 
+def git(cwd, *a):
+    subprocess.run(["git", "-c", "user.email=t@example.com", "-c", "user.name=t"] + list(a),
+                   cwd=cwd, check=True, capture_output=True)
+
+
+class TestHandoffReconcile(PauseBase):
+    def setUp(self):
+        super().setUp()
+        self.d["meta"]["naming"] = "work-ids"
+        self.d["meta"]["controller"] = {"one_writer": False, "decision_log": "docs/decisions.md"}
+        self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
+        os.makedirs(os.path.join(self.dir, "docs"))
+        open(os.path.join(self.dir, "docs", "decisions.md"), "w").write("# Decisions\n")
+        self.write()
+        git(self.dir, "checkout", "-q", "-b", "main")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "base")
+        git(self.dir, "checkout", "-q", "-b", "e-01-login")
+
+    def test_without_controller_the_note_is_as_before(self):
+        self.d["meta"].pop("controller")
+        self.write()
+        self.pause()
+        self.assertNotIn("## Reconcile", self.handoff())
+
+    def test_reconcile_section_lists_the_open_diff(self):
+        r = self.pause()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        h = self.handoff()
+        self.assertIn("## Reconcile", h)
+        self.assertIn("never reconciled", h)
+        self.assertIn("CONTROLLER:", r.stdout)
+
+    def test_git_per_active_item_names_branch_and_last_commit(self):
+        open(os.path.join(self.dir, "x.txt"), "w").write("x")
+        git(self.dir, "add", "x.txt")
+        git(self.dir, "commit", "-q", "-m", "E-01.S2: wire the form")
+        self.pause()
+        h = self.handoff()
+        self.assertIn("## Git per active item", h)
+        self.assertIn("e-01-login", h)
+        self.assertIn("E-01.S2: wire the form", h)
+
+    def test_decisions_added_since_the_last_handoff(self):
+        self.pause()
+        with open(os.path.join(self.dir, "docs", "decisions.md"), "a") as fh:
+            fh.write("- D-001 sessions expire after a day\n- D-002 no remember-me box\n")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "decisions")
+        self.pause()
+        h = self.handoff()
+        self.assertIn("## Decisions since the last handoff", h)
+        self.assertIn("D-001", h)
+        self.assertIn("D-002", h)
+        self.assertIn("transcript", h)
+
+    def test_handoff_head_is_recorded(self):
+        self.pause()
+        st = json.load(open(os.path.join(self.dir, "plan", "controller-state.json")))
+        self.assertEqual(len(st["handoff"]["head"]), 40)
+
+
 if __name__ == "__main__":
     unittest.main()
