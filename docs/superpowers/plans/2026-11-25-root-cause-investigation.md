@@ -969,6 +969,8 @@ with
 - [ ] **Step 5:** Read the failing answers of any red criterion; fix the case if the judge is wrong, the reference if the behaviour is.
 - [ ] **Step 6:** Record the hook output from section 5 ("Showing the reference loads"), base, head and regression counts and spend in the CHANGELOG (Task 9 Step 4) and amend that commit.
 
+**Owner ruling, 25 Nov 2026 (release bar for 0.4.0; replaces "every criterion green" in Steps 1 and 2 above).** 0.4.0 ships when: (1) no existing case drops against 0.3.0; (2) the criteria fix round A targets pass in at least 2 of 3 runs: `rc-01` c1 c2, `rc-03` c1 c2 c3, `rc-04` c1, `rc-05` c3, `fix-loop-bounded` c1 c2 c3, `instruction-file-compression` c4; (3) any other new criterion still red is recorded in the CHANGELOG as a known-red capability eval with a follow-up note. Same day, also ruled: the owner-wins rule extends to RC-10 (595ffae stands), and `rc-10` c1 is a guard, not RC-10 proof (0.3.0 passes it after the rewrite); RC-10's proof is c2.
+
 ### Task 11: Full suites and identifier scan
 
 - [ ] **Step 1:** `set -o pipefail; (cd plugins/plan-layer && python3 -m unittest tests/*.py 2>&1 | tail -3)`; `python3 -m pytest plugins/work-log/tests -q 2>&1 | tail -3`; `python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`. Each shows its OK or `passed` line with no failure.

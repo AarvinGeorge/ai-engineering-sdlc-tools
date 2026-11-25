@@ -92,7 +92,7 @@ Each case also carries `skill-fired.md` (indicator only). `rc-03-full-input` cop
 | RC-8: ledger of rejected hypotheses with their refuting evidence; a count measures frequency, not cause | G37 | `rc-08-label-and-fit/graders/c3-ledger-and-variance.md` |
 | RC-9 Close the loop: a per-stage table of conclusion, evidence, what was wrong and what unlocked the next stage | G38 | `rc-09-close-the-loop/graders/c1-stage-table.md` |
 | RC-9: map each lesson to the step that would have caught it; record an uncovered one as a general entry in the method | G38 | `rc-09-close-the-loop/graders/c2-lessons-mapped-and-uncovered-recorded.md` |
-| RC-10 Brief the investigator blind: one pushback on an owner-requested hypothesis, then it sits in its own section, the rest of the brief carries no cause | G39 | `rc-10-blind-brief/graders/c1-pushback-then-hypothesis-apart.md` |
+| RC-10 Brief the investigator blind: one pushback on an owner-requested hypothesis, then it sits in its own section, the rest of the brief carries no cause. **Guard, not RC-10 proof**: 0.3.0 passes it after the owner-wins rewrite; the proof is c2 | G39 | `rc-10-blind-brief/graders/c1-pushback-then-hypothesis-apart.md` |
 | RC-10: the brief requires the full-input statement with its store, the model id and labelled claims | G39 | `rc-10-blind-brief/graders/c2-requires-input-line-and-model-id.md` |
 | A debugging prompt loads the investigation reference (`tool_used: Read` on `root-cause-investigation.md`) | G40 | `rc-activation-loads-reference/graders/c1-reference-read.md` |
 | A debugging prompt gathers the decision record and the model input as sent before any cause or fix | G40 | `rc-activation-loads-reference/graders/c2-evidence-before-fix.md` |
