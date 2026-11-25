@@ -1,6 +1,6 @@
 ---
 description: "Contamination strings: closing tickets it should escalate ; before anyone touches the code"
-max_turns: 8
+max_turns: 12
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 

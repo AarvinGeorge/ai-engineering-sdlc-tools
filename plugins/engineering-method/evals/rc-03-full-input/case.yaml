@@ -1,3 +1,4 @@
+# Runs need --scaffold: fixture.sh copies resources/ into the workspace (add_dirs did not reach the agent).
 schema_version: "1.1"
 name: rc-03-full-input
 context:

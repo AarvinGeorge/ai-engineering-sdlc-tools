@@ -42,11 +42,11 @@
 - **Commands are the older format.** "Custom commands have been merged into skills … Prefer a skill for new work" (code.claude.com/docs/en/skills); "Commands are the older format, and skills supersede them for new work" (code.claude.com/docs/en/plugins/components, "Commands").
 - **Plugin agents** live in `agents/*.md`, are named `<plugin>:<name>`, support `name`, `description`, `model`, `tools`, `skills` and a few more fields; `permissionMode`, `hooks` and `mcpServers` are ignored in plugin agents (code.claude.com/docs/en/plugins/components, "Frontmatter fields in plugin agents").
 - **Plugin hooks fire on their events once the plugin loads**, not only when a skill runs (same page, "When plugin hooks fire").
-- **Evals:** `claude plugin eval` "loads the target plugin's skills, hooks, and agents"; in a run "other installed plugins … and skills are absent", so Superpowers is not loaded inside an eval; the case definitions are hidden from the agent. Grader types: `regex`, `tool_used` (`tool`, `input_match`, `min`, `max`), `tool_order`, `file_exists`, `llm`, `baseline`. `--runs` defaults to 3; `--case` takes a glob; `--ablation none` runs one arm and scores every grader; `--max-cost-usd` stops new runs at a list-price ceiling (exit 2, partial results); `case.yaml` with `schema_version: "1.1"`, `name` and `context.add_dirs` grants read-only fixture directories (code.claude.com/docs/en/plugin-evals, "Grader types", "Command options", "Seed the workspace or conversation", "How runs are isolated").
+- **Evals:** `claude plugin eval` "loads the target plugin's skills, hooks, and agents"; in a run "other installed plugins … and skills are absent", so Superpowers is not loaded inside an eval; the case definitions are hidden from the agent. Grader types: `regex`, `tool_used` (`tool`, `input_match`, `min`, `max`), `tool_order`, `file_exists`, `llm`, `baseline`. `--runs` defaults to 3; `--case` takes a glob; `--ablation none` runs one arm and scores every grader; `--max-cost-usd` stops new runs at a list-price ceiling (exit 2, partial results); `case.yaml` with `schema_version: "1.1"`, `name` and `context.add_dirs` grants read-only fixture directories (the docs; measured in Task 2 not to reach the agent, so rc-03 uses `context.scaffold_script` instead) (code.claude.com/docs/en/plugin-evals, "Grader types", "Command options", "Seed the workspace or conversation", "How runs are isolated").
 - **Instruction-file size** (code.claude.com/docs/en/memory, "Write effective instructions", read 25 Nov 2026): "target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence." Imports "help you organize a long file but don't reduce its context cost, because imported files load together with the CLAUDE.md that imports them." Same page, "Audit your instruction files": `/doctor prompt-audit` reports outdated or conflicting instructions and changes nothing until asked. So detail moves to files read by path on demand, never to `@`-imports.
 - **Context rot** (anthropic.com/engineering/effective-context-engineering-for-ai-agents, read 25 Nov 2026): "as the number of tokens in the context window increases, the model's ability to accurately recall information from that context decreases"; aim for "the smallest possible set of high-signal tokens".
 - **Fix-loop baselines.** Superpowers 6.2.0 `subagent-driven-development/SKILL.md` (lines 319-360, read from the installed plugin 25 Nov 2026): "A fix round is one fix dispatch plus one scoped re-review. Five rounds maximum per task"; rounds 1-3 resume the implementer, rounds 4-5 a fresh implementer on a more capable model; "When round 5's re-review still leaves findings open, stop dispatching. Adjudicate each open finding". GSD `get-shit-done/references/gates.md` (github.com/gsd-build/get-shit-done, read 25 Nov 2026), Revision Gate: "Bounded by iteration cap … The loop also escalates early if issue count does not decrease between consecutive iterations (stall detection). After max iterations, escalates unconditionally"; plan-checker "max 3 iterations".
-- **Hypothesis (not settled by the pages read):** the path at which an `add_dirs` directory appears to the agent. Task 2 measures it. The plan does not depend on `--eval-dir` pointing a base plugin at the head's cases; it copies the cases instead.
+- **Settled in Task 2 (measured):** an `add_dirs` grant did not reach the agent (`additional_directories: []` in the run's init record); rc-03 uses `scaffold_script` with `--scaffold`, and the files appear at `<cwd>/resources/`. The plan does not depend on `--eval-dir` pointing a base plugin at the head's cases; it copies the cases instead.
 
 ---
 
@@ -200,7 +200,7 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 
 ## 5. Evals
 
-**Mechanism.** The repo's existing one: `evals/<case>/prompt.md` (frontmatter `max_turns`, `allowed_tools`) plus `graders/cN-<slug>.md` (`type: llm`, `weight: 1`, one criterion each) and the `skill-fired.md` indicator copied from existing cases. One case (`rc-03`) adds `case.yaml` with `context.add_dirs: [resources]`. Every case name starts `rc-`, so `--case 'rc-*'` (one glob, as the docs specify) selects all of them. Scenarios use domains unlike the case (bookings, refunds, ticket triage, invoicing, a small code edit) so no case can be answered by recalling the reference (behaviour-evals.md, "Contamination").
+**Mechanism.** The repo's existing one: `evals/<case>/prompt.md` (frontmatter `max_turns`, `allowed_tools`) plus `graders/cN-<slug>.md` (`type: llm`, `weight: 1`, one criterion each) and the `skill-fired.md` indicator copied from existing cases. One case (`rc-03`) adds `case.yaml` with `context.scaffold_script: fixture.sh`, which copies `resources/` into the workspace (runs need `--scaffold`; `add_dirs` was measured in Task 2 not to reach the agent). Every case name starts `rc-`, so `--case 'rc-*'` (one glob, as the docs specify) selects all of them. Scenarios use domains unlike the case (bookings, refunds, ticket triage, invoicing, a small code edit) so no case can be answered by recalling the reference (behaviour-evals.md, "Contamination").
 
 **Superpowers is absent inside eval runs** (plugin-evals page, "How runs are isolated"), so no grader depends on systematic-debugging; each grades a behaviour the reference adds.
 
@@ -313,7 +313,7 @@ Serial, one writer per worktree (the reference, the SKILL row and the hook depen
 
 **Files:**
 - Create: `plugins/engineering-method/evals/<case>/prompt.md`, `graders/cN-<slug>.md`, `graders/skill-fired.md` for each of the 12 cases in section 5.
-- Create: `plugins/engineering-method/evals/rc-03-full-input/case.yaml`, `resources/session_local.jsonl`, `resources/trace_export.json`.
+- Create: `plugins/engineering-method/evals/rc-03-full-input/case.yaml`, `fixture.sh`, `resources/session_local.jsonl`, `resources/trace_export.json`.
 
 **Interfaces:** Produces case directory names exactly as in section 5, all starting `rc-`; Tasks 2 and 10 select them with `--case 'rc-*'`.
 
@@ -374,7 +374,7 @@ arm: both
 schema_version: "1.1"
 name: rc-03-full-input
 context:
-  add_dirs: [resources]
+  scaffold_script: fixture.sh   # copies resources/ into the workspace; runs need --scaffold
 ```
 
 `resources/session_local.jsonl`: three JSON lines (a user turn asking to escalate ticket 7731; an assistant turn refusing "I can't confirm this request comes from a team lead"; a `systemPrompt` record with `"truncated": true, "limitChars": 24000, "originalChars": 38500` whose text stops before the requester block). `resources/trace_export.json`: the same turn with the complete system prompt, whose requester block reads `requester_role:` with an empty value (the renderer fills it only for group tickets; this ticket has one requester). The empty value appears nowhere in the local file, so c1 can pass only from the full input. All names invented (`ticket 7731`, `team lead`, `example.invalid` addresses).

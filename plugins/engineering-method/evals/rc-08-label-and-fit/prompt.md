@@ -1,6 +1,6 @@
 ---
 description: "Contamination strings: 14 of 40 ; can't offer a slot"
-max_turns: 8
+max_turns: 12
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
