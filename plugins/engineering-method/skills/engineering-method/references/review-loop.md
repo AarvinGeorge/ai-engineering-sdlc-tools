@@ -73,12 +73,18 @@ review. This file says who reviews, what they must do, and when to stop.
   before the cap and the controller adjudicates as at the cap (park with a ruling, or BLOCKED to
   the owner). The cap is five for every review loop, plan and deploy-file reviews included, not
   GSD's three for plans: the stall rule already ends a loop that is not converging, and one number
-  for every loop is one rule to check. *Why:* the escalation line said who takes each round but
-  never when the rounds end, and a round that reopens what it closed spends review capacity
-  without converging. *Test:* the review's ledger line states the starting Z; each round's line is
-  Superpowers' (`Task N: fix round R/5 (...; commits a..b)`) carrying `closed X, reopened Y, open Z`
-  (Critical and Important only), ending `stall` when the round stalls; no task shows a round after
-  a second stall on it or after round 5.
+  for every loop is one rule to check. **These stops bind the agent's own autonomy, not the
+  owner.** The agent never starts a round past the cap, or after a second stall, on its own. When
+  the owner explicitly asks for more rounds, it pushes back once: it names the stall and the rounds
+  that meet it, states the cap and what happens to findings open at it, and recommends stopping.
+  If the owner still asks, the owner's word wins (SKILL.md: push back once, then do it as asked):
+  it dispatches as asked and keeps the ledger counts. *Why:* the escalation line said who takes
+  each round but never when the rounds end, and a round that reopens what it closed spends review
+  capacity without converging. *Test:* the review's ledger line states the starting Z; each round's
+  line is Superpowers' (`Task N: fix round R/5 (...; commits a..b)`) carrying
+  `closed X, reopened Y, open Z` (Critical and Important only), ending `stall` when the round
+  stalls; a round after a second stall on a task or after round 5 appears only beside the owner's
+  explicit instruction and the one pushback that preceded it.
 - **Record a residual rather than hiding it.** A known limit, stated, is a decision; a hidden one is
   a defect waiting.
 

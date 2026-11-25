@@ -218,7 +218,11 @@ recorded uncovered lesson.
 **Rule.** A brief to a second investigator or reviewer carries the symptom, the evidence locations
 and the constraints, never your hypothesis or conclusion. It requires the reply to state
 `full input read: yes/no, from <store>`, the model id it ran as, and a label on each claim. Your
-hypothesis is tested against its independent findings afterwards.
+hypothesis is tested against its independent findings afterwards. This binds the agent's own
+briefs: it never adds a hypothesis on its own. When the owner explicitly asks for one in the brief,
+it pushes back once (an anchored investigator tends to confirm what it is handed), then includes it
+as asked, in its own section after the symptom, evidence and constraints, worded as a claim to
+confirm or refute; those other sections still carry no cause.
 - **Trigger:** whenever investigation work is handed off (principle 10, review-loop.md briefs).
 - **Input:** symptom, evidence locations, constraints. **Output:** the brief.
 - **Prevents:** an anchored investigator returning your hypothesis confirmed.
@@ -226,7 +230,8 @@ hypothesis is tested against its independent findings afterwards.
 
 *Why:* the source case's independent investigator was handed the controller's hypothesis ("test
 this") and reported that it held, after reconstructing the input instead of reading it. *Test:*
-the brief holds no hypothesis and asks for the input line and the model id.
+the brief asks for the input line and the model id, and holds no hypothesis unless the owner
+explicitly asked for one, which then sits in its own section after one pushback.
 
 ## Where this departs from systematic-debugging
 
