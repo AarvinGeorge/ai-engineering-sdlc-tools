@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.4.0 — 2026-11-25
+
+**A debug stage.** A prompt that moves to debugging (debug, investigate, diagnose, bug, root cause)
+now makes the hook name `superpowers:systematic-debugging` and the new investigation reference, and
+`SKILL.md` §3 gains a `debug` row (enforced against the hook's stage map by test). Fix words give way
+to debug when a debug word follows ("fix the bug" investigates first); a nearer non-build stage word
+still wins. Known limit: a prompt that names only the symptom, with none of the stage words, relies on
+the skill's trigger text, not the hook.
+
+**Root-cause investigation reference.** `references/root-cause-investigation.md` holds ten named
+steps, RC-1 to RC-10, each invoked at its trigger and written as rule, trigger, input, output, what it
+prevents and evidence: pin what ran, read the decision record, read the full input, quote the
+objection, diff the served inputs, inventory the concept, trace the dropped fact, label the root then
+fit the fix, close the loop, brief the investigator blind. Most steps are for systems where a model
+makes the decision. RC-5 starts from the working case: the run that worked is the baseline before any
+cause is offered. The reference names where it departs from systematic-debugging and what stays in
+each project. Principle 17 now points at it.
+
+**Drift fix and maintainer loop.** `docs-and-decisions.md` described principle 17 as "five steps" while
+`SKILL.md` carries four required lines (Exists, Extends, Unlocks, Goals); it now says four, and a
+test in `tests/test_skill_budget.py` fails if the miscount returns. `CONTRIBUTING.md` gains a
+maintainer loop: a lesson an investigation surfaces that applies beyond its project enters through an
+issue stated generally, a behaviour eval shown failing first, then the reference change, with its
+row in `evals/COVERAGE.md`; a lesson without a failing eval is not a method change yet.
+
+**Keeping instruction files small.** `references/docs-and-decisions.md` gains a ten-step procedure for
+compressing an always-loaded instruction file without losing a rule: archive the file verbatim and
+prove the copy, sort sections by kind, keep binding rules as rule plus reason, source every added
+claim, grep a checklist of one-line rules, have a different model diff old against new before the
+commit, write the size rule into the file, scan before the push. Baseline: Anthropic's guidance on
+instruction-file size, with `/doctor prompt-audit` as an input, not a substitute.
+
+**Bounded review and fix loops.** `references/review-loop.md`, "Fix rounds", holds one rule: Superpowers'
+five-round cap is kept, GSD's stall detection is added (a finding that reopens, or an open count that
+does not fall), and a ledger line `fix round R/5: closed X, reopened Y, open Z` shows it. The
+departure is named: the first stall stops the loop and sends the open findings to the owner, where
+Superpowers would carry on to the cap. The duplicate rule in `model-routing-and-cost.md` is replaced by
+a pointer.
+
+**Tests and evals.** 71 unit tests (55 in 0.3.0). 14 new eval cases, each criterion graded on its own:
+`rc-01` to `rc-10`, `rc-activation-loads-reference`, `rc-near-miss-rename` (a regression guard that
+should pass on both versions), `instruction-file-compression` and `fix-loop-bounded`; `rc-03-full-input`
+needs `--scaffold`, and `rc-05-diff` c2 is a guard that 0.3.0 already passes 2 runs of 3.
+`evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43). Eval results, 0.3.0 base versus
+0.4.0 head, with cost: not yet measured at the time of this entry; to be filled from the measured run,
+never estimated.
+
 ## 0.3.0 — 2026-11-16
 
 **The method re-applies itself.** The main failure in long sessions was activation, not content: the
