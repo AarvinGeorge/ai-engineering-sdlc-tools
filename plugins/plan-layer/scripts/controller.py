@@ -20,6 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 
 
+_MISSING = object()  # a task absent from a record, distinct from a task with no state (None)
+
+
 def _f(check, message, level="FAIL"):
     return {"check": check, "level": level, "message": message}
 
@@ -60,13 +63,13 @@ def one_writer_findings(root, d, cfg):
         return []
     st = L.controller_state(root) or {}
     rec = st.get("writes")
-    if not isinstance(rec, dict):
-        return [_f("one_writer", "meta.controller.one_writer is on but move.py has recorded no write — "
-                   "run move.py --adopt once to stamp the current state")]
     dups = [_f("one_writer", "%s is the work id of more than one live item or release — rename the "
                "duplicate to its own id (--adopt cannot clear this)" % w) for w in L.duplicate_ids(d)]
     dups += [_f("one_writer", "task name %r appears more than once in %s — rename the duplicate "
                 "(--adopt cannot clear this)" % (t, w)) for w, t in duplicate_tasks(d)]
+    if not isinstance(rec, dict):
+        return dups + [_f("one_writer", "meta.controller.one_writer is on but move.py has recorded no write — "
+                          "run move.py --adopt once to stamp the current state")]
     if dups:
         return dups
     cur, first = L.controlled(d), first_stage(d)
@@ -83,13 +86,13 @@ def one_writer_findings(root, d, cfg):
                 out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; %s"
                               % (wid, b["stage"], a["stage"], FIX)))
             for t in sorted(set(a["tasks"]) | set(b["tasks"])):
-                ta, tb = a["tasks"].get(t), b["tasks"].get(t)
-                if ta is None and tb != "todo":
+                ta, tb = a["tasks"].get(t, _MISSING), b["tasks"].get(t, _MISSING)
+                if ta is _MISSING and tb != "todo":
                     out.append(_f("one_writer", "task %r of %s entered at %r by hand — %s"
                                   % (t, wid, tb, FIX)))
-                elif tb is None and ta not in (None, "todo"):
+                elif tb is _MISSING and ta not in (_MISSING, "todo"):
                     out.append(_f("one_writer", "task %r of %s (%s) was removed by hand — %s" % (t, wid, ta, FIX)))
-                elif ta is not None and tb is not None and ta != tb:
+                elif ta is not _MISSING and tb is not _MISSING and ta != tb:
                     out.append(_f("one_writer", "task %r of %s is %r but move.py last wrote %r — changed by "
                                   "hand; %s" % (t, wid, tb, ta, FIX)))
         elif b:
@@ -101,10 +104,16 @@ def one_writer_findings(root, d, cfg):
             out.append(_f("one_writer", "%s left plans.%s by hand (it was at %r) — %s (finish work with "
                           "move.py %s --to done --outcome \"<text>\")" % (wid, a["bucket"], a["stage"], FIX, wid)))
     rrel = rec.get("releases") or {}
-    for rid, stage in sorted(cur["releases"].items()):
-        if rid in rrel and rrel[rid] != stage:
+    for rid in sorted(set(rrel) | set(cur["releases"])):
+        if rid not in rrel:
+            out.append(_f("one_writer", "release %s (stage %r) was added by hand — %s"
+                          % (rid, cur["releases"][rid], FIX)))
+        elif rid not in cur["releases"]:
+            out.append(_f("one_writer", "release %s (stage %r) was removed by hand — %s"
+                          % (rid, rrel[rid], FIX)))
+        elif rrel[rid] != cur["releases"][rid]:
             out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; %s"
-                          % (rid, stage, rrel[rid], FIX)))
+                          % (rid, cur["releases"][rid], rrel[rid], FIX)))
     return out
 
 

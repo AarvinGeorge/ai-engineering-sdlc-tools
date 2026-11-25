@@ -582,12 +582,13 @@ def duplicate_ids(d):
                 dup.add(wid)
             elif wid:
                 seen.add(wid)
+    rseen = set()
     for r in d.get("releases") or []:
         rid = work_id(r.get("id")) if isinstance(r, dict) else None
         if rid and rid.startswith("R-"):
-            if rid in seen:
+            if rid in rseen:
                 dup.add(rid)
-            seen.add(rid)
+            rseen.add(rid)
     return sorted(dup)
 
 

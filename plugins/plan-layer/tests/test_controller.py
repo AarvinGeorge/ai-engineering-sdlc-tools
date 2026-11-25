@@ -279,3 +279,45 @@ class TestDuplicates(ControllerBase):
         self.write()
         _, fails, _ = self.gate()
         self.assertTrue(any("E-01.S2.T1 form" in f and "more than once" in f for f in fails), fails)
+
+
+class TestFixRound1Task2(ControllerBase):
+    REMEDY = "revert the hand edit, or run move.py --adopt (with the owner's say-so)"
+
+    def test_release_added_by_hand_fails(self):
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 a", "stage": "build"}]
+        stamp_now(self)
+        self.d["releases"].append({"id": "R-02", "name": "R-02 b", "stage": "production"})
+        self.write()
+        _, fails, _ = self.gate()
+        hit = [f for f in fails if "R-02" in f and "by hand" in f]
+        self.assertTrue(hit, fails)
+        self.assertIn(self.REMEDY, hit[0])
+
+    def test_release_removed_by_hand_fails(self):
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 a", "stage": "build"}]
+        stamp_now(self)
+        self.d["releases"] = []
+        self.write()
+        _, fails, _ = self.gate()
+        hit = [f for f in fails if "R-01" in f and "by hand" in f]
+        self.assertTrue(hit, fails)
+        self.assertIn(self.REMEDY, hit[0])
+
+    def test_task_without_state_unchanged_is_clean(self):
+        self.d["plans"]["now"][0]["tasks"].append({"name": "E-01.S2.T2 no state"})
+        stamp_now(self)
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_item_and_release_with_one_id_are_not_duplicates(self):
+        self.d["plans"]["next"].append(item("R-01 cut the release"))
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 a", "stage": "build"}]
+        self.assertEqual(L.duplicate_ids(self.d), [])
+
+    def test_duplicates_are_reported_even_with_no_stamp(self):
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("rename the duplicate" in f for f in fails), fails)
+        self.assertTrue(any("move.py --adopt" in f for f in fails), fails)
