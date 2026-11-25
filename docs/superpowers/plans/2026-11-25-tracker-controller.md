@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One controller in plan-layer owns the plan's state fields and every list that must mirror them: it is the only writer of stage and status, it computes one diff (plan vs its own last write, vs the tracker, vs the project's declared rules, vs a declared inventory), and that diff is a red gate fired by events, so the agent is never the trigger.
+**Goal:** One controller in plan-layer owns the plan's state fields and every list that must mirror them: it is the only writer of stage, bucket, task state and release stage, it computes one diff (plan vs its own last write, vs the tracker, vs the project's declared rules, vs a declared inventory), and that diff is a red gate fired by events, so the agent is never the trigger.
 
 **Architecture:** The reconciliation loop (GitOps, Kubernetes controller): plan.json is the declared desired state; the controller reads the observed state (its own write stamp, the tracker rows the agent fetched, git, the files that must cover an inventory) and one function, `controller.findings(root, d, event)`, returns the diff as data. `check.py` (the gate) turns findings into FAIL lines; the existing hooks (Stop, SessionStart) and the writer scripts (`move.py`, `pause.py`, `sync.py`) call the gate with their event name. plan-layer never calls a tracker API: it computes expected rows and the diff; the agent applies them through whatever connector it has (the 0.18.0 boundary, kept).
 
@@ -37,7 +37,7 @@
 
 | Capability | Exists (0.18.0) | EXTENDS / NEW | Unlocks | Goal served |
 |---|---|---|---|---|
-| One writer of stage/status (S8) | Single-writer precedent: `sync.py` is the only writer of `views[].spec_sha256`; `pause.py` of `meta.paused`; `plan_lib.roll` of the archive | **NEW `scripts/move.py`** (CLI writer) + **EXTENDS `plan_lib`** (writer matrix, controlled-field snapshot, stamp). Why new: `check.py` is the read-only gate (its one write is the verify stamp), `tracker.py` mirrors outward, `sync.py` orchestrates refresh-render-gate; a stage writer is its own job, like `pause.py` and `roll.py` | Stage moves become events the controller can fire rules on; the tracker sees only script-written state | Durable, trustworthy state; drift caught by code |
+| One writer of stage, bucket, task state, release stage (S8; prose status stays hand-editable, `tracker.expected_rows` never reads it) | Single-writer precedent: `sync.py` is the only writer of `views[].spec_sha256`; `pause.py` of `meta.paused`; `plan_lib.roll` of the archive | **NEW `scripts/move.py`** (CLI writer) + **EXTENDS `plan_lib`** (writer matrix, controlled-field snapshot, stamp). Why new: `check.py` is the read-only gate (its one write is the verify stamp), `tracker.py` mirrors outward, `sync.py` orchestrates refresh-render-gate; a stage writer is its own job, like `pause.py` and `roll.py` | Stage moves become events the controller can fire rules on; the tracker sees only script-written state | Durable, trustworthy state; drift caught by code |
 | The diff as data (all stories) | Gate strings in `check.run`; tracker diff in `tracker.diff_rows` | **NEW `scripts/controller.py`** (library only, no CLI). Why new: `check.run` returns strings, and `pause.py` must read the same findings structurally; putting them in `tracker.py` would make tracker-free checks (writes, rules, inventory) depend on the tracker module. Check, pause and brief all read one function | One loop, many readers; S4 and S9 add a check each, no second gate | No work built twice |
 | Relational tracker reconcile (S3) | Flat rows: now, next, last 5 done; `expected`, `diff --actual`, adapters as data | **EXTENDS `tracker.py`** and the two adapters: rows gain `kind` (epic, story, task, release) and relation fields, opt-in `meta.tracker.relational`; top-level `epics[]`, `releases[]` | A tracker with linked epics, stories, tasks and releases stays correct without hand edits | Tracker shows real state |
 | Drift is a red gate, run by events (S3, S7) | Tracker signals are DRIFT in `check.run`; Stop hook blocks on FAIL once per failure set | **EXTENDS `check.py`** (`--event`, findings → FAIL when `meta.controller` is set), `gate_hook.py`, `brief.py`, `sync.py`, `pause.py` pass their event; tracker signals move (unchanged text) into `controller.py` | The Stop hook blocks a turn that left the tracker unreconciled | Agent never the trigger |
@@ -52,6 +52,7 @@
 - Calling any tracker API, storing a token, or an integration account (the agent uses its connector).
 - A PostToolUse hook that catches a hand edit the moment it happens (the Stop gate catches it at turn end; add only on a measured miss).
 - Rule kinds other than `co_change` (content patterns, commands, regex on files): no stated case.
+- "Invariants with a runnable check" (Warp study): a co-change rule matches paths and runs nothing, so it cannot express this. plan-layer already has the mechanism, `assertions` run by `check.py --verify`, kept explicit and never hook-run by design (a hook that runs commands against the real system on every turn is the cost that ruling avoided). No new mechanism here.
 - Reading the session transcript from a script; the handoff names it as the agent's step.
 - Release stages as a validated enum, release-stage rules beyond the `release:<stage>` event.
 - Archive view, history timeline (ROADMAP gap 1), `disputed` flag (gap 3).
@@ -63,7 +64,7 @@
 |---|---|---|
 | `plugins/plan-layer/scripts/plan_lib.py` | Modify | `WRITERS` matrix, `controller_config`, `controlled`, controller-state read/write, `archived_ids` |
 | `plugins/plan-layer/scripts/controller.py` | Create | `findings(root, d, event)`: one_writer, tracker, rules, inventory; `changed_files` |
-| `plugins/plan-layer/scripts/move.py` | Create | The one writer of stage, status, task state, bucket, release stage; `--adopt` |
+| `plugins/plan-layer/scripts/move.py` | Create | The one writer of stage, task state, bucket, release stage (`--status` is a convenience, not stamped); `--adopt` |
 | `plugins/plan-layer/scripts/check.py` | Modify | `--event`; tracker block moved to controller; findings into FAIL/DRIFT and `--json` |
 | `plugins/plan-layer/scripts/tracker.py` | Modify | Relational expected rows, diff per kind with relations, `actual_keys` in the record |
 | `plugins/plan-layer/scripts/pause.py` | Modify | Reconcile section, git per active id, decisions since last handoff |
@@ -85,7 +86,7 @@
 | B relational | 4, 5 | Opus | Fable 5.2, one review for the lane | `tracker.py`, `trackers/*`, schema `meta.tracker`/`epics` |
 | serial | 6, 7, 8, 9, 10 | Opus | Fable 5.2 per task (6 and 7 are the security-of-the-gate seam) | needs A and B merged |
 
-A and B run in parallel in separate worktrees (different files, neither needs the other's output; the one shared file, the schema, is edited in different properties). Merge order: A, then B, the controller resolves any schema conflict. Every agent reports the model id it ran as. Implementers do not run the full suite; the controller does after each merge. Bound: 60 tool calls per implementer task, then "stop and report".
+A and B run in parallel in separate worktrees; neither needs the other's output. **Two files are shared** (review M1): `plan_lib.py` (A appends a new "Controller" section at the end; B edits only the body of `tracker_config`) and `schema/plan.schema.json` (A adds `meta.controller` and `releases`; B adds `meta.tracker.relational` and `epics`). Merge order: **A first** into `tracker-controller`; then B rebases onto it, resolves the two files by keeping both sides, runs `tests/test_controller.py`, `tests/test_relational.py` and `tests/test_tracker.py`, and merges; the controller then runs the full suite before Task 6 starts. Every agent reports the model id it ran as. Implementers do not run the full suite; the controller does after each merge. Bound: 60 tool calls per implementer task, then "stop and report".
 
 ---
 
@@ -100,7 +101,8 @@ A and B run in parallel in separate worktrees (different files, neither needs th
 - Produces:
   - `L.WRITERS: list[dict]` each `{"field": str, "writer": str, "enforced": str}`
   - `L.controller_config(d) -> (dict | None, str | None)`; dict `{"one_writer": bool, "base": str, "decision_log": str | None, "rules": list}`; `(None, None)` when `meta.controller` is absent
-  - `L.controlled(d) -> {"items": {wid: {"bucket", "stage", "status", "tasks": {name: state}}}, "releases": {rid: stage}}` (status is a 12-char sha of the NFC text, or None)
+  - `L.controlled(d) -> {"items": {wid: {"bucket", "stage", "tasks": {name: state}}}, "releases": {rid: stage}}` (prose status is not controlled: ruling 2)
+  - `L.duplicate_ids(d) -> list[str]` (work ids held by more than one live item; I4)
   - `L.controller_state(root) -> dict | None`, `L.write_stamp(root, d, by) -> None`, `L.controller_state_path(root) -> str`, `L.archived_ids(root) -> set[str]`
 
 - [ ] **Step 1: Write the failing tests**
@@ -173,21 +175,19 @@ class TestPlumbing(ControllerBase):
         cfg, err = L.controller_config(self.d)
         self.assertIn("work-ids", err)
 
-    def test_controlled_reads_bucket_stage_status_tasks_and_releases(self):
+    def test_controlled_reads_bucket_stage_tasks_and_releases_not_status(self):
         self.d["releases"] = [{"id": "R-01", "name": "R-01 Accounts", "stage": "build",
                                "stories": ["E-01.S2"]}]
         c = L.controlled(self.d)
         s2 = c["items"]["E-01.S2"]
-        self.assertEqual((s2["bucket"], s2["stage"]), ("now", "building"))
-        self.assertEqual(len(s2["status"]), 12)
-        self.assertEqual(s2["tasks"], {"E-01.S2.T1 form": "todo"})
-        self.assertIsNone(c["items"]["E-01.S3"]["status"])
+        self.assertEqual(s2, {"bucket": "now", "stage": "building",
+                              "tasks": {"E-01.S2.T1 form": "todo"}})
         self.assertEqual(c["releases"], {"R-01": "build"})
 
-    def test_status_sha_ignores_nfc_and_whitespace_only_differences(self):
-        a = L.controlled(self.d)["items"]["E-01.S2"]["status"]
-        self.d["plans"]["now"][0]["status"] = "wiring  the form "
-        self.assertEqual(L.controlled(self.d)["items"]["E-01.S2"]["status"], a)
+    def test_duplicate_live_work_ids_are_found(self):
+        self.assertEqual(L.duplicate_ids(self.d), [])
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.assertEqual(L.duplicate_ids(self.d), ["E-01.S2"])
 
     def test_write_stamp_round_trips_and_keeps_other_keys(self):
         self.write()
@@ -203,7 +203,7 @@ class TestPlumbing(ControllerBase):
 
     def test_writer_matrix_names_every_stamped_field(self):
         fields = " ".join(w["field"] for w in L.WRITERS)
-        for f in ("stage", "status", "tasks[].state", "releases[].stage", "meta.paused",
+        for f in ("stage", "tasks[].state", "releases[].stage", "meta.paused",
                   "plan/tracker-state.json", "plan/controller-state.json"):
             self.assertIn(f, fields)
         for w in L.WRITERS:
@@ -226,7 +226,7 @@ CONTROLLER_STATE_FILENAME = "controller-state.json"
 _CONTROLLER_KEYS = ("one_writer", "base", "decision_log", "rules")
 
 WRITERS = [
-    {"field": "plans.now[] / plans.next[]: membership, stage, status, tasks[].state",
+    {"field": "plans.now[] / plans.next[]: membership, stage, tasks[].state",
      "writer": "move.py", "enforced": "stamp in plan/controller-state.json; the gate FAILs on a hand edit"},
     {"field": "plans.done[] (an item finished from now)", "writer": "move.py --to done",
      "enforced": "stamp"},
@@ -280,18 +280,14 @@ def controller_config(d):
     return {"one_writer": ow, "base": base, "decision_log": log, "rules": rules}, None
 
 
-def _status_sha(text):
-    if not (isinstance(text, str) and text.strip()):
-        return None
-    return _hashlib.sha256(nfc_text(text).encode("utf-8")).hexdigest()[:12]
-
-
 def controlled(d):
     """The fields one writer owns, read from the plan. Pure.
 
     Items in plans.now and plans.next keyed by work id (an item without one is
-    the naming check's FAIL, not this one's); releases[] keyed by id. Status is
-    stored as a short hash so the stamp stays small and never copies prose.
+    the naming check's FAIL, not this one's); releases[] keyed by id. Prose
+    status is deliberately not controlled: nothing downstream reads it as
+    state (review ruling 2). Two live items with one id collapse here, so
+    duplicate_ids() is checked first and FAILs.
     """
     out = {"items": {}, "releases": {}}
     plans = d.get("plans") or {}
@@ -301,13 +297,26 @@ def controlled(d):
             if not wid:
                 continue
             out["items"][wid] = {
-                "bucket": bucket, "stage": it.get("stage"), "status": _status_sha(it.get("status")),
+                "bucket": bucket, "stage": it.get("stage"),
                 "tasks": {str(t.get("name")): t.get("state")
                           for t in it.get("tasks") or [] if isinstance(t, dict)}}
     for r in d.get("releases") or []:
         if isinstance(r, dict) and work_id(r.get("id")):
             out["releases"][r["id"]] = r.get("stage")
     return out
+
+
+def duplicate_ids(d):
+    """Work ids carried by more than one item in plans.now and plans.next, sorted. Pure."""
+    seen, dup = set(), set()
+    for bucket in ("now", "next"):
+        for it in (d.get("plans") or {}).get(bucket) or []:
+            wid = work_id(it.get("name")) if isinstance(it, dict) else None
+            if wid in seen:
+                dup.add(wid)
+            elif wid:
+                seen.add(wid)
+    return sorted(dup)
 
 
 def controller_state_path(root=None):
@@ -349,8 +358,6 @@ def archived_ids(root=None):
     return out
 ```
 
-`_hashlib` is imported further down the file (views section); move `import hashlib as _hashlib` to the imports at the top of the file so this section can use it.
-
 Schema: add `meta.controller` (object: `one_writer` boolean, `base` string, `decision_log` string, `rules` array, `additionalProperties: false`, description naming the writer matrix and `move.py`), and top-level `releases` (array of `{id: "R-NN", name, stage, stories: [story ids]}`, required `id`, `name`, `stage`).
 
 - [ ] **Step 4: Run to verify they pass**
@@ -371,7 +378,8 @@ git commit -m "plan-layer: writer matrix, meta.controller and the controlled-fie
 
 **Files:**
 - Create: `plugins/plan-layer/scripts/controller.py`
-- Modify: `plugins/plan-layer/scripts/check.py` (`run(root=None, event=None)`, `main` parses `--event`, `--json` gains `"controller"`)
+- Modify: `plugins/plan-layer/scripts/check.py` (`run(root=None, event=None)`, `main` parses `--event`, `--json` gains `"controller"` only when opted in)
+- Modify: `plugins/plan-layer/tests/test_plan_layer.py:1394` (`allowed` gains `"controller"`)
 - Test: `plugins/plan-layer/tests/test_controller.py` (append)
 
 **Interfaces:**
@@ -414,14 +422,38 @@ class TestOneWriterGate(ControllerBase):
         self.assertTrue(hit, fails)
         self.assertIn("move.py E-01.S2 --stage verified", hit[0])
 
-    def test_hand_edit_of_status_and_task_state_fail(self):
+    def test_hand_edit_of_task_state_fails_but_prose_status_is_free(self):
         stamp_now(self)
-        self.d["plans"]["now"][0]["status"] = "done, trust me"
+        self.d["plans"]["now"][0]["status"] = "rewritten by hand"
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], "prose status is not controlled (ruling 2)")
         self.d["plans"]["now"][0]["tasks"][0]["state"] = "done"
         self.write()
         _, fails, _ = self.gate()
-        self.assertTrue(any("status of E-01.S2" in f for f in fails), fails)
         self.assertTrue(any("E-01.S2.T1 form" in f and "done" in f for f in fails), fails)
+
+    def test_two_live_items_with_one_work_id_fail(self):
+        stamp_now(self)
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-01.S2" in f and "more than one" in f for f in fails), fails)
+
+    def test_json_has_no_controller_key_when_off(self):
+        del self.d["meta"]["controller"]
+        self.write()
+        run("render.py", project=self.dir)
+        out = json.loads(run("check.py", "--json", project=self.dir).stdout)
+        self.assertNotIn("controller", out)
+        self.assertNotIn("controller", out["summary"])
+
+    def test_a_crash_inside_the_controller_is_a_fail_not_silence(self):
+        stamp_now(self)
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            json.dump({"writes": {"items": {"E-01.S2": "not-a-dict"}}}, fh)
+        _, fails, _ = self.gate()
+        self.assertTrue(any("controller crashed" in f for f in fails), fails)
 
     def test_new_idea_in_next_at_first_stage_is_planning_not_a_hand_move(self):
         stamp_now(self)
@@ -539,6 +571,10 @@ def one_writer_findings(root, d, cfg):
     if not isinstance(rec, dict):
         return [_f("one_writer", "meta.controller.one_writer is on but move.py has recorded no write — "
                    "run move.py --adopt once to stamp the current state")]
+    dups = L.duplicate_ids(d)
+    if dups:
+        return [_f("one_writer", "%s is the work id of more than one live item — give each its own id"
+                   % w) for w in dups]
     cur, first = L.controlled(d), first_stage(d)
     archived = L.archived_ids(root)
     out = []
@@ -553,9 +589,6 @@ def one_writer_findings(root, d, cfg):
                 out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; "
                               "run move.py %s --stage %s (or revert the edit)"
                               % (wid, b["stage"], a["stage"], wid, b["stage"])))
-            if a["status"] != b["status"]:
-                out.append(_f("one_writer", "status of %s changed by hand — set it with "
-                              "move.py %s --status \"<text>\"" % (wid, wid)))
             for t in sorted(set(a["tasks"]) | set(b["tasks"])):
                 ta, tb = a["tasks"].get(t), b["tasks"].get(t)
                 if ta is None and tb != "todo":
@@ -595,13 +628,21 @@ In `check.py`: `import controller` beside `import tracker`; change `def run(root
 
 ```python
     # The controller's diff (0.19.0): one function, read by the gate, the
-    # handoff and the hooks, so nothing computes it twice.
-    found = controller.findings(root, d, event)
+    # handoff and the hooks, so nothing computes it twice. A crash inside it
+    # is a FAIL, never silence: the Stop hook fails open on an exception, so
+    # an uncaught one would switch the whole gate off (review I3).
+    try:
+        found = controller.findings(root, d, event)
+    except Exception as exc:
+        found = [{"check": "config", "level": "FAIL",
+                  "message": "controller crashed (%s: %s) — the plan's controller inputs are malformed"
+                             % (exc.__class__.__name__, exc)}]
     for f in found:
         (fails if f["level"] == "FAIL" else drifts).append(f["message"])
+    controller_on = "controller" in d.get("meta", {}) or "inventory" in d
 ```
 
-add `"controller": found,` to `summary`; in `main`:
+after `summary` is built, add `if controller_on: summary["controller"] = found` (absent otherwise, so `--json` stays byte-identical for a plan that does not opt in: review M2); in `main`:
 
 ```python
     event = None
@@ -614,7 +655,9 @@ add `"controller": found,` to `summary`; in `main`:
     fails, drifts, summary = run(event=event)
 ```
 
-and in the `--json` branch add `"controller": summary["controller"]`. Update the module docstring's usage block with `check.py --event <name>`.
+and in the `--json` branch add `"controller": summary["controller"]` only when the key is in `summary`.
+
+Add `"controller"` to the `allowed` set in `tests/test_plan_layer.py::test_no_third_party_imports` (line 1394 at base), or that test fails on the new import (review I1). Update the module docstring's usage block with `check.py --event <name>`.
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -624,8 +667,8 @@ Expected: all OK. Then `python3 -m unittest tests/*.py` from the controller only
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/plan-layer/scripts/controller.py plugins/plan-layer/scripts/check.py plugins/plan-layer/tests/test_controller.py
-git commit -m "plan-layer: controller.findings, the one diff; the gate FAILs on a hand edit of stage or status (S8)"
+git add plugins/plan-layer/scripts/controller.py plugins/plan-layer/scripts/check.py plugins/plan-layer/tests/test_controller.py plugins/plan-layer/tests/test_plan_layer.py
+git commit -m "plan-layer: controller.findings, the one diff; the gate FAILs on a hand edit of stage or task state (S8)"
 ```
 
 ---
@@ -644,7 +687,8 @@ git commit -m "plan-layer: controller.findings, the one diff; the gate FAILs on 
   - `move.py <id> --task <name or task id> --state done|active|todo|blocked`
   - `move.py <id> --to now|next|done [--status TEXT] [--outcome TEXT]` (`now` needs a status, given or present; `done` needs `--outcome`)
   - `move.py --adopt` (stamp the current state; record what it accepted)
-  - Exit 0 written; 1 refused (Task 7: a rule on the event failed); 2 usage, unknown id, invalid stage or state.
+  - Exit 0 written; 1 refused (pending hand edits, review C1; or, Task 7, a rule on the event failed); 2 usage, unknown id, invalid stage or state, a non-stage flag on a release (M3).
+  - `--status` writes the prose status as a convenience; it is not stamped (ruling 2).
   - `move.event_for(kind, stage) -> str` (`"stage:<id>"` for items, `"release:<stage>"` for releases), used by Task 7.
 
 - [ ] **Step 1: Write the failing tests**
@@ -719,6 +763,27 @@ class TestMove(ControllerBase):
         _, fails, _ = self.gate()
         self.assertEqual(ctl(fails), [], fails)
 
+    def test_pending_hand_edit_blocks_any_move_and_is_not_adopted(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("E-01.S3", "--stage", "grounded")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("pending hand edits", r.stdout)
+        self.assertEqual(self.read()["plans"]["next"][0]["stage"], "intent", "nothing written")
+        self.assertEqual(self.stamp()["writes"]["items"]["E-01.S2"]["stage"], "building",
+                         "the hand edit was not silently adopted")
+
+    def test_release_takes_stage_only(self):
+        self.d = self.read()
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 Accounts", "stage": "build", "stories": []}]
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        for args in (("--status", "x"), ("--to", "now"), ("--task", "T", "--state", "done")):
+            r = self.move("R-01", *args)
+            self.assertEqual(r.returncode, 2, (args, r.stdout + r.stderr))
+            self.assertIn("releases take --stage only", r.stdout)
+
     def test_tracker_reminder_when_a_tracker_is_set(self):
         self.d = self.read()
         self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
@@ -730,9 +795,9 @@ class TestMove(ControllerBase):
 
 class TestSoleWriter(unittest.TestCase):
     """The writer matrix is enforced in code: no other script assigns a stamped field."""
-    def test_only_move_and_plan_lib_assign_stage_state_or_status(self):
+    def test_only_move_and_plan_lib_assign_stage_or_state(self):
         import re
-        pat = re.compile(r"""\[["'](stage|state|status)["']\]\s*=(?!=)""")
+        pat = re.compile(r"""\[["'](stage|state)["']\]\s*=(?!=)""")
         for fn in sorted(os.listdir(SCRIPTS)):
             if fn.endswith(".py") and fn not in ("move.py", "plan_lib.py"):
                 text = open(os.path.join(SCRIPTS, fn), encoding="utf-8").read()
@@ -755,7 +820,7 @@ Expected: TestMove errors (`move.py` not found, non-zero exit), TestSoleWriter p
 
 ```python
 #!/usr/bin/env python3
-"""The one writer of plan state: stage, status, task state, bucket, release stage.
+"""The one writer of plan state: stage, task state, bucket, release stage (and, as a convenience, status).
 
   move.py <id> --stage <stage> [--status TEXT]
   move.py <id> --status TEXT
@@ -808,6 +873,8 @@ def find(d, wid):
 def apply(d, a):
     """Apply the request to d in memory. Returns (description, event or None). Raises Usage."""
     kind, bucket, obj = find(d, a.id)
+    if kind == "release" and (a.status is not None or a.task or a.to):
+        raise Usage("releases take --stage only")
     stages = [s["id"] for s in (d.get("cycle") or L.DEFAULT_CYCLE)["stages"]]
     today = L.utc_now()[:10]
     said, event = [], None
@@ -897,6 +964,15 @@ def main():
     if (a.task is None) != (a.state is None):
         print("  move: --task and --state go together")
         return 2
+    if cfg and cfg["one_writer"]:
+        import controller
+        pending = controller.one_writer_findings(p["root"], d, cfg)
+        if pending:
+            # Restamping now would silently adopt every hand edit (review C1).
+            print("  move: pending hand edits: revert them or run move.py --adopt; nothing written:")
+            for f in pending:
+                print("    - %s" % f["message"])
+            return 1
     try:
         said, event = apply(d, a)
     except Usage as exc:
@@ -917,7 +993,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-`argparse` exits 2 on unknown flags, which matches the usage code. Replace the inline `__import__("json")` with a top-level `import json` when typing it in.
+`argparse` exits 2 on unknown flags, which matches the usage code. Replace the inline `__import__("json")` with a top-level `import json` when typing it in. The pending-edit check runs before argument errors on the id so a refused move never half-writes; `--adopt` runs before it (it is the remedy).
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -928,7 +1004,7 @@ Expected: all OK.
 
 ```bash
 git add plugins/plan-layer/scripts/move.py plugins/plan-layer/tests/test_controller.py
-git commit -m "plan-layer: move.py, the one writer of stage, status, task state and release stage (S8)"
+git commit -m "plan-layer: move.py, the one writer of stage, bucket, task state and release stage (S8)"
 ```
 
 ---
@@ -1298,11 +1374,120 @@ Expected: the new tests FAIL (no `actual_keys`, rows compared flat, missing `kin
 
 - [ ] **Step 3: Implement**
 
-- `read_actual(path, cfg)`: when `cfg.get("relational")`, every row must have `"kind"` in `("epic", "story", "task", "release")`, else `return None, "row %d of %s has no kind (epic, story, task or release); tag each row by the database it came from"`. Relation fields are plain strings like any other field (add `cfg["relations"].values()` to the fields checked for type).
-- `diff_rows(...)`: change the two places that read `e[f[k]]` to `e.get(f[k])` and skip a comparison when the expected row lacks that field (task and epic rows have no stage); add an optional `relations=()` parameter: for each matched pair and each relation field name in `relations` present in `e` or `r`, compare `{L.work_id(x.strip()) or _norm(x) for x in (value or "").split(",") if x.strip()}` between actual and expected; on difference append `"set %s of '%s' to '%s'" % (field, shown, e.get(field) or "")`. Include the relation fields in the `create row` column list. Change the create text to `"create %s row: ..." % kind` when the row has a kind (flat stays `"create row: ..."`, so `test_tracker.py` is untouched).
-- `diff_relational(expected, actual, cfg, root, d)`: group both lists by `kind`; for each kind call `diff_rows(exp_k, act_k, cfg, known_k, relations=cfg["relations"].values())` where `known_k` is `_known_names(root, d)` for stories, `({epic ids}, {epic names}, set(), set())` for epics, `({release ids}, ...)` for releases, and for tasks the task ids of every item in now, next, done and the archive. Return the concatenation, kinds in the order epic, story, task, release.
-- `reconcile`: after `cfg` resolves, when `cfg.get("relational")`, `faults = relational_faults(d)`; if any, print each as `"  tracker: %s -- nothing was compared"` and return 2 (record nothing). Use `diff_relational` instead of `diff_rows` in relational mode.
-- `record(root, d, cfg, drift, actual=None)`: add `"actual_keys": sorted({L.work_id(r[nf]) or _norm(r[nf]) for r in actual})` when `actual` is given; `reconcile` passes it. Flat reconciles gain the key too (a state file, not printed output).
+`read_actual(path, cfg)`: replace the per-row loop with
+
+```python
+    nf = cfg["fields"]["name"]
+    checked = list(cfg["fields"].values()) + (list(cfg["relations"].values()) if cfg.get("relational") else [])
+    for i, r in enumerate(raw):
+        if not isinstance(r, dict) or not isinstance(r.get(nf), str):
+            return None, "row %d of %s is not an object with a %r text field" % (i, path, nf)
+        if cfg.get("relational") and r.get("kind") not in KINDS:
+            return None, ("row %d of %s has no kind (epic, story, task or release); tag each row by "
+                          "the database it came from" % (i, path))
+        for fname in checked:
+            v = r.get(fname)
+            if v is not None and not isinstance(v, str):
+                return None, ("field %r of row %r is %s, not a plain string: flatten every "
+                              "property to a plain string when fetching"
+                              % (fname, r[nf], type(v).__name__))
+    return raw, None
+```
+
+with `KINDS = ("epic", "story", "task", "release")` at module level.
+
+`diff_rows`: signature `def diff_rows(expected, actual, cfg, known, relations=()):`; add the helper
+
+```python
+def _ids(value):
+    """The work ids (else normalised titles) in a flattened link value 'E-01 A, E-02 B'."""
+    return {L.work_id(x.strip()) or _norm(x) for x in str(value or "").split(",") if x.strip()}
+```
+
+replace the create branch with
+
+```python
+        if not hits:
+            cols = [f["name"], f["status"], f.get("stage"), f.get("updated"), f.get("link")] + list(relations)
+            kind = e.get("kind")
+            out.append("create %srow: %s" % (kind + " " if kind else "",
+                                             ", ".join("%s=%r" % (k, e[k]) for k in cols if k and k in e)))
+            continue
+```
+
+(flat rows have no `kind`, so the flat text stays `create row: ...` and `test_tracker.py` is untouched), and replace the status/stage loop with
+
+```python
+        for k in ("status", "stage"):
+            if f.get(k) and f[k] in e and L.nfc_text(r.get(f[k])) != L.nfc_text(e[f[k]]):
+                out.append("set %s of '%s' to '%s'" % (f[k], shown, e[f[k]]))
+        for rf in relations:
+            if (rf in e or r.get(rf)) and _ids(r.get(rf)) != _ids(e.get(rf)):
+                out.append("set %s of '%s' to '%s'" % (rf, shown, e.get(rf) or ""))
+```
+
+(`f[k] in e` changes nothing in flat mode: a flat row always carries status, and stage whenever the old code read it.)
+
+Add
+
+```python
+def _task_ids(root, d):
+    """Every task id the plan has held: tasks of now, next, done and the archive."""
+    plans = d.get("plans") or {}
+    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME)
+    items = list(plans.get("now") or []) + list(plans.get("next") or []) + list(plans.get("done") or [])
+    for fn in ("done.json", "backlog.json"):
+        try:
+            items += json.load(open(os.path.join(adir, fn), encoding="utf-8")) or []
+        except Exception:
+            pass
+    return {L.work_id(t.get("name")) for it in items if isinstance(it, dict)
+            for t in (it.get("tasks") if isinstance(it.get("tasks"), list) else [])
+            if isinstance(t, dict) and L.work_id(t.get("name"))}
+
+
+def diff_relational(expected, actual, cfg, root, d):
+    """Diff per kind (epic, story, task, release) with link comparison. Pure apart from reading the archive.
+
+    A row matches only rows of its own kind, so R-01 tagged as a story is a
+    stray story and a missing release. Returns instruction strings, kinds in order.
+    """
+    rels = list(cfg["relations"].values())
+    epics = [e for e in d.get("epics") or [] if isinstance(e, dict)]
+    releases = [r for r in d.get("releases") or [] if isinstance(r, dict)]
+    known = {
+        "epic": ({e.get("id") for e in epics}, {_norm(e.get("name")) for e in epics}, set(), set()),
+        "story": _known_names(root, d),
+        "task": (_task_ids(root, d), set(), set(), set()),
+        "release": ({r.get("id") for r in releases}, {_norm(r.get("name")) for r in releases}, set(), set()),
+    }
+    out = []
+    for k in KINDS:
+        out += diff_rows([e for e in expected if e.get("kind") == k],
+                         [r for r in actual if r.get("kind") == k], cfg, known[k], relations=rels)
+    return out
+```
+
+`record`: signature `def record(root, d, cfg, drift, actual=None):`; build the dict as before and add, when `actual is not None`, `state["actual_keys"] = sorted({L.work_id(r[cfg["fields"]["name"]]) or _norm(r[cfg["fields"]["name"]]) for r in actual})` (flat reconciles gain the key too: a state file, not printed output).
+
+`reconcile`: after `cfg` resolves and before reading the file:
+
+```python
+    if cfg.get("relational"):
+        faults = relational_faults(d)
+        if faults:
+            for m in faults:
+                print("  tracker: %s -- nothing was compared" % m)
+            return 2
+```
+
+and replace the diff line with
+
+```python
+    todo = (diff_relational(exp, actual, cfg, p["root"], d) if cfg.get("relational")
+            else diff_rows(exp, actual, cfg, known))
+    record(p["root"], d, cfg, len(todo), actual)
+```
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -1473,7 +1658,8 @@ git commit -m "plan-layer: tracker drift is a red gate under meta.controller; ev
   - Rule shape `{"name": str, "on": [event...], "if_changed": [glob...], "then_changed": [glob...], "why": str}` (all required; `kind` is implied `co_change`, the only kind)
   - `controller.rule_faults(rules, stage_ids) -> list[str]`
   - `controller.changed_files(root, base) -> (set[str] | None, str | None)` (committed since the merge-base with `base`, plus uncommitted and untracked)
-  - `controller.rule_findings(root, cfg, event) -> list` (only rules whose `on` holds `event`; FAIL)
+  - `controller.rule_findings(root, cfg, event) -> list` (only rules whose `on` holds `event`; FAIL). Callers: `findings` and `move.py` (a stage move, and each stage change `--adopt` accepts: review I5)
+  - `controller.stage_events(stamp_writes, d) -> list[str]` (the `stage:`/`release:` events implied by every stage that differs from the stamp)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1501,6 +1687,7 @@ class TestRules(ControllerBase):
         git(self.dir, "commit", "-q", "-m", "base")
         git(self.dir, "checkout", "-q", "-b", "feature")
         open(os.path.join(self.dir, "src", "app.py"), "a").write("y = 2\n")
+        git(self.dir, "commit", "-q", "-am", "feature work")  # merge-base must sit behind HEAD
 
     def test_rule_fires_only_on_its_event(self):
         _, fails, _ = self.gate()
@@ -1531,6 +1718,24 @@ class TestRules(ControllerBase):
         r = self.move("E-01.S2", "--stage", "verified")
         self.assertEqual(r.returncode, 1)
         self.assertIn("cannot measure", r.stdout)
+
+    def test_base_at_head_measures_nothing_and_fails(self):
+        git(self.dir, "checkout", "-q", "main")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("behind HEAD", r.stdout)
+
+    def test_adopt_runs_the_rules_of_each_stage_it_accepts(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        before = self.stamp()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("changelog with code", r.stdout)
+        self.assertEqual(self.stamp(), before, "a refused adopt stamps nothing")
+        open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
+        self.assertEqual(self.move("--adopt").returncode, 0)
 
     def test_rule_shape_faults(self):
         import controller
@@ -1614,12 +1819,26 @@ def changed_files(root, base):
     mb = L.git(root, "merge-base", base, "HEAD")
     if not mb:
         return None, "cannot measure changes: no merge-base between %r and HEAD" % base
+    if mb == L.git(root, "rev-parse", "HEAD"):
+        # On the base itself nothing committed is measured (review I2).
+        return None, ("cannot measure changes: the merge-base with %r is HEAD itself — set "
+                      "meta.controller.base to a ref behind HEAD" % base)
     files = set(L.git(root, "diff", "--name-only", mb).splitlines())
     files |= set(L.git(root, "ls-files", "--others", "--exclude-standard").splitlines())
     return {f for f in files if f}, None
 
 
-def rule_findings(root, d, cfg, event):
+def stage_events(writes, d):
+    """Events implied by every stage in the plan that differs from the stamp's (for --adopt)."""
+    cur = L.controlled(d)
+    old_i, old_r = (writes or {}).get("items") or {}, (writes or {}).get("releases") or {}
+    ev = ["stage:%s" % v["stage"] for k, v in sorted(cur["items"].items())
+          if (old_i.get(k) or {}).get("stage") != v["stage"]]
+    ev += ["release:%s" % s for k, s in sorted(cur["releases"].items()) if old_r.get(k) != s]
+    return sorted(set(ev))
+
+
+def rule_findings(root, cfg, event):
     """FAIL for each rule bound to `event` whose co-change does not hold."""
     if not cfg or not event:
         return []
@@ -1642,19 +1861,33 @@ def rule_findings(root, d, cfg, event):
     return out
 ```
 
-`findings` adds, after the config read: when `cfg`, `out += [_f("config", m) for m in rule_faults(cfg["rules"], stage_ids(d))]`, and only if those are empty, `out += rule_findings(root, d, cfg, event)`. `stage_ids(d)` = `[s["id"] for s in (d.get("cycle") or L.DEFAULT_CYCLE)["stages"]]`.
+`findings` adds, after the config read: when `cfg`, `out += [_f("config", m) for m in rule_faults(cfg["rules"], stage_ids(d))]`, and only if those are empty, `out += rule_findings(root, cfg, event)`. `stage_ids(d)` = `[s["id"] for s in (d.get("cycle") or L.DEFAULT_CYCLE)["stages"]]`.
 
 `move.py` main, after `said, event = apply(d, a)` and before saving:
 
 ```python
     if event and cfg:
         import controller
-        blocked = [f["message"] for f in controller.rule_findings(p["root"], d, cfg, event)]
+        blocked = [f["message"] for f in controller.rule_findings(p["root"], cfg, event)]
         if blocked:
             print("  move: refused -- the %s rules fail; nothing written:" % event)
             for m in blocked:
                 print("    - %s" % m)
             return 1
+```
+
+`move.py --adopt` (review I5), before `L.write_stamp`: an adopt accepts stage changes, so it fires their events too.
+
+```python
+        if cfg:
+            prior = (L.controller_state(p["root"]) or {}).get("writes")
+            blocked = [f["message"] for ev in controller.stage_events(prior, d)
+                       for f in controller.rule_findings(p["root"], cfg, ev)]
+            if blocked:
+                print("  move: --adopt refused -- rules on the stages it would accept fail; nothing stamped:")
+                for m in blocked:
+                    print("    - %s" % m)
+                return 1
 ```
 
 Schema: `meta.controller.rules` items `{name, on, if_changed, then_changed, why}`, all required, `additionalProperties: false`.
@@ -1680,7 +1913,7 @@ git commit -m "plan-layer: co-change rules bound to events; a failing rule refus
 - Test: `plugins/plan-layer/tests/test_pause.py` (append)
 
 **Interfaces:**
-- Consumes: `controller.findings(root, d, "pause")`, `L.controller_config`, `L.controller_state`.
+- Consumes: `summary["controller"]` from the one `check.run(root, event="pause")` call pause already makes (review M5: no second diff), `L.controller_config`, `L.controller_state`.
 - Produces: HANDOFF.md sections, only when `meta.controller` is set: `## Reconcile (the controller's diff at <time>)`, `## Git per active item`, `## Decisions since the last handoff`; `controller-state.json` gains `"handoff": {"at", "head"}`; `render_handoff(d, git_line, read_at, fails, drifts, extra=None)` (extra = list of lines appended before `## Traps`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -1762,7 +1995,7 @@ DECISION_ID = re.compile(r"\bD-[0-9]{3,}\b")
 
 
 def git_per_item(root, d):
-    """For each active or queued work id: branches whose name holds its epic slug, and
+    """For each active work id (plans.now): branches whose name holds its epic slug, and
     the last commit whose message names the id. Read now, never recalled."""
     out = []
     branches = L.git(root, "branch", "--list", "--format=%(refname:short)").splitlines()
@@ -1793,11 +2026,10 @@ def decisions_since(root, cfg, since_head):
     return ["- added to %s since %s: %s" % (log, since[:7], ", ".join(ids) or "none")]
 ```
 
-In `pause(p)`: read `cfg, _ = L.controller_config(d)` and `head = L.git(root, "rev-parse", "HEAD")` before the save; after `check.run(root, event="pause")`, when `cfg`:
+In `pause(p)`: read `cfg, _ = L.controller_config(d)` and `head = L.git(root, "rev-parse", "HEAD")` before the save; change `fails, drifts, _ = check.run(root)` to `fails, drifts, summary = check.run(root, event="pause")`; then, when `cfg`:
 
 ```python
-        import controller
-        found = controller.findings(root, d, "pause")
+        found = summary.get("controller") or []
         prev = ((L.controller_state(root) or {}).get("handoff") or {}).get("head")
         extra = ["## Reconcile (the controller's diff at %s)" % at, ""]
         extra += ["- [%s] %s: %s" % (f["level"], f["check"], f["message"]) for f in found] \
@@ -1813,7 +2045,7 @@ In `pause(p)`: read `cfg, _ = L.controller_config(d)` and `head = L.git(root, "r
             print("  CONTROLLER: [%s] %s" % (f["level"], f["message"]))
 ```
 
-Pass `extra` into `render_handoff`, which inserts it just before `## Traps`. Pause still exits 0 (see the open design question; a handoff is never blocked).
+Pass `extra` into `render_handoff`, which inserts it just before `## Traps`. Pause still exits 0 (ruling 4: a handoff is never blocked).
 
 - [ ] **Step 4: Run to verify they pass**
 
@@ -1850,7 +2082,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from test_light_and_budget import Base  # noqa: E402
+from test_light_and_budget import Base, SCRIPTS  # noqa: E402
 
 AGENTS = ["agent-%02d" % i for i in range(1, 11)]
 
@@ -1959,6 +2191,31 @@ class TestParity(InvBase):
         self.write()
         _, fails, _ = self.gate()
         self.assertTrue([f for f in inv(fails) if "covered_by" in f], fails)
+
+    def test_a_bare_path_as_covering_list_fails_and_the_stop_hook_still_blocks(self):
+        import subprocess, uuid
+        self.d["inventory"]["hosts"]["covered_by"] = ["ops/copy.json"]
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in inv(fails) if "must be an object" in f], fails)
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=self.dir)
+        r = subprocess.run([sys.executable, os.path.join(SCRIPTS, "gate_hook.py")], cwd=self.dir,
+                           env=env, input=json.dumps({"session_id": uuid.uuid4().hex}),
+                           capture_output=True, text=True)
+        self.assertEqual(json.loads(r.stdout).get("decision"), "block", r.stdout + r.stderr)
+
+    def test_from_needs_a_json_path(self):
+        del self.d["inventory"]["agents"]["items"]
+        self.d["inventory"]["agents"]["from"] = {"file": "ops/backup.sh"}
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in inv(fails) if "from needs" in f], fails)
+
+    def test_sentence_full_stop_after_a_name_still_counts(self):
+        self.put("ops/backup.sh", "# covers " + ", ".join(AGENTS) + ".\n")
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertFalse([f for f in inv(fails) if "nightly backup" in f], fails)
 ```
 
 - [ ] **Step 2: Run to verify they fail**
@@ -2016,7 +2273,8 @@ def extract(root, src):
 
 def _covered(item, entries, whole_text):
     if whole_text:
-        return re.search(r"(?<![\w.-])%s(?![\w.-])" % re.escape(item), entries[0]) is not None
+        # A trailing full stop ends a sentence, not a name: "agent-10." covers agent-10, "agent-10.b" does not.
+        return re.search(r"(?<![\w.-])%s(?![\w-]|\.\w)" % re.escape(item), entries[0]) is not None
     return item in entries
 
 
@@ -2035,7 +2293,12 @@ def inventory_findings(root, d):
             out.append(_f("inventory", "%s needs covered_by: a non-empty list of lists to check" % who))
             continue
         if "from" in spec:
-            items, why = extract(root, spec["from"])
+            src = spec["from"]
+            if not (isinstance(src, dict) and src.get("file") and src.get("json")):
+                out.append(_f("inventory", "%s: from needs {file, json}: the inventory is a list of names "
+                              "read at a JSON path" % who))
+                continue
+            items, why = extract(root, src)
             if why:
                 out.append(_f("inventory", "%s: %s" % (who, why)))
                 continue
@@ -2051,6 +2314,10 @@ def inventory_findings(root, d):
                 continue
             exempt.setdefault(e["list"], set()).add(e["item"])
         for cov in spec["covered_by"]:
+            if not isinstance(cov, dict):
+                out.append(_f("inventory", "%s: each covered_by entry must be an object {list, file, json?} "
+                              "or {list, tracker: true}, not %r" % (who, cov)))
+                continue
             label = cov.get("list") or cov.get("file") or "list"
             if cov.get("tracker"):
                 st = L.tracker_state(root)
@@ -2135,13 +2402,17 @@ Expected: TestDocs FAILs (no block, version 0.18.0).
 
 - [ ] **Step 3: Write the docs**
 
-SKILL.md "Controller (opt-in)" section, in this order, each a short paragraph: the pattern (declared state, observed state, one diff, drift is a red gate, the agent is never the trigger); `meta.controller` keys; `move.py` commands and that hand edits FAIL, with `--adopt` used only on the human's say-so; the writer-matrix table (columns `Field | Writer | Enforced`, rows exactly `L.WRITERS`); events and who fires each; rules (one kind, co-change; example `{"name": "changelog with code", "on": ["stage:verified"], "if_changed": ["src/*.py"], "then_changed": ["CHANGELOG.md"], "why": "…"}`; `fnmatch` `*` also matches `/`); relational tracker; inventory (example with `agent-01`… and `ops/backup.sh`, whole-word match, exemptions need a why); handoff sections. Keep the SKILL.md additions under 450 words.
+SKILL.md "Controller (opt-in)" section, in this order, each a short paragraph: the pattern (declared state, observed state, one diff, drift is a red gate, the agent is never the trigger); `meta.controller` keys; `move.py` commands and that hand edits FAIL, with `--adopt` used only on the human's say-so; the writer-matrix table (columns `Field | Writer | Enforced`, rows exactly `L.WRITERS`); events and who fires each; rules (one kind, co-change; example `{"name": "changelog with code", "on": ["stage:verified"], "if_changed": ["src/*.py"], "then_changed": ["CHANGELOG.md"], "why": "…"}`; `fnmatch` `*` also matches `/`); relational tracker; inventory (example with `agent-01`… and `ops/backup.sh`, whole-word match, exemptions need a why); handoff sections. Keep the SKILL.md additions under 500 words.
+
+Two worked rule examples, configuration only (no new mechanism; the Warp study's ideas checked against Task 7):
+- **An approval recorded before live-tier work proceeds:** `{"name": "approval before production", "on": ["release:production"], "if_changed": ["deploy/*"], "then_changed": ["docs/approvals/*.md"], "why": "live changes need a recorded approval"}`. Say plainly what it proves: that an approval file changed on the branch, not who wrote it; the content stays a human check.
+- The second idea (an invariant with a runnable check) is **not** expressible as a co-change rule (rules match paths, they run nothing); see Out of scope.
 
 CHANGELOG `## 0.19.0 — <date measured at commit>`: one paragraph per story (S8, S3, S7, S4, S9), the opt-in and compatibility statement, and `Tests: N new; M passed, 0 skipped (base 246)` with N and M read from the controller's full-suite run in Task 11 (fill at that step, never estimated). Both manifests to `0.19.0`.
 
-engineering-method (rebase after 0.4.0; word-neutral in SKILL.md):
+engineering-method, shipped as **engineering-method 0.4.1** (rebase after 0.4.0; a one-line CHANGELOG entry; word-neutral in SKILL.md):
 - SKILL.md principle 15: replace `reconciled at every progress report (plan-layer: \`/plan-layer sync --tracker\`;` with `reconciled on events by plan-layer's controller (\`move.py\`, \`sync --tracker\`;` and confirm the body word count is unchanged or lower (`python3 -m unittest tests/test_skill_budget.py`).
-- docs-and-decisions.md, after "a check that fails without it (CI, a pre-push hook or a test)": add one sentence: "With plan-layer, a "changed X, so Y must change" rule is a co-change rule in `meta.controller.rules`, fired on a stage event."
+- docs-and-decisions.md, after the sentence ending "not another line in the instructions file (SKILL.md principle 7)." (line 95 at base): add one sentence: "With plan-layer, a "changed X, so Y must change" rule is a co-change rule in `meta.controller.rules`, fired on a stage event."
 
 - [ ] **Step 4: Run to verify**
 
@@ -2186,10 +2457,12 @@ Run the local identifier scan (its list lives outside the repo) over `git diff 5
 
 ---
 
-## Open design questions for the reviewer to rule on
+## Review rulings (Fable 5.2, 25 Nov 2026), adopted
 
-1. **`move.py --adopt` exists** (records what it accepted in `controller-state.json`). Alternative: no escape; a hand edit is reverted and redone with `move.py`. Recommendation: keep it, because a human's deliberate JSON edit must be acceptable without retyping it, and the record makes it visible; the skill says the agent never adopts without the human's say-so.
-2. **"Status" scope.** The plan puts item stage, item prose status, task state, bucket membership and release stage under the one writer. If the owner meant only stage and the tracker status, prose status and task state could stay hand-editable (smaller change, weaker S3 for task rows).
-3. **Red by default once `meta.controller` is set.** Tracker signals FAIL whenever `meta.controller` exists (no separate switch), so a stage move blocks the end of the turn until the tracker is reconciled. Recommendation: keep; a switch nobody should flip is over-engineering.
-4. **`pause.py` exits 0 with an open diff** (the note lists it under Reconcile and prints `CONTROLLER:` lines). Alternative: exit 1. Recommendation: 0, because a handoff is often written because things are broken and must never be blocked; the next session's brief shows the same FAILs.
-5. **Two new scripts** (`controller.py` library, `move.py` CLI) rather than folding the writer into `controller.py` or `sync.py`. Recommendation: keep both; each has one job and one reader set.
+1. `move.py --adopt` stays (first opt-in, after a git merge); it now fires the rules of each stage change it accepts (I5) and every other move refuses while hand edits are pending (C1).
+2. The one writer covers stage, bucket, task state and release stage. Prose status is dropped from the stamp (`tracker.expected_rows` never reads it); `--status` stays as a convenience.
+3. Drift is red by default once `meta.controller` is set; no switch.
+4. `pause.py` exits 0; the note and `CONTROLLER:` lines carry the diff.
+5. Both new scripts stay (`controller.py` library, `move.py` CLI).
+
+Review fixes folded in: C1 (Task 3), I1 (Task 2), I2 and I5 (Task 7), I3 (Tasks 2 and 9), I4 (Tasks 1 and 2), M1 (Lanes), M2 (Task 2), M3 (Task 3), M4 (Task 9), M5 (Task 8), M6 (Tasks 5 and 7), M7 (Task 10).
