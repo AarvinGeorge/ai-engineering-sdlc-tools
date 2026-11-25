@@ -141,3 +141,60 @@ class TestParity(InvBase):
         self.write()
         _, fails, _ = self.gate()
         self.assertFalse([f for f in inv(fails) if "nightly backup" in f], fails)
+
+
+class TestBoundaryAndTypes(InvBase):
+    def only(self, text, item="agent-10"):
+        self.put("ops/backup.sh", text + "\n")
+        self.d["inventory"] = {"a": {"items": [item],
+                                     "covered_by": [{"list": "bk", "file": "ops/backup.sh"}]}}
+        self.write()
+        _, fails, _ = self.gate()
+        return inv(fails)
+
+    def test_boundary_is_pinned(self):
+        for bad in ("agent-10.b", "agent-10.env", "x.agent-10", "agent-10..env", "agent-10.-x"):
+            self.assertTrue(self.only("see " + bad + " here"), bad)
+        for ok in ("agent-10.", "agent-10, next", "(agent-10)", "agent-10.."):
+            self.assertEqual(self.only("see " + ok), [], ok)
+
+    def test_covering_entry_needs_file_or_tracker(self):
+        self.d["inventory"]["hosts"]["covered_by"] = [{"list": "x"}]
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in inv(fails) if "file or tracker" in f], fails)
+
+    def test_wrong_types_name_the_inventory_not_a_crash(self):
+        cases = [{"item": 5, "list": "copy job", "why": "w"},
+                 {"item": "host-b", "list": ["copy job"], "why": "w"},
+                 {"item": "host-b", "list": "copy job", "why": 7}]
+        for e in cases:
+            self.d["inventory"]["hosts"]["exempt"] = [e]
+            self.write()
+            _, fails, _ = self.gate()
+            self.assertTrue([f for f in inv(fails) if "'hosts'" in f and "exemption" in f], (e, fails))
+            self.assertFalse([f for f in fails if "crashed" in f], fails)
+        del self.d["inventory"]["hosts"]["exempt"]
+        self.d["inventory"]["hosts"]["covered_by"] = [{"list": "tr", "tracker": True}]
+        self.write()
+        json.dump({"at": "2026-01-01T00:00:00Z", "actual_keys": "host-a"},
+                  open(os.path.join(self.dir, "plan", "tracker-state.json"), "w"))
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in inv(fails) if "never reconciled" in f], fails)
+        self.assertFalse([f for f in fails if "crashed" in f], fails)
+
+    def test_a_boolean_is_not_an_extracted_name(self):
+        self.put("ops/copy.json", json.dumps({"jobs": [{"host": True}, {"host": "host-a"}]}))
+        self.d["inventory"]["hosts"]["items"] = ["host-a", "True"]
+        self.write()
+        _, fails, _ = self.gate()
+        hit = [f for f in inv(fails) if "copy job" in f]
+        self.assertTrue(hit and "True" in hit[0] and "1 of 2" in hit[0], fails)
+
+    def test_exemption_naming_unknown_item_or_list_fails(self):
+        for e in ({"item": "host-z", "list": "copy job", "why": "w"},
+                  {"item": "host-b", "list": "no such list", "why": "w"}):
+            self.d["inventory"]["hosts"]["exempt"] = [e]
+            self.write()
+            _, fails, _ = self.gate()
+            self.assertTrue([f for f in inv(fails) if "unknown item or list" in f], (e, fails))

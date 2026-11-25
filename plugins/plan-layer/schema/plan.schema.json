@@ -146,7 +146,8 @@
           "from": {"type": "object", "properties": {"file": {"type": "string"}, "json": {"type": "string"}}, "required": ["file", "json"]},
           "covered_by": {"type": "array", "items": {"type": "object",
             "properties": {"list": {"type": "string"}, "file": {"type": "string"}, "json": {"type": "string"}, "tracker": {"type": "boolean"}},
-            "required": ["list"]}},
+            "required": ["list"],
+            "anyOf": [{"required": ["file"]}, {"required": ["tracker"]}]}},
           "exempt": {"type": "array", "items": {"type": "object",
             "properties": {"item": {"type": "string"}, "list": {"type": "string"}, "why": {"type": "string"}},
             "required": ["item", "list", "why"]}}

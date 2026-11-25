@@ -309,7 +309,7 @@ def _walk(obj, path):
             elif v is not None and not (each or keys):
                 nxt.append(v)
         vals = nxt
-    return [str(v) for v in vals if isinstance(v, (str, int))]
+    return [str(v) for v in vals if isinstance(v, (str, int)) and not isinstance(v, bool)]
 
 
 def extract(root, src):
@@ -343,12 +343,12 @@ def _covered(item, entries, whole_text):
     """Whether item is in the list. Whole text: a whole-word match; else exact entry.
 
     What: a trailing full stop ends a sentence, not a name, so "a-1." covers a-1
-    while "a-1.b" and "a-1.env" do not. Use when: comparing an inventory item to
+    while "a-1.b", "a-1..env" and "a-1.-x" do not. Use when: comparing an inventory item to
     a covering list. Inputs: item, entries, whole_text flag. Output: bool.
     Side effects: none. Role: helper.
     """
     if whole_text:
-        return re.search(r"(?<![\w.-])%s(?![\w-]|\.\w)" % re.escape(item), entries[0]) is not None
+        return re.search(r"(?<![\w.-])%s(?![\w-]|\.+[\w-])" % re.escape(item), entries[0]) is not None
     return item in entries
 
 
@@ -388,10 +388,19 @@ def inventory_findings(root, d):
         if not (isinstance(items, list) and items and all(isinstance(i, str) and i for i in items)):
             out.append(_f("inventory", "%s needs items (a non-empty list of names) or from" % who))
             continue
+        labels = {c["list"] for c in spec["covered_by"] if isinstance(c, dict) and isinstance(c.get("list"), str)}
         exempt = {}
-        for e in spec.get("exempt") or []:
-            if not (isinstance(e, dict) and e.get("item") and e.get("list") and (e.get("why") or "").strip()):
-                out.append(_f("inventory", "%s: an exemption needs item, list and why: %r" % (who, e)))
+        ex_list = spec.get("exempt") or []
+        if not isinstance(ex_list, list):
+            out.append(_f("inventory", "%s: exempt must be a list of {item, list, why}" % who))
+            ex_list = []
+        for e in ex_list:
+            if not (isinstance(e, dict) and all(isinstance(e.get(k), str) and e[k].strip()
+                                                for k in ("item", "list", "why"))):
+                out.append(_f("inventory", "%s: an exemption needs item, list and why, all text: %r" % (who, e)))
+                continue
+            if e["item"] not in items or e["list"] not in labels:
+                out.append(_f("inventory", "%s: an exemption names an unknown item or list: %r" % (who, e)))
                 continue
             exempt.setdefault(e["list"], set()).add(e["item"])
         for cov in spec["covered_by"]:
@@ -399,10 +408,14 @@ def inventory_findings(root, d):
                 out.append(_f("inventory", "%s: each covered_by entry must be an object {list, file, json?} "
                               "or {list, tracker: true}, not %r" % (who, cov)))
                 continue
-            label = cov.get("list") or cov.get("file") or "list"
-            if cov.get("tracker"):
+            label = cov.get("list") if isinstance(cov.get("list"), str) and cov["list"] else None
+            if label is None or not (cov.get("tracker") is True or (isinstance(cov.get("file"), str) and cov["file"])):
+                out.append(_f("inventory", "%s: each covered_by entry needs a list name and file or tracker: true: %r"
+                              % (who, cov)))
+                continue
+            if cov.get("tracker") is True:
                 st = L.tracker_state(root)
-                if not st or "actual_keys" not in st:
+                if not st or not isinstance(st.get("actual_keys"), list):
                     out.append(_f("inventory", "%s, list %r: the tracker was never reconciled with "
                                   "keys recorded — run the tracker reconcile" % (who, label)))
                     continue
