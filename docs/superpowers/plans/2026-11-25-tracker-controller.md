@@ -51,6 +51,7 @@
 
 - Calling any tracker API, storing a token, or an integration account (the agent uses its connector).
 - A PostToolUse hook that catches a hand edit the moment it happens (the Stop gate catches it at turn end; add only on a measured miss).
+- A hand move from now to done followed by `--adopt` fires no rule: there is no done event, only `stage:` and `release:` (review re-round). A `done` event waits for a stated case.
 - Rule kinds other than `co_change` (content patterns, commands, regex on files): no stated case.
 - "Invariants with a runnable check" (Warp study): a co-change rule matches paths and runs nothing, so it cannot express this. plan-layer already has the mechanism, `assertions` run by `check.py --verify`, kept explicit and never hook-run by design (a hook that runs commands against the real system on every turn is the cost that ruling avoided). No new mechanism here.
 - Reading the session transcript from a script; the handoff names it as the agent's step.
@@ -420,7 +421,7 @@ class TestOneWriterGate(ControllerBase):
         self.assertEqual(rc, 1)
         hit = [f for f in fails if "E-01.S2" in f and "stage" in f and "by hand" in f]
         self.assertTrue(hit, fails)
-        self.assertIn("move.py E-01.S2 --stage verified", hit[0])
+        self.assertIn("revert the hand edit, or run move.py --adopt", hit[0])
 
     def test_hand_edit_of_task_state_fails_but_prose_status_is_free(self):
         stamp_now(self)
@@ -438,7 +439,7 @@ class TestOneWriterGate(ControllerBase):
         self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
         self.write()
         _, fails, _ = self.gate()
-        self.assertTrue(any("E-01.S2" in f and "more than one" in f for f in fails), fails)
+        self.assertTrue(any("E-01.S2" in f and "rename the duplicate" in f for f in fails), fails)
 
     def test_json_has_no_controller_key_when_off(self):
         del self.d["meta"]["controller"]
@@ -492,7 +493,7 @@ class TestOneWriterGate(ControllerBase):
         self.d["releases"][0]["stage"] = "production"
         self.write()
         _, fails, _ = self.gate()
-        self.assertTrue(any("R-01" in f and "move.py R-01 --stage production" in f for f in fails), fails)
+        self.assertTrue(any("R-01" in f and "move.py --adopt" in f for f in fails), fails)
 
     def test_bad_config_is_a_fail(self):
         self.d["meta"]["controller"] = {"one_writer": "yes"}
@@ -555,6 +556,9 @@ def first_stage(d):
     return stages[0].get("id")
 
 
+FIX = "revert the hand edit, or run move.py --adopt (with the owner's say-so)"  # the one remedy a hand edit has (review N2: move.py refuses while edits are pending)
+
+
 def one_writer_findings(root, d, cfg):
     """Every controlled field that differs from move.py's last recorded write.
 
@@ -573,8 +577,8 @@ def one_writer_findings(root, d, cfg):
                    "run move.py --adopt once to stamp the current state")]
     dups = L.duplicate_ids(d)
     if dups:
-        return [_f("one_writer", "%s is the work id of more than one live item — give each its own id"
-                   % w) for w in dups]
+        return [_f("one_writer", "%s is the work id of more than one live item — rename the duplicate to "
+                   "its own id (--adopt cannot clear this)" % w, ) for w in dups]
     cur, first = L.controlled(d), first_stage(d)
     archived = L.archived_ids(root)
     out = []
@@ -583,36 +587,34 @@ def one_writer_findings(root, d, cfg):
         a, b = ritems.get(wid), citems.get(wid)
         if a and b:
             if a["bucket"] != b["bucket"]:
-                out.append(_f("one_writer", "%s moved from plans.%s to plans.%s by hand — run "
-                              "move.py %s --to %s" % (wid, a["bucket"], b["bucket"], wid, b["bucket"])))
+                out.append(_f("one_writer", "%s moved from plans.%s to plans.%s by hand — %s"
+                              % (wid, a["bucket"], b["bucket"], FIX)))
             if a["stage"] != b["stage"]:
-                out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; "
-                              "run move.py %s --stage %s (or revert the edit)"
-                              % (wid, b["stage"], a["stage"], wid, b["stage"])))
+                out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; %s"
+                              % (wid, b["stage"], a["stage"], FIX)))
             for t in sorted(set(a["tasks"]) | set(b["tasks"])):
                 ta, tb = a["tasks"].get(t), b["tasks"].get(t)
                 if ta is None and tb != "todo":
-                    out.append(_f("one_writer", "task %r of %s entered at %r by hand — add it as todo, then "
-                                  "move.py %s --task %r --state %s" % (t, wid, tb, wid, t, tb)))
+                    out.append(_f("one_writer", "task %r of %s entered at %r by hand — %s"
+                                  % (t, wid, tb, FIX)))
                 elif tb is None and ta not in (None, "todo"):
-                    out.append(_f("one_writer", "task %r of %s (%s) was removed by hand" % (t, wid, ta)))
+                    out.append(_f("one_writer", "task %r of %s (%s) was removed by hand — %s" % (t, wid, ta, FIX)))
                 elif ta is not None and tb is not None and ta != tb:
                     out.append(_f("one_writer", "task %r of %s is %r but move.py last wrote %r — changed by "
-                                  "hand; run move.py %s --task %r --state %s" % (t, wid, tb, ta, wid, t, tb)))
+                                  "hand; %s" % (t, wid, tb, ta, FIX)))
         elif b:
             if not (b["bucket"] == "next" and b["stage"] == first
                     and all(s == "todo" for s in b["tasks"].values())):
-                out.append(_f("one_writer", "%s entered plans.%s at stage %r by hand — add it to plans.next "
-                              "at %r, then move it with move.py" % (wid, b["bucket"], b["stage"], first)))
+                out.append(_f("one_writer", "%s entered plans.%s at stage %r by hand — %s (an item enters "
+                              "plans.next at %r, then moves with move.py)" % (wid, b["bucket"], b["stage"], FIX, first)))
         elif wid not in archived and not (a["bucket"] == "next" and a["stage"] == first):
-            out.append(_f("one_writer", "%s left plans.%s by hand (it was at %r) — finish it with "
-                          "move.py %s --to done --outcome \"<text>\", or restore it"
-                          % (wid, a["bucket"], a["stage"], wid)))
+            out.append(_f("one_writer", "%s left plans.%s by hand (it was at %r) — %s (finish work with "
+                          "move.py %s --to done --outcome \"<text>\")" % (wid, a["bucket"], a["stage"], FIX, wid)))
     rrel = rec.get("releases") or {}
     for rid, stage in sorted(cur["releases"].items()):
         if rid in rrel and rrel[rid] != stage:
-            out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; "
-                          "run move.py %s --stage %s" % (rid, stage, rrel[rid], rid, stage)))
+            out.append(_f("one_writer", "stage of %s is %r but move.py last wrote %r — changed by hand; %s"
+                          % (rid, stage, rrel[rid], FIX)))
     return out
 
 
@@ -784,6 +786,32 @@ class TestMove(ControllerBase):
             self.assertEqual(r.returncode, 2, (args, r.stdout + r.stderr))
             self.assertIn("releases take --stage only", r.stdout)
 
+    def test_gate_remedy_is_not_a_refused_move(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        self.assertEqual(self.move("E-01.S2", "--stage", "verified").returncode, 1,
+                         "so the gate's message names revert or --adopt, never this move (N2)")
+
+    def test_duplicate_ids_refusal_says_rename_and_adopt_refuses(self):
+        self.d = self.read()
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        r = self.move("E-01.S3", "--stage", "grounded")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("rename", r.stdout)
+        self.assertNotIn("run move.py --adopt", r.stdout)
+        self.assertEqual(self.move("--adopt").returncode, 1, "adopt cannot clear a duplicate id")
+
+    def test_corrupt_stamp_is_a_message_not_a_traceback(self):
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            json.dump({"writes": {"items": {"E-01.S2": "not-a-dict"}}}, fh)
+        for args in (("E-01.S2", "--stage", "verified"), ("--adopt",)):
+            r = self.move(*args)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("stamp unreadable", r.stdout)
+            self.assertNotIn("Traceback", r.stderr)
+
     def test_tracker_reminder_when_a_tracker_is_set(self):
         self.d = self.read()
         self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
@@ -847,6 +875,8 @@ import plan_lib as L  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TASK_STATES = ("done", "active", "todo", "blocked")
+STAMP_UNREADABLE = ("  move: stamp unreadable: delete plan/controller-state.json and run move.py --adopt "
+                    "(review the plan first: adopt accepts its current state)")
 
 
 class Usage(Exception):
@@ -947,8 +977,17 @@ def main():
             print("  move: --adopt takes no id")
             return 2
         import controller
-        changes = [f["message"] for f in controller.one_writer_findings(p["root"], d, cfg or
-                                                                        {"one_writer": True})]
+        if L.duplicate_ids(d):
+            print("  move: --adopt refused -- rename the duplicate work id(s) %s first; nothing stamped"
+                  % ", ".join(L.duplicate_ids(d)))
+            return 1
+        try:
+            changes = [f["message"] for f in controller.one_writer_findings(p["root"], d, cfg or
+                                                                            {"one_writer": True})]
+        except Exception:
+            print(STAMP_UNREADABLE)
+            return 2
+        # (Task 7 inserts the rule check for the accepted stage changes here.)
         L.write_stamp(p["root"], d, "move.py --adopt")
         st = L.controller_state(p["root"])
         st.setdefault("adopted", []).append({"at": L.utc_now(), "changes": changes})
@@ -966,10 +1005,18 @@ def main():
         return 2
     if cfg and cfg["one_writer"]:
         import controller
-        pending = controller.one_writer_findings(p["root"], d, cfg)
+        try:
+            pending = controller.one_writer_findings(p["root"], d, cfg)
+        except Exception:
+            print(STAMP_UNREADABLE)
+            return 2
         if pending:
             # Restamping now would silently adopt every hand edit (review C1).
-            print("  move: pending hand edits: revert them or run move.py --adopt; nothing written:")
+            if L.duplicate_ids(d):
+                print("  move: refused -- rename the duplicate work id(s) %s first; nothing written:"
+                      % ", ".join(L.duplicate_ids(d)))
+            else:
+                print("  move: pending hand edits: revert them or run move.py --adopt; nothing written:")
             for f in pending:
                 print("    - %s" % f["message"])
             return 1
@@ -1687,7 +1734,6 @@ class TestRules(ControllerBase):
         git(self.dir, "commit", "-q", "-m", "base")
         git(self.dir, "checkout", "-q", "-b", "feature")
         open(os.path.join(self.dir, "src", "app.py"), "a").write("y = 2\n")
-        git(self.dir, "commit", "-q", "-am", "feature work")  # merge-base must sit behind HEAD
 
     def test_rule_fires_only_on_its_event(self):
         _, fails, _ = self.gate()
@@ -1719,11 +1765,22 @@ class TestRules(ControllerBase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("cannot measure", r.stdout)
 
-    def test_base_at_head_measures_nothing_and_fails(self):
+    def test_on_the_base_branch_itself_measures_nothing_and_fails(self):
         git(self.dir, "checkout", "-q", "main")
         r = self.move("E-01.S2", "--stage", "verified")
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        self.assertIn("behind HEAD", r.stdout)
+        self.assertIn("base branch", r.stdout)
+
+    def test_fresh_branch_with_no_commit_is_measured_from_the_working_tree(self):
+        # setUp's feature branch has no commit of its own: merge-base == HEAD.
+        open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_committed_change_on_the_branch_counts_too(self):
+        git(self.dir, "commit", "-q", "-am", "feature work")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, "src/app.py committed, CHANGELOG untouched")
 
     def test_adopt_runs_the_rules_of_each_stage_it_accepts(self):
         self.d = self.read()
@@ -1736,6 +1793,15 @@ class TestRules(ControllerBase):
         self.assertEqual(self.stamp(), before, "a refused adopt stamps nothing")
         open(os.path.join(self.dir, "CHANGELOG.md"), "a").write("- y\n")
         self.assertEqual(self.move("--adopt").returncode, 0)
+
+    def test_first_opt_in_adopt_does_not_fire_rules(self):
+        os.remove(L.controller_state_path(self.dir))
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("first opt-in", r.stdout)
 
     def test_rule_shape_faults(self):
         import controller
@@ -1813,16 +1879,20 @@ def rule_faults(rules, stage_ids):
 def changed_files(root, base):
     """Paths changed since the merge-base with `base`, plus uncommitted and untracked.
 
-    Returns (set, None) or (None, reason). A missing base is a reason, never an
-    empty set: a rule that measured nothing must not pass.
+    Returns (set, None) or (None, reason). A missing base, or HEAD sitting on the
+    base branch, is a reason, never an empty set: a rule that measured nothing
+    must not pass. Committed changes since the merge-base and the working tree
+    are both measured, so a branch with no commit of its own still counts.
     """
     mb = L.git(root, "merge-base", base, "HEAD")
     if not mb:
         return None, "cannot measure changes: no merge-base between %r and HEAD" % base
-    if mb == L.git(root, "rev-parse", "HEAD"):
-        # On the base itself nothing committed is measured (review I2).
-        return None, ("cannot measure changes: the merge-base with %r is HEAD itself — set "
-                      "meta.controller.base to a ref behind HEAD" % base)
+    if L.git(root, "rev-parse", "--abbrev-ref", "HEAD") == base:
+        # On the base branch itself every commit is "the base", so committed
+        # work is invisible (review I2). A fresh branch off the base with no
+        # commit yet is fine: its working tree is measured (review N1).
+        return None, ("cannot measure changes: HEAD is on the base branch %r itself — work on a "
+                      "branch, or set meta.controller.base to a ref behind HEAD" % base)
     files = set(L.git(root, "diff", "--name-only", mb).splitlines())
     files |= set(L.git(root, "ls-files", "--others", "--exclude-standard").splitlines())
     return {f for f in files if f}, None
@@ -1876,11 +1946,16 @@ def rule_findings(root, cfg, event):
             return 1
 ```
 
-`move.py --adopt` (review I5), before `L.write_stamp`: an adopt accepts stage changes, so it fires their events too.
+`move.py --adopt` (review I5), at the marked line before `L.write_stamp`: an adopt accepts stage changes, so it fires their events too, except on the first opt-in (no stamp yet), which records without firing rules and says so.
 
 ```python
-        if cfg:
-            prior = (L.controller_state(p["root"]) or {}).get("writes")
+        prior = (L.controller_state(p["root"]) or {}).get("writes")
+        if not prior:
+            # First opt-in: there is no earlier write to compare with, so every
+            # existing stage would read as a change and an item already at a
+            # rule-bound stage would block opting in at all (review minor a).
+            print("  move: first opt-in: stamping the current state without firing stage rules")
+        elif cfg:
             blocked = [f["message"] for ev in controller.stage_events(prior, d)
                        for f in controller.rule_findings(p["root"], cfg, ev)]
             if blocked:
@@ -2418,7 +2493,7 @@ engineering-method, shipped as **engineering-method 0.4.1** (rebase after 0.4.0;
 
 Rebase onto `readme-use-cases` first (it merges before this branch and adds the "Use cases" section to `plugins/plan-layer/README.md`). Add two entries to that section in its format (one-line situation, what the plugin does, the exact command typed and what comes back). Copy the printed lines from real runs of the built scripts on a scratch fixture; never write them from this plan. The shape:
 
-- **Someone edits a stage by hand while the tracker is mirrored.** The controller notices that the state differs from `move.py`'s last write, and the gate goes red. Typed: `python3 scripts/check.py`. Back: `FAIL   stage of E-01.S2 is 'verified' but move.py last wrote 'building' — changed by hand; run move.py E-01.S2 --stage verified (or revert the edit)`. Then `move.py E-01.S2 --stage verified` prints `move: E-01.S2 building -> verified` and `NEXT: run sync.py --tracker and reconcile the tracker`.
+- **Someone edits a stage by hand while the tracker is mirrored.** The controller notices that the state differs from `move.py`'s last write, and the gate goes red. Typed: `python3 scripts/check.py`. Back: `FAIL   stage of E-01.S2 is 'verified' but move.py last wrote 'building' — changed by hand; revert the hand edit, or run move.py --adopt (with the owner's say-so)`. After reverting the edit, `move.py E-01.S2 --stage verified` prints `move: E-01.S2 building -> verified` and `NEXT: run sync.py --tracker and reconcile the tracker`.
 - **A backup job lists five agents of ten.** The inventory check compares the declared agents with the backup file and fails on the gap. Typed: `python3 scripts/check.py`. Back: `FAIL   inventory 'agents': list 'nightly backup' covers 5 of 10 — missing agent-06, agent-07, agent-08, agent-09, agent-10`.
 
 Generic names only (`E-01.S2`, `agent-01`, `ops/backup.sh`).
@@ -2473,5 +2548,7 @@ Run the local identifier scan (its list lives outside the repo) over `git diff 5
 3. Drift is red by default once `meta.controller` is set; no switch.
 4. `pause.py` exits 0; the note and `CONTROLLER:` lines carry the diff.
 5. Both new scripts stay (`controller.py` library, `move.py` CLI).
+
+Fix round 2 (Fable re-review): N1 (Task 7: only the base branch itself is unmeasurable; a fresh branch is measured from its working tree), N2 (Task 2 messages and Task 10 Step 3b: the remedy is revert or `--adopt`), minors a, b, c (Tasks 3 and 7), the done-event gap listed out of scope.
 
 Review fixes folded in: C1 (Task 3), I1 (Task 2), I2 and I5 (Task 7), I3 (Tasks 2 and 9), I4 (Tasks 1 and 2), M1 (Lanes), M2 (Task 2), M3 (Task 3), M4 (Task 9), M5 (Task 8), M6 (Tasks 5 and 7), M7 (Task 10).
