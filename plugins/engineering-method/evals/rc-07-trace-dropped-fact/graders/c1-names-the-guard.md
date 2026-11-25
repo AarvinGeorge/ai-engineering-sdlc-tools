@@ -3,8 +3,8 @@ type: llm
 weight: 1
 ---
 
-Scenario: payment_verified is computed True, but payment_block returns an empty string when order.total < 50, so the model never sees the verified flag.
+Scenario: payment_verified is computed True, but payment_block returns an empty string when order.total < 50; the prompt shows only code.
 
-Pass when it names the `if order.total < 50: return ""` line in payment_block as the point where the verified fact is dropped between being computed and reaching the model, states the guard's assumption (small orders need no payment history) and why it fails here (the verified flag is not payment history, and the policy needs it for every refund).
+Pass when it names the guard as the hop where the verified fact is dropped (computed, then gated, never rendered or sent), states the guard's assumption and why it fails, and confirms the drop from the input actually sent on order 30217's turn (a trace or logged context showing no Payment line), not only from reading the code or a unit test.
 
-Fail when it blames the model or the policy wording, or does not identify the guard as the place the fact is lost.
+Fail when it rests the diagnosis on reading the code or on a new unit test alone, without checking the input that was actually sent on the failing turn; or it blames the model or the policy wording.

@@ -3,8 +3,8 @@ type: llm
 weight: 1
 ---
 
-Scenario: the same booking request is confirmed on one instance and refused on another.
+Scenario: the same booking request is confirmed on one instance and refused on another, and confirmed 7 of 10 times on the failing instance itself.
 
-Pass when it asks for or performs a block-by-block comparison of the full model inputs actually given to a working run and a failing run (system prompt, tool definitions, retrieved data, history), not only of the user messages or configuration.
+Pass when it asks for or performs a block-by-block diff of the model inputs as actually sent (captured from traces or logs of real runs), a refused run against a confirmed run, rather than reading prompt templates, configuration or code to guess what each run was given.
 
-Fail when it does not compare the model inputs of a working and a failing run, or compares only the message text.
+Fail when it proposes inspecting templates, configuration, retrieved documents or tool schemas as sources, without diffing the inputs as sent on a refused and a confirmed run.

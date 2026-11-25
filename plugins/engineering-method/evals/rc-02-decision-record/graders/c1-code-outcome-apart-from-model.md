@@ -3,8 +3,8 @@ type: llm
 weight: 1
 ---
 
-Scenario: a refund agent declined a supervisor; the log shows role=supervisor route=act outcome=declined_by_model.
+Scenario: a refund agent declined a supervisor; one log line is available for the turn.
 
-Pass when it reads the log line as the code's own outcome (the caller was identified as a supervisor and routed to act) and keeps that separate from the model's decline, so the question becomes why the model declined what the code allowed.
+Pass when it treats that line as only part of the code's decision record and asks for or reads the whole record for that event (every log line for the turn or request, with timestamps), quoting the decision fields (caller, role=supervisor, route=act, outcome=declined_by_model) as what the code decided, separate from the model's decline.
 
-Fail when it treats the decline as the code's permission check, or reasons only about the model's wording without using what the log says the code determined.
+Fail when it reasons from the single line as if it were the complete record, or treats the decline as the code's permission check.
