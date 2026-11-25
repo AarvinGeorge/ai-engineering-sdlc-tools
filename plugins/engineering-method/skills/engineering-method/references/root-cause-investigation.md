@@ -1,13 +1,9 @@
 # Root-cause investigation
 
-**Evidence before any cause (tier b and c).** The reply opens with RC-1 to RC-4, and RC-5 when a
-working case exists: each step `done` with its evidence, or `requested` with the exact read, its
-source and its command when you cannot run it yourself. Nothing above those lines names a cause, a
-ranked or unranked suspect list, or a fix, and no suspect is cleared or blamed by argument while its
-value is unread. A cause offered after them is a [hypothesis] (RC-8); a remedy waits for RC-6.
-*Why:* answers that had read this file still led with a cause or a suspect list and moved the steps
-to the end as a to-do, so the evidence came after the conclusion it should have shaped. *Test:* no
-line above the last of those step lines names a cause, a suspect or a fix.
+**Evidence before any cause (tier b and c).** The first reply that discusses a cause opens with one
+line each for RC-1 to RC-4 (and RC-5 when a working case exists): `done`, `requested`, or `skipped`
+with the reason; evidence the reporter pasted counts as `done`. No cause, suspect list or fix
+before those lines.
 
 Superpowers' `superpowers:systematic-debugging` owns the procedure: its iron law, its four phases
 and its tracing technique are not restated here. This file adds the investigation steps it does

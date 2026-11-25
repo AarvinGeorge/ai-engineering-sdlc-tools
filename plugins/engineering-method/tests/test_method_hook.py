@@ -381,6 +381,8 @@ class DebugStage(Base):
     def test_debug_message_puts_evidence_before_any_cause(self):
         text = context(self.prompt("investigate this", session="dm2"))
         self.assertIn("no cause, suspect list or fix until RC-1 to RC-4", text)
+        self.assertIn("(tier b, c)", text)
+        self.assertIn("are done, requested or skipped", text)
         self.assertLessEqual(len(text), 400)
         other = context(self.prompt("review this", session="dm3"))
         self.assertNotIn("RC-1", other)

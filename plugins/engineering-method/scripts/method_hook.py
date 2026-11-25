@@ -45,8 +45,8 @@ STAGES = [
                "diagnosing", "diagnosed", "diagnosis", "bug", "bugs"],
      "skill": "superpowers:systematic-debugging",
      "references": ["root-cause-investigation.md", "measurement-and-state-claims.md"],
-     "note": "evidence first: no cause, suspect list or fix until RC-1 to RC-4 have run or "
-             "been requested; "},
+     "note": "evidence first (tier b, c): no cause, suspect list or fix until RC-1 to RC-4 "
+             "are done, requested or skipped; "},
     {"stage": "build",
      "words": ["build", "builds", "building", "built", "implement", "implements",
                "implementing", "implemented", "fix", "fixes", "fixing", "fixed",

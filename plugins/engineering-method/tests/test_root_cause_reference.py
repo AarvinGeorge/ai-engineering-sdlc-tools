@@ -51,9 +51,9 @@ class RootCauseReference(unittest.TestCase):
         body = read().split("\n", 1)[1].lstrip("\n")
         first = body.split("\n\n", 1)[0]
         self.assertTrue(first.startswith("**Evidence before any cause"), first[:80])
-        for step in ("RC-1", "RC-4", "RC-5", "RC-6", "RC-8"):
-            self.assertIn(step, first)
-        self.assertIn("requested", first)
+        for word in ("RC-1", "RC-4", "RC-5", "`done`", "`requested`", "`skipped`",
+                     "No cause, suspect list or fix"):
+            self.assertIn(word, first)
 
     def test_names_its_departures(self):
         self.assertRegex(read(), r"(?m)^## Where this departs from systematic-debugging")
