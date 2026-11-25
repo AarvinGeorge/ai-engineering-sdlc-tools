@@ -106,6 +106,7 @@ def apply(d, a):
             if not (a.outcome and a.outcome.strip()):
                 raise Usage("--to done needs --outcome \"<what it produced>\"")
             changed = True
+            said.append("%s plans.%s -> plans.done" % (a.id, bucket))
             plans[bucket].remove(obj)
             plans.setdefault("done", []).append(
                 {k: v for k, v in (("name", obj["name"]), ("period", today), ("outcome", a.outcome),

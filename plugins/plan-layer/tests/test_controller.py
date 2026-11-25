@@ -354,6 +354,7 @@ class TestMove(ControllerBase):
         self.assertEqual(self.move("E-01.S3", "--to", "now", "--status", "starting").returncode, 0)
         r = self.move("E-01.S2", "--to", "done", "--outcome", "login works")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("E-01.S2 plans.now -> plans.done", r.stdout)
         d = self.read()
         self.assertEqual([p["name"] for p in d["plans"]["now"]], ["E-01.S3 Logout page"])
         self.assertEqual(d["plans"]["done"][-1]["outcome"], "login works")
