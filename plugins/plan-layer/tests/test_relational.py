@@ -210,5 +210,73 @@ class TestConfigFetch(RelBase):
         self.assertEqual(cfg["fetch"], "")
 
 
+class TestRelationalDiff(RelBase):
+    def good(self):
+        self.write()
+        body = json.loads(run("tracker.py", "expected", project=self.dir).stdout)
+        return [dict(r) for r in body["rows"]]
+
+    def diff(self, rows):
+        p = self.actual_file([{k: v for k, v in r.items() if k != "key"} for r in rows])
+        return self.tracker("diff", "--actual", p)
+
+    def test_clean_and_records_actual_keys(self):
+        r = self.diff(self.good())
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("E-01.S2.T1", self.state()["actual_keys"])
+
+    def test_missing_task_row_is_created_with_its_story_link(self):
+        rows = [r for r in self.good() if r["key"] != "E-01.S2.T1"]
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("create task row", r.stdout)
+        self.assertIn("Story='E-01.S2 Login page'", r.stdout)
+
+    def test_wrong_link_is_a_set_instruction(self):
+        rows = self.good()
+        for row in rows:
+            if row["key"] == "E-01.S3":
+                row["Release"] = "R-01 Accounts"
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("set Release of 'E-01.S3 Logout page' to ''", r.stdout)
+
+    def test_link_compared_on_work_id_so_a_retitled_epic_still_matches(self):
+        rows = self.good()
+        for row in rows:
+            if row["key"] == "E-01.S2":
+                row["Epic"] = "E-01 Accounts and sessions"
+        self.assertEqual(self.diff(rows).returncode, 0)
+
+    def test_same_id_under_another_kind_is_not_a_match(self):
+        rows = self.good()
+        for row in rows:
+            if row["key"] == "R-01":
+                row["kind"] = "story"
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("create release row", r.stdout)
+
+    def test_row_without_kind_is_unreadable_exit_2(self):
+        rows = self.good()
+        rows[0].pop("kind")
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 2, r.stdout)
+        self.assertIn("kind", r.stdout)
+
+    def test_stray_epic_is_flagged(self):
+        rows = self.good() + [{"kind": "epic", "Name": "E-07 Billing", "Status": "Planned"}]
+        r = self.diff(rows)
+        self.assertIn("row 'E-07 Billing' not in the plan", r.stdout)
+
+    def test_plan_fault_exits_2_before_comparing(self):
+        self.d["epics"] = []
+        self.write()
+        r = self.tracker("diff", "--actual", self.actual_file([]))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("not declared in epics", r.stdout)
+        self.assertIsNone(self.state())
+
+
 if __name__ == "__main__":
     unittest.main()
