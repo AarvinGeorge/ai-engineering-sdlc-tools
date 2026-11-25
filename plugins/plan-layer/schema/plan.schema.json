@@ -136,6 +136,24 @@
         }
       }
     },
+    "inventory": {
+      "type": "object",
+      "description": "Inventory parity: each named inventory is a list of things the project runs (every agent, every host) and the lists that must cover it (backup jobs, monitors, tracker rows). The gate FAILs on any item a covering list misses. A covering list is an object {list, file, json?} or {list, tracker: true}; without json the file is matched by whole word.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "items": {"type": "array", "items": {"type": "string"}},
+          "from": {"type": "object", "properties": {"file": {"type": "string"}, "json": {"type": "string"}}, "required": ["file", "json"]},
+          "covered_by": {"type": "array", "items": {"type": "object",
+            "properties": {"list": {"type": "string"}, "file": {"type": "string"}, "json": {"type": "string"}, "tracker": {"type": "boolean"}},
+            "required": ["list"]}},
+          "exempt": {"type": "array", "items": {"type": "object",
+            "properties": {"item": {"type": "string"}, "list": {"type": "string"}, "why": {"type": "string"}},
+            "required": ["item", "list", "why"]}}
+        },
+        "required": ["covered_by"]
+      }
+    },
     "contract": {
       "type": "object",
       "description": "The obligation each side accepts. Stating it in the data beats a convention someone has to remember. Any key starting with `for_` is rendered, with a label derived from the name, so a project can address a named person as well as the agent and the human.",

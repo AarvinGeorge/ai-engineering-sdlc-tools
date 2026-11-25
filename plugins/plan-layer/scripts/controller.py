@@ -14,7 +14,9 @@ move.py), tracker (Task 6), rule (Task 7, only on the rule's events),
 inventory (Task 9). Library only: there is no CLI; read it with check.py --json.
 """
 import fnmatch
+import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -286,6 +288,140 @@ def tracker_findings(root, d, level):
     return []
 
 
+def _walk(obj, path):
+    """The values at a dot path.
+
+    What: 'a[]' steps into each element of a list, 'a{}' takes a mapping's keys.
+    Use when: reading names out of a JSON file. Inputs: parsed JSON, path string.
+    Output: list of strings (strings and ints only). Side effects: none.
+    Role: helper.
+    """
+    vals = [obj]
+    for part in [p for p in path.split(".") if p]:
+        nxt = []
+        name, each, keys = part.rstrip("[]{}"), part.endswith("[]"), part.endswith("{}")
+        for v in vals:
+            v = v.get(name) if (isinstance(v, dict) and name) else v
+            if each and isinstance(v, list):
+                nxt.extend(v)
+            elif keys and isinstance(v, dict):
+                nxt.extend(v.keys())
+            elif v is not None and not (each or keys):
+                nxt.append(v)
+        vals = nxt
+    return [str(v) for v in vals if isinstance(v, (str, int))]
+
+
+def extract(root, src):
+    """The entries of one list.
+
+    What: with "json", the values at that path; without, the file's text kept
+    whole (coverage is then a whole-word match). An unreadable file, bad JSON or
+    an empty extraction is a reason, never an empty list.
+    Use when: an inventory or a covering list is read from a file.
+    Inputs: root, src = {"file", "json"?}. Output: (entries, None) or (None, reason).
+    Side effects: reads one file. Role: helper.
+    """
+    path = os.path.join(root, src.get("file") or "")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except Exception as exc:
+        return None, "cannot read %s (%s)" % (src.get("file"), exc.__class__.__name__)
+    if not src.get("json"):
+        return [text], None
+    try:
+        vals = _walk(json.loads(text), src["json"])
+    except Exception as exc:
+        return None, "cannot parse %s as JSON (%s)" % (src["file"], exc)
+    if not vals:
+        return None, "%s at %r extracted nothing — the path or the file is wrong" % (src["file"], src["json"])
+    return vals, None
+
+
+def _covered(item, entries, whole_text):
+    """Whether item is in the list. Whole text: a whole-word match; else exact entry.
+
+    What: a trailing full stop ends a sentence, not a name, so "a-1." covers a-1
+    while "a-1.b" and "a-1.env" do not. Use when: comparing an inventory item to
+    a covering list. Inputs: item, entries, whole_text flag. Output: bool.
+    Side effects: none. Role: helper.
+    """
+    if whole_text:
+        return re.search(r"(?<![\w.-])%s(?![\w-]|\.\w)" % re.escape(item), entries[0]) is not None
+    return item in entries
+
+
+def inventory_findings(root, d):
+    """FAIL for every inventory item missing from a list that must cover it.
+
+    What: also FAILs any list that cannot be read, extracts nothing, or is
+    malformed; an exemption needs item, list and why.
+    Use when: the gate checks a plan that declares an inventory.
+    Inputs: root, plan dict. Output: list of findings (none without inventory).
+    Side effects: reads the listed files and the tracker reconcile record.
+    Role: gate check.
+    """
+    out = []
+    inv = d.get("inventory")
+    if inv is None:
+        return out
+    if not isinstance(inv, dict):
+        return [_f("inventory", "inventory is %r — an object of named inventories" % (inv,))]
+    for name, spec in sorted(inv.items()):
+        who = "inventory %r" % name
+        if not (isinstance(spec, dict) and isinstance(spec.get("covered_by"), list) and spec["covered_by"]):
+            out.append(_f("inventory", "%s needs covered_by: a non-empty list of lists to check" % who))
+            continue
+        if "from" in spec:
+            src = spec["from"]
+            if not (isinstance(src, dict) and src.get("file") and src.get("json")):
+                out.append(_f("inventory", "%s: from needs {file, json}: the inventory is a list of names "
+                              "read at a JSON path" % who))
+                continue
+            items, why = extract(root, src)
+            if why:
+                out.append(_f("inventory", "%s: %s" % (who, why)))
+                continue
+        else:
+            items = spec.get("items")
+        if not (isinstance(items, list) and items and all(isinstance(i, str) and i for i in items)):
+            out.append(_f("inventory", "%s needs items (a non-empty list of names) or from" % who))
+            continue
+        exempt = {}
+        for e in spec.get("exempt") or []:
+            if not (isinstance(e, dict) and e.get("item") and e.get("list") and (e.get("why") or "").strip()):
+                out.append(_f("inventory", "%s: an exemption needs item, list and why: %r" % (who, e)))
+                continue
+            exempt.setdefault(e["list"], set()).add(e["item"])
+        for cov in spec["covered_by"]:
+            if not isinstance(cov, dict):
+                out.append(_f("inventory", "%s: each covered_by entry must be an object {list, file, json?} "
+                              "or {list, tracker: true}, not %r" % (who, cov)))
+                continue
+            label = cov.get("list") or cov.get("file") or "list"
+            if cov.get("tracker"):
+                st = L.tracker_state(root)
+                if not st or "actual_keys" not in st:
+                    out.append(_f("inventory", "%s, list %r: the tracker was never reconciled with "
+                                  "keys recorded — run the tracker reconcile" % (who, label)))
+                    continue
+                entries, whole = [str(k).casefold() for k in st["actual_keys"]], False
+                check = [i.casefold() for i in items]
+            else:
+                entries, why = extract(root, cov)
+                if why:
+                    out.append(_f("inventory", "%s, list %r: %s" % (who, label, why)))
+                    continue
+                whole, check = not cov.get("json"), items
+            missing = [orig for orig, i in zip(items, check)
+                       if orig not in exempt.get(label, set()) and not _covered(i, entries, whole)]
+            if missing:
+                out.append(_f("inventory", "%s: list %r covers %d of %d — missing %s"
+                              % (who, label, len(items) - len(missing), len(items), ", ".join(missing))))
+    return out
+
+
 def findings(root, d, event=None):
     """The whole diff, in check order. Inputs: root, plan dict, event name or None. Pure reads."""
     cfg, err = L.controller_config(d)
@@ -294,4 +430,4 @@ def findings(root, d, event=None):
         bad = [_f("config", m) for m in rule_faults(cfg["rules"], stage_ids(d))]
         out += bad or rule_findings(root, cfg, event)
     out += tracker_findings(root, d, "FAIL" if (cfg or err) else "DRIFT")
-    return out
+    return out + inventory_findings(root, d)
