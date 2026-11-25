@@ -117,6 +117,17 @@
             "at": {"type": "string", "description": "ISO-8601 UTC time the work was paused, read from the clock by pause.py."}
           },
           "description": "0.18.0. Written by pause.py, cleared by pause.py --resume. While present, active items show as the adapter's Paused value in the tracker mirror and the session brief opens with a PAUSED line pointing at plan/HANDOFF.md."
+        },
+        "controller": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "one_writer": {"type": "boolean"},
+            "base": {"type": "string"},
+            "decision_log": {"type": "string"},
+            "rules": {"type": "array"}
+          },
+          "description": "0.19.0, opt-in. The tracker controller: one writer (move.py) moves the state fields named in the writer matrix (plan_lib.WRITERS) and the gate FAILs on a hand edit. Keys: one_writer (needs meta.naming work-ids), base branch, decision_log path, rules. Absent means the feature is off."
         }
       }
     },
@@ -621,6 +632,20 @@
               "stage"
             ]
           }
+        }
+      }
+    },
+    "releases": {
+      "type": "array",
+      "description": "0.19.0. Releases, their stage moved only by move.py when meta.controller.one_writer is on.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "stage"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^R-[0-9]+$"},
+          "name": {"type": "string"},
+          "stage": {"type": "string"},
+          "stories": {"type": "array", "items": {"type": "string"}}
         }
       }
     },

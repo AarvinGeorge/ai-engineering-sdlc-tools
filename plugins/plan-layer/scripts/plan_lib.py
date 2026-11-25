@@ -482,3 +482,142 @@ def view_facts(root, view):
     except Exception:
         pass
     return out
+
+# --------------------------------------------------------------------------
+# Controller (0.19.0). The reconciliation loop: plan.json is the desired state,
+# one writer moves its state fields, and controller.findings() is the one diff.
+# The writer matrix is data so the skill's table and the code cannot disagree.
+CONTROLLER_STATE_FILENAME = "controller-state.json"
+_CONTROLLER_KEYS = ("one_writer", "base", "decision_log", "rules")
+
+WRITERS = [
+    {"field": "plans.now[] / plans.next[]: membership, stage, tasks[].state",
+     "writer": "move.py", "enforced": "stamp in plan/controller-state.json; the gate FAILs on a hand edit"},
+    {"field": "plans.done[] (an item finished from now)", "writer": "move.py --to done",
+     "enforced": "stamp"},
+    {"field": "releases[].stage", "writer": "move.py", "enforced": "stamp"},
+    {"field": "meta.paused, plan/HANDOFF.md", "writer": "pause.py", "enforced": "sole code path (test)"},
+    {"field": "views[].spec_sha256, views[].revision, facts.live_revision", "writer": "sync.py",
+     "enforced": "sole code path"},
+    {"field": "meta.assertions_verified", "writer": "check.py --verify", "enforced": "sole code path"},
+    {"field": "plan/archive/*.json", "writer": "plan_lib.roll (roll.py, sync.py)", "enforced": "sole code path"},
+    {"field": "plan/tracker-state.json", "writer": "tracker.py diff, sync.py --tracker --actual",
+     "enforced": "sole code path"},
+    {"field": "plan/controller-state.json", "writer": "plan_lib.write_stamp (move.py)",
+     "enforced": "sole code path"},
+    {"field": "plan/index.html", "writer": "render.py", "enforced": "fingerprint"},
+]
+
+
+def controller_config(d):
+    """meta.controller resolved, or (None, None) when absent. Returns (config, error); one is None.
+
+    Why: check.py, move.py and pause.py must read one effective config. Every
+    fault is words, never a silent default. one_writer keys items by work id,
+    so it requires meta.naming = "work-ids". Rules are validated in
+    controller.rule_faults (they need the cycle's stage ids). No side effects.
+    """
+    meta = d.get("meta") or {}
+    if "controller" not in meta:
+        return None, None
+    c = meta["controller"]
+    if not isinstance(c, dict):
+        return None, "meta.controller is %r — it must be an object" % (c,)
+    unknown = sorted(set(c) - set(_CONTROLLER_KEYS))
+    if unknown:
+        return None, "meta.controller has unknown key(s) %s (known: %s)" % (
+            ", ".join(unknown), ", ".join(_CONTROLLER_KEYS))
+    ow = c.get("one_writer", False)
+    if not isinstance(ow, bool):
+        return None, "meta.controller.one_writer is %r — it must be true or false" % (ow,)
+    if ow and meta.get("naming") != "work-ids":
+        return None, ("meta.controller.one_writer keys items by work id — set meta.naming "
+                      "to \"work-ids\"")
+    base = c.get("base", "main")
+    if not isinstance(base, str) or not base.strip():
+        return None, "meta.controller.base is %r — it must name the base branch" % (base,)
+    log = c.get("decision_log")
+    if log is not None and not (isinstance(log, str) and log.strip()):
+        return None, "meta.controller.decision_log is %r — a path, or leave it out" % (log,)
+    rules = c.get("rules", [])
+    if not isinstance(rules, list):
+        return None, "meta.controller.rules is %r — it must be a list" % (rules,)
+    return {"one_writer": ow, "base": base, "decision_log": log, "rules": rules}, None
+
+
+def controlled(d):
+    """The fields one writer owns, read from the plan. Pure.
+
+    Items in plans.now and plans.next keyed by work id (an item without one is
+    the naming check's FAIL, not this one's); releases[] keyed by id. Prose
+    status is deliberately not controlled: nothing downstream reads it as
+    state (review ruling 2). Two live items with one id collapse here, so
+    duplicate_ids() is checked first and FAILs.
+    """
+    out = {"items": {}, "releases": {}}
+    plans = d.get("plans") or {}
+    for bucket in ("now", "next"):
+        for it in plans.get(bucket) or []:
+            wid = work_id(it.get("name")) if isinstance(it, dict) else None
+            if not wid:
+                continue
+            out["items"][wid] = {
+                "bucket": bucket, "stage": it.get("stage"),
+                "tasks": {str(t.get("name")): t.get("state")
+                          for t in it.get("tasks") or [] if isinstance(t, dict)}}
+    for r in d.get("releases") or []:
+        if isinstance(r, dict) and work_id(r.get("id")):
+            out["releases"][r["id"]] = r.get("stage")
+    return out
+
+
+def duplicate_ids(d):
+    """Work ids carried by more than one item in plans.now and plans.next, sorted. Pure."""
+    seen, dup = set(), set()
+    for bucket in ("now", "next"):
+        for it in (d.get("plans") or {}).get(bucket) or []:
+            wid = work_id(it.get("name")) if isinstance(it, dict) else None
+            if wid in seen:
+                dup.add(wid)
+            elif wid:
+                seen.add(wid)
+    return sorted(dup)
+
+
+def controller_state_path(root=None):
+    """Where the controller records its last write: <plan dir>/controller-state.json."""
+    return os.path.join(paths(root)["dir"], CONTROLLER_STATE_FILENAME)
+
+
+def controller_state(root=None):
+    """The controller record, or None when absent or unreadable."""
+    try:
+        v = json.load(open(controller_state_path(root), encoding="utf-8"))
+        return v if isinstance(v, dict) else None
+    except Exception:
+        return None
+
+
+def write_stamp(root, d, by):
+    """Record what the one writer just wrote. Side effect: rewrites controller-state.json's "writes".
+
+    Other keys (adopted, handoff) are kept. `by` is the command line that wrote it.
+    """
+    st = controller_state(root) or {}
+    st["writes"] = dict(controlled(d), at=utc_now(), by=by)
+    atomic_write(controller_state_path(root), json.dumps(st, indent=2, ensure_ascii=False) + "\n")
+
+
+def archived_ids(root=None):
+    """Work ids held in plan/archive/done.json and backlog.json (rolled, so not 'gone by hand')."""
+    out = set()
+    adir = os.path.join(paths(root)["dir"], ARCHIVE_DIRNAME)
+    for fn in ("done.json", "backlog.json"):
+        try:
+            for it in json.load(open(os.path.join(adir, fn), encoding="utf-8")) or []:
+                wid = work_id(it.get("name")) if isinstance(it, dict) else None
+                if wid:
+                    out.add(wid)
+        except Exception:
+            continue
+    return out
