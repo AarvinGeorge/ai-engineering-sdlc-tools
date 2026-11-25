@@ -321,3 +321,185 @@ class TestFixRound1Task2(ControllerBase):
         _, fails, _ = self.gate()
         self.assertTrue(any("rename the duplicate" in f for f in fails), fails)
         self.assertTrue(any("move.py --adopt" in f for f in fails), fails)
+
+
+class TestMove(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        stamp_now(self)
+
+    def test_stage_move_writes_stamps_bumps_and_renders(self):
+        r = self.move("E-01.S2", "--stage", "verified", "--status", "suite green")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.read()
+        self.assertEqual(d["plans"]["now"][0]["stage"], "verified")
+        self.assertEqual(d["plans"]["now"][0]["status"], "suite green")
+        self.assertNotEqual(d["meta"]["updated"], "2026-01-01T00:00:00Z")
+        self.assertEqual(self.stamp()["writes"]["items"]["E-01.S2"]["stage"], "verified")
+        self.assertIn("building -> verified", r.stdout)
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_task_state_by_task_id_or_full_name(self):
+        self.assertEqual(self.move("E-01.S2", "--task", "E-01.S2.T1", "--state", "done").returncode, 0)
+        self.assertEqual(self.read()["plans"]["now"][0]["tasks"][0]["state"], "done")
+        self.assertEqual(self.move("E-01.S2", "--task", "E-01.S2.T1 form", "--state", "active").returncode, 0)
+
+    def test_to_now_then_done(self):
+        self.d = self.read()
+        self.d["meta"]["allow_multiple_active"] = True
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        self.assertEqual(self.move("E-01.S3", "--to", "now").returncode, 2, "now needs a status")
+        self.assertEqual(self.move("E-01.S3", "--to", "now", "--status", "starting").returncode, 0)
+        r = self.move("E-01.S2", "--to", "done", "--outcome", "login works")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.read()
+        self.assertEqual([p["name"] for p in d["plans"]["now"]], ["E-01.S3 Logout page"])
+        self.assertEqual(d["plans"]["done"][-1]["outcome"], "login works")
+        self.assertNotIn("E-01.S2", self.stamp()["writes"]["items"])
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_release_stage(self):
+        self.d = self.read()
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 Accounts", "stage": "build", "stories": []}]
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        self.assertEqual(self.move("R-01", "--stage", "production").returncode, 0)
+        self.assertEqual(self.read()["releases"][0]["stage"], "production")
+
+    def test_refusals_are_exit_2_and_change_nothing(self):
+        before = open(os.path.join(self.dir, "plan", "plan.json")).read()
+        for args in (("E-09.S1", "--stage", "building"), ("E-01.S2", "--stage", "flying"),
+                     ("E-01.S2", "--task", "nope", "--state", "done"),
+                     ("E-01.S2", "--task", "E-01.S2.T1", "--state", "finished"),
+                     ("E-01.S2", "--to", "done"), ("E-01.S2",), ()):
+            r = self.move(*args)
+            self.assertEqual(r.returncode, 2, (args, r.stdout + r.stderr))
+        self.assertEqual(open(os.path.join(self.dir, "plan", "plan.json")).read(), before)
+
+    def test_adopt_records_what_it_accepted(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("stage of E-01.S2", r.stdout)
+        st = self.stamp()
+        self.assertEqual(len(st["adopted"]), 1)
+        self.assertIn("stage of E-01.S2", st["adopted"][0]["changes"][0])
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_pending_hand_edit_blocks_any_move_and_is_not_adopted(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("E-01.S3", "--stage", "grounded")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("pending hand edits", r.stdout)
+        self.assertEqual(self.read()["plans"]["next"][0]["stage"], "intent", "nothing written")
+        self.assertEqual(self.stamp()["writes"]["items"]["E-01.S2"]["stage"], "building",
+                         "the hand edit was not silently adopted")
+
+    def test_release_takes_stage_only(self):
+        self.d = self.read()
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 Accounts", "stage": "build", "stories": []}]
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        for args in (("--status", "x"), ("--to", "now"), ("--task", "T", "--state", "done")):
+            r = self.move("R-01", *args)
+            self.assertEqual(r.returncode, 2, (args, r.stdout + r.stderr))
+            self.assertIn("releases take --stage only", r.stdout)
+
+    def test_gate_remedy_is_not_a_refused_move(self):
+        self.d = self.read()
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        self.assertEqual(self.move("E-01.S2", "--stage", "verified").returncode, 1,
+                         "so the gate's message names revert or --adopt, never this move (N2)")
+
+    def test_duplicate_ids_refusal_says_rename_and_adopt_refuses(self):
+        self.d = self.read()
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        r = self.move("E-01.S3", "--stage", "grounded")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("rename", r.stdout)
+        self.assertNotIn("run move.py --adopt", r.stdout)
+        self.assertEqual(self.move("--adopt").returncode, 1, "adopt cannot clear a duplicate id")
+
+    def test_corrupt_stamp_is_a_message_not_a_traceback(self):
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            json.dump({"writes": {"items": {"E-01.S2": "not-a-dict"}}}, fh)
+        for args in (("E-01.S2", "--stage", "verified"), ("--adopt",)):
+            r = self.move(*args)
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("stamp unreadable", r.stdout)
+            self.assertNotIn("Traceback", r.stderr)
+
+    def test_tracker_reminder_when_a_tracker_is_set(self):
+        self.d = self.read()
+        self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertIn("sync.py --tracker", r.stdout)
+
+
+class TestSoleWriter(unittest.TestCase):
+    """The writer matrix is enforced in code: no other script assigns a stamped field."""
+    def test_only_move_and_plan_lib_assign_stage_or_state(self):
+        import re
+        pat = re.compile(r"""\[["'](stage|state)["']\]\s*=(?!=)""")
+        for fn in sorted(os.listdir(SCRIPTS)):
+            if fn.endswith(".py") and fn not in ("move.py", "plan_lib.py"):
+                text = open(os.path.join(SCRIPTS, fn), encoding="utf-8").read()
+                self.assertIsNone(pat.search(text), fn)
+
+    def test_only_pause_assigns_meta_paused(self):
+        import re
+        pat = re.compile(r"""\[["']paused["']\]\s*=(?!=)""")
+        for fn in sorted(os.listdir(SCRIPTS)):
+            if fn.endswith(".py") and fn != "pause.py":
+                self.assertIsNone(pat.search(open(os.path.join(SCRIPTS, fn)).read()), fn)
+
+
+class TestMoveAdoptDuplicates(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        stamp_now(self)
+
+    def test_adopt_refusal_names_the_duplicate_ids(self):
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("E-01.S2", r.stdout)
+        self.assertIn("nothing stamped", r.stdout)
+
+    def test_adopt_refusal_names_duplicate_task_names(self):
+        self.d["plans"]["now"][0]["tasks"].append({"name": "E-01.S2.T1 form", "state": "todo"})
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("E-01.S2.T1 form", r.stdout)
+
+    def test_first_adopt_with_no_stamp_stamps_and_says_so(self):
+        os.remove(L.controller_state_path(self.dir))
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.stamp()["adopted"][0]["changes"], ["first stamp of the current state"])
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_a_release_added_by_hand_is_listed_by_adopt_and_blocks_a_move(self):
+        self.d["releases"] = [{"id": "R-05", "name": "R-05 x", "stage": "build", "stories": []}]
+        self.write()
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("R-05", r.stdout)
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("R-05", r.stdout)
