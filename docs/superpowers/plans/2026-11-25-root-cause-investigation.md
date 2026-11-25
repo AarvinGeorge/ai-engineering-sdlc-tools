@@ -86,43 +86,43 @@ Fourteen candidates were reduced to ten:
 The text below is the reference's text for each step; Task 3 copies it, tightening wording only.
 
 ### RC-1 Pin what ran
-**Rule.** Before comparing any two cases, read for every instance involved (the failing one, its siblings, and every population the reporter calls working) the revision, image digest, model id, and the configuration and data values that shape what the model is given (names, roles, modes, switches), each with its command, now.
+**Rule.** Before comparing any two cases, read for every instance involved (the failing one, its siblings, and every population the reporter calls working) the revision, image digest, model id, and the configuration and data values that shape what the model is given (names, roles, modes, switches), each with its command, now. Read them from what is running: a committed config, a tag or a manifest says what was meant to run, not what ran.
 - **Trigger:** first, whenever an investigation compares instances or someone says "it works elsewhere".
 - **Input:** the instance list. **Output:** one row per instance, one column per value, each cell with its command and time.
-- **Prevents:** "same image, so same behaviour"; a recalled version; a per-instance value that makes one instance work by coincidence.
+- **Prevents:** "same image, so same behaviour"; a recalled version; a per-instance value that makes one instance work by coincidence; a suspect cleared or blamed by argument before its value is read.
 - **Evidence:** the table; each differing value flagged as a candidate confounder.
 
-*Why:* every instance in the case ran the same build; the working ones worked because a per-instance name happened to resemble the sender's address. *Test:* the table exists before the first comparison, covers the populations the reporter named, and holds data values, not only the build.
+*Why:* every instance in the case was on one build; the working ones worked because a per-instance name happened to resemble the sender's address. *Test:* the table exists before the first comparison, covers the populations the reporter named, and holds data values, not only the build.
 
 ### RC-2 Read the decision record
-**Rule.** Read what deterministic code decided for the failing event (identity, permission level, route, outcome) from its own logs, and map every logged size or count to the block or item it stands for. A number you cannot account for is the lead.
+**Rule.** Read what deterministic code decided for the failing event (identity, permission level, route, outcome) from its own logs. A line someone pasted is a lead, not the record: pull every line the code logged for that event before reading the decision from it. Then map every logged size or count to the block or item it stands for. A number you cannot account for is the lead.
 - **Trigger:** the start of every behaviour bug, after RC-1.
-- **Input:** the event id or time window. **Output:** the decision quoted line by line, and a size map (logged number → block it represents → present or absent).
-- **Prevents:** confusing what the code decided with what the model did; a clue on screen left undecoded.
-- **Evidence:** quoted log lines with timestamps; the size map with no unexplained row.
+- **Input:** the event id or time window. **Output:** every logged line for the event, quoted; the decision read from them; a size map (logged number → block it represents → present or absent).
+- **Prevents:** confusing what the code decided with what the model did; one quoted line taken for the whole record; a clue on screen left undecoded.
+- **Evidence:** the query that pulled the event's lines and the quoted lines with timestamps; the size map with no unexplained row.
 
-*Why:* the decisive number was on screen in the case's first minute and decoded an hour later; it showed an expected block was never sent. *Test:* every number in the quoted lines has a row in the size map.
+*Why:* the decisive number was on screen in the case's first minute and decoded an hour later; it showed an expected block was never sent. *Test:* the report pulls the event's full log rather than reasoning from the pasted line alone, and every number in the quoted lines has a row in the size map.
 
 ### RC-3 Read the full input (LLM)
-**Rule.** Before naming any root for a model decision, read the exact input the model received on that turn (system prompt, messages, tool schemas, tool results) from the most complete store (the tracing backend before a local transcript), check every truncation flag, and match its size to the logged size. Rebuilding the input from code, log lengths or the model's own quotes is not reading it.
+**Rule.** Before naming any root for a model decision, read the exact input the model received on that turn (system prompt, messages, tool schemas, tool results) from the most complete store (the tracing backend before a local transcript). Compare the length of the copy you rely on with the original length its own record states, and note every truncation flag, before naming a cause; a copy shorter than the original is a fragment, and the part it is missing is where to look. Rebuilding the input from code, log lengths or the model's own quotes is not reading it.
 - **Trigger:** before any claim about why a model acted; whenever a record shows a truncation flag, a character limit, or a size smaller than the one logged.
 - **Input:** the run id and the stores available. **Output:** the input as sent, or a statement that it cannot be read, naming where you looked.
 - **Prevents:** theorising from fragments; "reconstructed from code"; a root recorded on an input nobody read.
-- **Evidence:** the store and query used; size read against size logged; truncation flags shown false, or the untruncated source named. If no store holds it, every root stays [hypothesis] (RC-8) and the missing trace is reported as an observability gap.
+- **Evidence:** the store and query used; the length of the copy read against the original; truncation flags shown false, or the untruncated source named. If no store holds it, every root stays [hypothesis] (RC-8) and the missing trace is reported as an observability gap.
 
 *Why:* two investigators in the case reasoned from a local copy cut to about two thirds of its length; the full input in the trace store showed the missing fact at once. *Test:* the report names the store, the size match and the flags before the first root is named.
 
 ### RC-4 Quote the objection (LLM)
-**Rule.** Quote the model's own stated reason (reasoning text, final reply) and its tool calls on the failing turn, and name the exact input fact it objected to. Keep three lines apart: what the code **decided** (RC-2), what the model was **told** about it (RC-3), and what the model then **judged**.
+**Rule.** Quote the model's own stated reason (reasoning text, final reply) and its tool calls on the failing turn and on at least one working turn, and name the exact input fact it objected to. Keep three lines apart: what the code **decided** (RC-2), what the model was **told** about it (RC-3), and what the model then **judged**.
 - **Trigger:** after RC-3, on the failing run and at least one working run.
 - **Input:** run ids. **Output:** the quotes and the decided / told / judged lines.
-- **Prevents:** guessing the model's motive; placing "the break" at the model when the told line is where the fact went missing.
+- **Prevents:** guessing the model's motive; placing the break at the model when the told line is where the fact went missing.
 - **Evidence:** quotes with run ids; each of the three lines cites its source.
 
 *Why:* the case's first hypothesis blamed the message's wording; the model's own reasoning named a different fact, and the code's decision was right while the text sent to the model left out its basis. *Test:* the three lines exist, each with a source.
 
 ### RC-5 Diff the served inputs
-**Rule.** This specialises systematic-debugging's Phase 2 ("list every difference") for a model decision. When one instance or run works and another fails, find the working case first and diff the two served inputs: the working case is evidence, not an anecdote. Diff the **rendered model inputs** block by block, a failing run against a working run from each population the reporter named, and run the identical input N times and report k of N. A decision that flips on an identical input is evidence that the input is ambiguous or missing a fact; it is not an explanation.
+**Rule.** This specialises systematic-debugging's Phase 2 ("list every difference") for a model decision. When one instance or run works and another fails, find the working case first and diff the two served inputs: the working case is evidence, not an anecdote. Diff the **rendered model inputs** block by block, a failing run against a working run from each population the reporter named, and run the identical input N times and report k of N (identical means the rendered input was checked to match, not that the same message was sent; a retry hides the flip, it does not explain it). A decision that flips on an identical input is evidence that the input is ambiguous or missing a fact; it is not an explanation.
 - **Trigger:** "it works elsewhere", "it worked yesterday", or a model decision that varies.
 - **Input:** one failing run, working runs, RC-1's table. **Output:** the block diff; k of N; each difference sorted as mechanism candidate or correlate.
 - **Prevents:** randomness as the explanation; a correlate (a name, a phrasing) taken for the mechanism; comparing only the nearest sibling; the working instance waved off as luck.
@@ -140,13 +140,13 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 *Why:* the case's remedies proposed a new fact, then a tool-description edit, then a general principle, while a mechanism that already rendered the missing fact sat switched off on that path; the earlier fixes were present and fired, which, proven early, would have moved the search to what they did not cover. *Test:* the table exists before the first remedy, with its suppression and fired columns filled.
 
 ### RC-7 Trace the dropped fact
-**Rule.** This specialises systematic-debugging's Phase 1 boundary instrumentation for a model-driven system, where the boundary that matters is context assembly. For a fact the code knows (RC-2) that the model was not told (RC-3, RC-4), name the hop where it is dropped (computed → gated → rendered → sent), the guard on that hop and the assumption the guard states, find when the guard arrived (`git log -S '<guard text>'`) and the test that pins it. The remedy extends that mechanism and changes that test.
+**Rule.** This specialises systematic-debugging's Phase 1 boundary instrumentation for a model-driven system, where the boundary that matters is context assembly. For a fact the code knows (RC-2) that the model was not told (RC-3, RC-4), name the hop where it is dropped (computed → gated → rendered → sent), the guard on that hop and the assumption the guard states, find when the guard arrived (`git log -S '<guard text>'`) and the test that pins it. A code reading of where the fact is dropped stays a [hypothesis] until the model's input for that turn, as sent, is read (RC-3), or requested when you cannot read it yourself. The remedy extends that mechanism and changes that test.
 - **Trigger:** RC-4's decided and told lines differ.
-- **Input:** the fact and the rendered input. **Output:** the hop with file and line; the guard, its stated assumption and why it no longer holds; its commit and its pinning test.
-- **Prevents:** blaming the model for not re-checking what the code proved; asking the model to re-verify a safety-floor fact (principle 22).
-- **Evidence:** file and line; the `git log -S` output; the test name.
+- **Input:** the fact and the rendered input. **Output:** the hop with file and line; the guard, its stated assumption and why it no longer holds; its commit and its pinning test; the sent input that confirms the drop, or the request for it.
+- **Prevents:** blaming the model for not re-checking what the code proved; asking the model to re-verify a safety-floor fact (principle 22); a drop point read from code reported as traced.
+- **Evidence:** file and line; the `git log -S` output; the test name; the sent input read, or the request for it with the claim still labelled [hypothesis].
 
-*Why:* the case's root was a guard that returned nothing on one-to-one messages because "there is nothing to add"; for the sender's identity there was. *Test:* the report names the guard's file and line, its assumption, its commit and its test.
+*Why:* the case's root was a guard that returned nothing on one-to-one messages because "there is nothing to add"; for the sender's identity there was. *Test:* the report names the guard's file and line, its assumption, its commit and its test, and calls the drop traced only after the sent input is read.
 
 ### RC-8 Label the root, then fit the fix
 **Rule.** Every claim carries the labels the method already uses (measurement-and-state-claims.md): [measured] with its source, [documented] with its citation, or [hypothesis]; a claim inferred from code but not observed is a [hypothesis] with its basis stated. "Root" or "traced" is written only after RC-3 and RC-7; until then a durable record (incident log, observation row, commit message) says hypothesis. Then classify the root (setup or data, code suppression, model judgement), separate it from contributing conditions, keep a ledger of rejected hypotheses with the evidence that refuted each, and run principle 17's fit check. A fleet count (with its instrument shown matching a sample) explains variance, not the root. A workaround for a deadline is offered once, labelled a workaround, apart from the diagnosis.

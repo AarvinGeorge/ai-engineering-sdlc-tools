@@ -26,13 +26,15 @@ Exists line and RC-8 calls it by name.
 **Rule.** Before comparing any two cases, read for every instance involved (the failing one, its
 siblings, and every population the reporter calls working) the revision, image digest, model id,
 and the configuration and data values that shape what the model is given (names, roles, modes,
-switches), each with its command, now.
+switches), each with its command, now. Read them from what is running: a committed config, a tag
+or a manifest says what was meant to run, not what ran.
 - **Trigger:** first, whenever an investigation compares instances or someone says "it works
   elsewhere".
 - **Input:** the instance list. **Output:** one row per instance, one column per value, each cell
   with its command and time.
 - **Prevents:** "same image, so same behaviour"; a recalled version; a per-instance value that
-  makes one instance work by coincidence.
+  makes one instance work by coincidence; a suspect cleared or blamed by argument before its value
+  is read.
 - **Evidence:** the table; each differing value flagged as a candidate confounder.
 
 *Why:* every instance in the source case was on one build; the working ones worked because a
@@ -62,8 +64,8 @@ in the size map.
 ### RC-3 Read the full input (LLM)
 **Rule.** Before naming any root for a model decision, read the exact input the model received on
 that turn (system prompt, messages, tool schemas, tool results) from the most complete store (the
-tracing backend before a local transcript). Check the size of the copy you rely on against the
-original length the record states, and note every truncation flag, before naming a cause; a copy
+tracing backend before a local transcript). Compare the length of the copy you rely on with the
+original length its own record states, and note every truncation flag, before naming a cause; a copy
 shorter than the original is a fragment, and the part it is missing is where to look. Rebuilding
 the input from code, log lengths or the model's own quotes is not reading it.
 - **Trigger:** before any claim about why a model acted; whenever a record shows a truncation
@@ -72,7 +74,7 @@ the input from code, log lengths or the model's own quotes is not reading it.
   that it cannot be read, naming where you looked.
 - **Prevents:** theorising from fragments; "reconstructed from code"; a root recorded on an input
   nobody read.
-- **Evidence:** the store and query used; the size of the copy read against the original size;
+- **Evidence:** the store and query used; the length of the copy read against the original;
   truncation flags shown false, or the untruncated source named. If no store holds it, every root
   stays [hypothesis] (RC-8) and the missing trace is reported as an observability gap.
 
@@ -82,7 +84,7 @@ names the store, the size match and the flags before the first root is named.
 
 ### RC-4 Quote the objection (LLM)
 **Rule.** Quote the model's own stated reason (reasoning text, final reply) and its tool calls on
-the failing turn, and name the exact input fact it objected to. Keep three lines apart: what the
+the failing turn and on at least one working turn, and name the exact input fact it objected to. Keep three lines apart: what the
 code **decided** (RC-2), what the model was **told** about it (RC-3), and what the model then
 **judged**.
 - **Trigger:** after RC-3, on the failing run and at least one working run.
@@ -100,7 +102,9 @@ out its basis. *Test:* the three lines exist, each with a source.
 decision. When one instance or run works and another fails, find the working case first and diff
 the two served inputs: the working case is evidence, not an anecdote. Diff the **rendered model
 inputs** block by block, a failing run against a working run from each population the reporter
-named, and run the identical input N times and report k of N. A decision that flips on an
+named, and run the identical input N times and report k of N (identical means the rendered input was
+checked to match, not that the same message was sent; a retry hides the flip, it does not explain
+it). A decision that flips on an
 identical input is evidence that the input is ambiguous or missing a fact; it is not an
 explanation.
 - **Trigger:** "it works elsewhere", "it worked yesterday", or a model decision that varies.
@@ -144,7 +148,7 @@ model-driven system, where the boundary that matters is context assembly. For a 
 knows (RC-2) that the model was not told (RC-3, RC-4), name the hop where it is dropped (computed
 → gated → rendered → sent), the guard on that hop and the assumption the guard states, find when
 the guard arrived (`git log -S '<guard text>'`) and the test that pins it. A code reading of where
-the fact is dropped stays a [hypothesis] until the input actually sent on the failing turn is read
+the fact is dropped stays a [hypothesis] until the model's input for that turn, as sent, is read
 (RC-3), or requested when you cannot read it yourself. The remedy extends that mechanism and
 changes that test.
 - **Trigger:** RC-4's decided and told lines differ.
