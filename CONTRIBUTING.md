@@ -76,6 +76,16 @@ Things to know when a gate fails or when you write a test:
 
 The reviewer must be someone other than the author, and the reviewer **runs the change**: checks out the branch, runs the tests, and exercises the behaviour that changed, rather than only reading the diff. Say in the pull request what you ran and what you saw.
 
+## Turning an investigation lesson into a method change
+
+engineering-method's root-cause steps end by recording, in the project's own method record, any lesson the steps do not cover (step RC-9 in `plugins/engineering-method/skills/engineering-method/references/root-cause-investigation.md`). When such a lesson applies beyond its project, it enters this repository through the same path as any other change (see "Proposing a change" and "Review rule"):
+
+- open an issue stating it generally (no project, person or host names) with the evidence summarised;
+- write its behaviour eval first and show it failing on the current version;
+- then change the reference or SKILL.md, show the eval passing, and add its row to `plugins/engineering-method/evals/COVERAGE.md`.
+
+A lesson without a failing eval is not a method change yet.
+
 ## Pull request checklist
 
 - Tests pass locally, and new behaviour has a test.
