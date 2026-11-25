@@ -93,7 +93,7 @@ def pause(p):
     L.save(d, root)
     subprocess.run([sys.executable, os.path.join(HERE, "render.py")], capture_output=True)
     import check
-    fails, drifts, _ = check.run(root)
+    fails, drifts, _ = check.run(root, event="pause")
     L.atomic_write(os.path.join(p["dir"], HANDOFF),
                    render_handoff(d, git_line, at, [m for _, m in fails], [m for _, m in drifts]))
     print("  pause: wrote %s (paused at %s)" % (os.path.join(os.path.relpath(p["dir"], root), HANDOFF), at))

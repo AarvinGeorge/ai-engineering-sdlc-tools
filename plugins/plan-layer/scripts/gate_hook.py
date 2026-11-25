@@ -83,7 +83,7 @@ def main():
 
     try:
         import check
-        fails, drifts, _summary = check.run()
+        fails, drifts, _summary = check.run(event="stop")
     except Exception:
         # A broken gate must never trap a session.
         return 0

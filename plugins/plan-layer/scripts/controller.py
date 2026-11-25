@@ -18,6 +18,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
+import tracker  # noqa: E402
+
+EVENTS = ("stop", "session-start", "sync", "pause")  # plus stage:<id> and release:<stage>
 
 
 _MISSING = object()  # a task absent from a record, distinct from a task with no state (None)
@@ -117,9 +120,42 @@ def one_writer_findings(root, d, cfg):
     return out
 
 
+def tracker_findings(root, d, level):
+    """The tracker mirror's state as findings.
+
+    What: malformed config always FAILs; a mirror never reconciled, reconciled
+    against other expected rows, or left with differences is `level`.
+    Use when: the gate, the handoff and the hooks need the mirror's state.
+    Inputs: root, plan dict, level ("FAIL" when meta.controller is set, so drift
+    is a red gate; "DRIFT" otherwise, as in 0.18.0). Output: list of findings,
+    messages are the 0.18.0 text. Side effects: none (reads the reconcile record).
+    Role: gate check.
+    """
+    tcfg, terr = L.tracker_config(d, root)
+    if terr:
+        return [_f("tracker", terr)]
+    if not tcfg:
+        return []
+    if tcfg.get("relational"):
+        faults = tracker.relational_faults(d, root)
+        if faults:
+            return [_f("tracker", m, level) for m in faults]
+    st = L.tracker_state(root)
+    if not st or not st.get("at"):
+        return [_f("tracker", "tracker mirror (%s) was never reconciled — fetch its rows and run "
+                   "tracker.py diff --actual <file>" % tcfg["kind"], level)]
+    if st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg, root), tcfg):
+        return [_f("tracker", "tracker mirror (%s): the rows the plan now expects differ from those last "
+                   "reconciled (%s) — fetch the rows and reconcile again" % (tcfg["kind"], st["at"]), level)]
+    if st.get("drift"):
+        return [_f("tracker", "tracker mirror (%s): the last reconcile (%s) left %s difference(s) — "
+                   "apply them and diff again" % (tcfg["kind"], st["at"], st["drift"]), level)]
+    return []
+
+
 def findings(root, d, event=None):
     """The whole diff, in check order. Inputs: root, plan dict, event name or None. Pure reads."""
     cfg, err = L.controller_config(d)
-    if err:
-        return [_f("config", err)]
-    return one_writer_findings(root, d, cfg)
+    out = [_f("config", err)] if err else one_writer_findings(root, d, cfg)
+    out += tracker_findings(root, d, "FAIL" if (cfg or err) else "DRIFT")
+    return out

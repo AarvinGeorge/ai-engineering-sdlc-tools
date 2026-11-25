@@ -632,3 +632,83 @@ class TestSoleWriterPatterns(unittest.TestCase):
                 text = open(os.path.join(SCRIPTS, fn), encoding="utf-8").read()
                 for p in pats:
                     self.assertIsNone(p.search(text), (fn, p.pattern))
+
+
+def stop_hook(project, session=None):
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=project)
+    r = subprocess.run([sys.executable, os.path.join(SCRIPTS, "gate_hook.py")], cwd=project, env=env,
+                       input=json.dumps({"session_id": session or uuid.uuid4().hex}),
+                       capture_output=True, text=True)
+    return json.loads(r.stdout) if r.stdout.strip() else {}
+
+
+class TestTrackerRedGate(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        self.d["meta"]["tracker"] = {"kind": "notion", "target": "db-1"}
+        stamp_now(self)
+
+    def test_without_controller_tracker_signals_stay_drift(self):
+        del self.d["meta"]["controller"]
+        self.write()
+        _, fails, drifts = self.gate()
+        self.assertFalse([f for f in fails if "tracker mirror" in f], fails)
+        self.assertTrue([m for m in drifts if "never reconciled" in m], drifts)
+
+    def test_with_controller_never_reconciled_fails(self):
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in fails if "never reconciled" in f], fails)
+
+    def test_stop_hook_blocks_with_the_reconcile_step(self):
+        run("render.py", project=self.dir)
+        out = stop_hook(self.dir)
+        self.assertEqual(out.get("decision"), "block", out)
+        self.assertIn("tracker.py diff --actual", out["reason"])
+
+    def test_reconciled_clean_then_a_move_reddens_it_again(self):
+        exp = json.loads(run("tracker.py", "expected", project=self.dir).stdout)["rows"]
+        p = os.path.join(self.dir, "actual.json")
+        json.dump([{k: v for k, v in r.items() if k != "key"} for r in exp], open(p, "w"))
+        self.assertEqual(run("tracker.py", "diff", "--actual", p, project=self.dir).returncode, 0)
+        _, fails, _ = self.gate()
+        self.assertFalse([f for f in fails if "tracker mirror" in f], fails)
+        self.assertEqual(self.move("E-01.S2", "--stage", "verified").returncode, 0)
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in fails if "tracker mirror" in f and "differ" in f], fails)
+
+    def test_stop_hook_silent_on_the_same_failure_set(self):
+        run("render.py", project=self.dir)
+        sid = uuid.uuid4().hex
+        self.assertEqual(stop_hook(self.dir, sid).get("decision"), "block")
+        self.assertEqual(stop_hook(self.dir, sid), {})
+
+    def test_controller_crash_is_a_fail(self):
+        import check
+        import controller
+        run("render.py", project=self.dir)
+        real = controller.findings
+        controller.findings = lambda *a, **k: 1 / 0
+        try:
+            fails, _, _ = check.run(self.dir)
+        finally:
+            controller.findings = real
+        self.assertTrue([m for _, m in fails if "controller crashed" in m], fails)
+
+    def test_relational_fault_is_a_gate_fail(self):
+        self.d["meta"]["tracker"]["relational"] = True
+        self.d["epics"] = []
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue([f for f in fails if "not declared in epics" in f], fails)
+
+    def test_tracker_message_text_is_unchanged_from_0_18(self):
+        del self.d["meta"]["controller"]
+        self.write()
+        _, _, drifts = self.gate()
+        self.assertIn("tracker mirror (notion) was never reconciled — fetch its rows and run "
+                      "tracker.py diff --actual <file>", drifts)
+
+    def test_callers_pass_their_event(self):
+        for script, event in (("gate_hook.py", '"stop"'), ("brief.py", '"session-start"'),
+                              ("sync.py", '"sync"'), ("pause.py", '"pause"')):
+            self.assertIn(event, open(os.path.join(SCRIPTS, script)).read(), script)

@@ -35,7 +35,6 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
-import tracker  # noqa: E402
 import controller  # noqa: E402
 
 VALID_BUILD = {"done", "active", "partial", "not-started"}
@@ -715,25 +714,6 @@ def run(root=None, event=None):
                                      "meta.naming = work-ids every live item is named E-NN, "
                                      "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
                                      % (bucket, p.get("name")))
-
-    # External-tracker mirror (opt-in via meta.tracker). A malformed block FAILs;
-    # a mirror that was never reconciled, or not since the plan last changed,
-    # or reconciled with differences left, DRIFTs. Work-id naming for tracker
-    # rows is the naming check above (meta.naming), not a second copy of it.
-    tcfg, terr = L.tracker_config(d, root)
-    if terr:
-        fails.append(terr)
-    elif tcfg:
-        st = L.tracker_state(root)
-        if not st or not st.get("at"):
-            drifts.append("tracker mirror (%s) was never reconciled — fetch its rows and run "
-                          "tracker.py diff --actual <file>" % tcfg["kind"])
-        elif st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg, root), tcfg):
-            drifts.append("tracker mirror (%s): the rows the plan now expects differ from those last "
-                          "reconciled (%s) — fetch the rows and reconcile again" % (tcfg["kind"], st["at"]))
-        elif st.get("drift"):
-            drifts.append("tracker mirror (%s): the last reconcile (%s) left %s difference(s) — "
-                          "apply them and diff again" % (tcfg["kind"], st["at"], st["drift"]))
 
     # Pause (meta.paused): present means paused, so it must be well formed.
     if "paused" in meta_ and L.paused_at(d) is None:

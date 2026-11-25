@@ -41,7 +41,7 @@ def emit(event, text):
 
 def session_start():
     import check
-    fails, drifts, s = check.run()
+    fails, drifts, s = check.run(event="session-start")
 
     lines = []
     at = L.paused_at(L.load())
