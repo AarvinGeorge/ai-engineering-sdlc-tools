@@ -271,11 +271,13 @@ def clean_prompt(prompt):
 def detect_stage(prompt):
     """Find the stage a prompt asks for.
 
-    What: the stage of the earliest stage word or phrase, except that when the
-    earliest match is a fix word (FIX_WORDS) and a debug word or phrase appears
-    anywhere in the scanned text, the stage is debug ("fix the bug" investigates
-    first). Other build words keep build. The prompt is cleaned first, a leading
-    slash-command token is skipped, and "git status" is ignored. Whole-word,
+    What: the stage of the earliest stage word or phrase (the first verb usually
+    names the work asked for), except that when the earliest match is a fix word
+    (FIX_WORDS) and a debug word or phrase follows before any other non-build
+    stage word, the stage is debug (if that other stage word comes first, it wins) ("fix the bug" investigates first). Other
+    build words keep build. The prompt is cleaned first, a leading slash-command
+    token is skipped ("/plan-layer status" is not "plan"), and "git status" is
+    ignored because it is a command, not a request for a report. Whole-word,
     case-insensitive; hyphens split words.
     Use when: the --prompt hook decides whether to announce a stage.
     Inputs: prompt text.
@@ -305,6 +307,8 @@ def detect_stage(prompt):
                 return first
         elif stage["stage"] == "debug":
             return stage
+        elif stage["stage"] != "build":
+            return stage  # a nearer plan/review/test/deploy/merge/release/report word wins
     return first
 
 

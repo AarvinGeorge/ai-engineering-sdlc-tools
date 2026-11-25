@@ -397,6 +397,16 @@ class DebugStage(Base):
         self.assertEqual(self.stage_of("plan the fix for the bug"), "plan")
         self.assertEqual(self.stage_of("review the bug fix"), "review")
 
+    def test_a_nearer_non_build_stage_blocks_the_debug_override(self):
+        self.assertEqual(self.stage_of("fix the typo, then deploy to production; "
+                                       "the bug report can wait"), "deploy")
+        self.assertEqual(self.stage_of("fix it then merge, the bug is known"), "merge")
+
+    def test_inflected_fix_and_bug_words_route_to_debug(self):
+        for text in ("fixed the bug", "fixing bugs in the parser", "fixes the bugs here",
+                     "fixed it, bugs remain"):
+            self.assertEqual(self.stage_of(text), "debug", text)
+
     def test_why_questions_do_not_claim_the_debug_stage(self):
         self.assertIsNone(context(self.prompt("why did we decide on Postgres?", session="why")))
         text = context(self.prompt("debug the login failure", session="why"))
