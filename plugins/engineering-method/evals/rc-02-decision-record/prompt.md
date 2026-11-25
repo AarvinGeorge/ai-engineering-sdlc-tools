@@ -9,7 +9,7 @@ Our refund agent is an LLM with a `refund(order_id, amount)` tool. This morning 
 The log line someone pasted for that turn:
 
 ```
-2026-03-04T10:12:07Z refund-agent policy: caller=lena.varga@example.invalid role=supervisor route=act outcome=declined_by_model served=(612 + 0 + 940 chars)
+2026-03-04T10:12:07Z refund-agent policy: caller=lena.varga@example.invalid role=supervisor route=act outcome=declined_by_model served=(612 + 0 + 940 chars) tokens_in=401 tools=1 turns=3
 ```
 
 A teammate suggests adding "Supervisors may always request refunds" to the system prompt, since the model is clearly being over-cautious.

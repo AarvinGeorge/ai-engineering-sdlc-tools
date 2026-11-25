@@ -3,8 +3,8 @@ type: llm
 weight: 1
 ---
 
-Scenario: the same booking request is confirmed on one instance and refused on another, and confirmed 7 of 10 times on the failing instance itself.
+Scenario: the request is confirmed on Harbour, refused on Hilltop, and confirmed 7 of 10 times on Hilltop itself, so two working populations exist.
 
-Pass when it asks for or performs a block-by-block diff of the model inputs as actually sent (captured from traces or logs of real runs), a refused run against a confirmed run, rather than reading prompt templates, configuration or code to guess what each run was given.
+Pass when it asks for or performs a block-by-block diff of the model inputs as actually sent (captured from traces or logs), comparing a refused Hilltop run against a working run from each population: a confirmed Hilltop run and a Harbour run.
 
-Fail when it proposes inspecting templates, configuration, retrieved documents or tool schemas as sources, without diffing the inputs as sent on a refused and a confirmed run.
+Fail when it diffs against only one working population, compares templates, configuration or code instead of the inputs as sent, or does not diff at all.
