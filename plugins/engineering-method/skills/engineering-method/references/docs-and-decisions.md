@@ -135,7 +135,7 @@ like code. Report each step done with its evidence:
    the easiest to lose.
 8. **An independent reviewer before the commit:** a different model diffs old against new, lists
    each lost rule and each wrong new claim with its evidence, and confirms the frozen sections;
-   its findings are applied before committing (principle 10).
+   every finding it raises gets a fix or a written answer before the commit (principle 10).
 9. **Write the size rule into the file itself:** its cap; old where-we-left-off entries move to
    the archive verbatim; findings go to dated documents.
 10. **Scan for secrets and personal data before the push** (live-system-changes.md, "Pushing and
