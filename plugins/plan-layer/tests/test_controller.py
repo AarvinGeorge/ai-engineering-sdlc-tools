@@ -503,3 +503,131 @@ class TestMoveAdoptDuplicates(ControllerBase):
         r = self.move("--adopt")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("R-05", r.stdout)
+
+
+class TestMoveFixRound1(ControllerBase):
+    def setUp(self):
+        super().setUp()
+        stamp_now(self)
+
+    def plan_text(self):
+        return open(os.path.join(self.dir, "plan", "plan.json")).read()
+
+    def test_unreadable_stamp_is_exit_2_in_both_paths_for_both_inputs(self):
+        for junk in ("{not json", "[]"):
+            with open(L.controller_state_path(self.dir), "w") as fh:
+                fh.write(junk)
+            for args in (("E-01.S2", "--stage", "verified"), ("--adopt",)):
+                r = self.move(*args)
+                self.assertEqual(r.returncode, 2, (junk, args, r.stdout + r.stderr))
+                self.assertIn("stamp unreadable", r.stdout)
+                self.assertNotIn("Traceback", r.stderr)
+            self.assertEqual(open(L.controller_state_path(self.dir)).read(), junk)
+
+    def test_adopted_not_a_list_is_refused_and_nothing_is_rewritten(self):
+        st = self.stamp()
+        st["adopted"] = "oops"
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            json.dump(st, fh)
+        before = open(L.controller_state_path(self.dir)).read()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertEqual(open(L.controller_state_path(self.dir)).read(), before)
+
+    def test_adopt_with_controller_off_writes_nothing(self):
+        os.remove(L.controller_state_path(self.dir))
+        for ctrl in (None, {"one_writer": False}):
+            self.d = self.read()
+            if ctrl is None:
+                self.d["meta"].pop("controller", None)
+            else:
+                self.d["meta"]["controller"] = ctrl
+            self.write()
+            r = self.move("--adopt")
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+            self.assertIn("meta.controller.one_writer is off: nothing to adopt", r.stdout)
+            self.assertFalse(os.path.exists(L.controller_state_path(self.dir)))
+
+    def test_same_stage_and_same_bucket_are_no_ops(self):
+        before = self.plan_text()
+        for args in (("E-01.S2", "--stage", "building"), ("E-01.S2", "--to", "now")):
+            r = self.move(*args)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("no change", r.stdout)
+            self.assertEqual(self.plan_text(), before)
+
+    def test_to_now_with_another_active_item_is_refused_naming_it(self):
+        before = self.plan_text()
+        r = self.move("E-01.S3", "--to", "now", "--status", "go")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("E-01.S2", r.stdout)
+        self.assertEqual(self.plan_text(), before)
+
+    def test_outcome_without_to_done_is_usage(self):
+        r = self.move("E-01.S2", "--stage", "verified", "--outcome", "x")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("--outcome", r.stdout)
+
+    def test_a_render_failure_is_a_warning_not_a_silent_pass(self):
+        os.makedirs(os.path.join(self.dir, "plan", "index.html"))
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("WARNING: render.py failed", r.stdout)
+
+    def test_move_renders_the_page(self):
+        r = self.move("E-01.S2", "--stage", "verified")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        page = open(os.path.join(self.dir, "plan", "index.html"), encoding="utf-8").read()
+        self.assertIn("verified", page)
+
+    def test_non_dict_items_and_tasks_are_a_message_not_a_traceback(self):
+        self.d = self.read()
+        self.d["plans"]["next"].append("junk")
+        self.d["plans"]["now"][0]["tasks"].append("junk")
+        self.write()
+        r = self.move("E-01.S9", "--stage", "building")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        r = self.move("E-01.S2", "--task", "E-01.S2.T1", "--state", "done")
+        self.assertNotIn("Traceback", r.stderr)
+
+    def test_read_only_plan_dir_is_a_message(self):
+        pdir = os.path.join(self.dir, "plan")
+        os.chmod(pdir, 0o500)
+        try:
+            r = self.move("E-01.S2", "--stage", "verified")
+        finally:
+            os.chmod(pdir, 0o700)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("cannot write", r.stdout)
+        self.assertNotIn("Traceback", r.stderr)
+
+
+class TestSoleWriterPatterns(unittest.TestCase):
+    def test_the_detector_catches_tuple_assignment_and_update(self):
+        import re
+        pats = [re.compile(p, re.M) for p in (
+            r"""\[["'](?:stage|state)["']\]\s*=(?!=)""",
+            r"""^\s*[^=\n#]*\[["'](?:stage|state)["']\]\s*,[^=\n]*=(?!=)""",
+            r"""^\s*[^=\n#(]*,\s*[\w.\[\]"']+\[["'](?:stage|state)["']\]\s*=(?!=)""",
+            r"""\.update\([^)]*["'](?:stage|state)["']\s*:""",
+            r"""\.update\([^)]*\b(?:stage|state)\s*=""")]
+        for src in ('x["stage"] = 1', 'x["stage"], y = 1, 2', 'y, x["state"] = 1, 2',
+                    'it.update({"stage": "a"})', 'it.update(stage="a")'):
+            self.assertTrue(any(p.search(src) for p in pats), src)
+        for src in ('if x["stage"] == 1:', 'f(x["stage"], y)', 'a = x["stage"]'):
+            self.assertFalse(any(p.search(src) for p in pats), src)
+
+    def test_no_other_script_uses_those_forms(self):
+        import re
+        pats = [re.compile(p, re.M) for p in (
+            r"""^\s*[^=\n#]*\[["'](?:stage|state)["']\]\s*,[^=\n]*=(?!=)""",
+            r"""^\s*[^=\n#(]*,\s*[\w.\[\]"']+\[["'](?:stage|state)["']\]\s*=(?!=)""",
+            r"""\.update\([^)]*["'](?:stage|state)["']\s*:""",
+            r"""\.update\([^)]*\b(?:stage|state)\s*=""")]
+        for fn in sorted(os.listdir(SCRIPTS)):
+            if fn.endswith(".py") and fn not in ("move.py", "plan_lib.py"):
+                text = open(os.path.join(SCRIPTS, fn), encoding="utf-8").read()
+                for p in pats:
+                    self.assertIsNone(p.search(text), (fn, p.pattern))

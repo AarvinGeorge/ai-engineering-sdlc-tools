@@ -14,7 +14,9 @@ event: rules bound to it run first and a failing rule refuses the move.
 
 Side effects: rewrites plan/plan.json (the field, the item's `updated`,
 meta.updated), plan/controller-state.json (the stamp), re-renders the page.
-Exit: 0 written, 1 refused by a rule, 2 usage / unknown id / invalid value.
+Exit: 0 written (or no change), 1 refused (pending hand edits, duplicates, a second active
+item; Task 7: a rule on the event failed), 2 usage / unknown id / invalid value / unreadable
+stamp / plan not writable.
 """
 import argparse
 import json
@@ -35,6 +37,10 @@ class Usage(Exception):
     """A request move.py will not write; the message says why (exit 2)."""
 
 
+class Refused(Exception):
+    """A valid request the plan's own rules refuse; the message says why (exit 1)."""
+
+
 def event_for(kind, stage):
     """The event a move fires: stage:<id> for an item, release:<stage> for a release."""
     return ("release:%s" if kind == "release" else "stage:%s") % stage
@@ -51,48 +57,55 @@ def find(d, wid):
     """(kind, bucket, object) for a work id in now, next or releases; raises Usage when absent."""
     for bucket in ("now", "next"):
         for it in (d.get("plans") or {}).get(bucket) or []:
-            if L.work_id(it.get("name")) == wid:
+            if isinstance(it, dict) and L.work_id(it.get("name")) == wid:
                 return "item", bucket, it
     for r in d.get("releases") or []:
-        if r.get("id") == wid:
+        if isinstance(r, dict) and r.get("id") == wid:
             return "release", None, r
     raise Usage("%s is not in plans.now, plans.next or releases" % wid)
 
 
 def apply(d, a):
-    """Apply the request to d in memory. Returns (description, event or None). Raises Usage."""
+    """Apply the request to d in memory. Returns (description, event or None, changed). Raises Usage, Refused."""
     kind, bucket, obj = find(d, a.id)
     if kind == "release" and (a.status is not None or a.task or a.to):
         raise Usage("releases take --stage only")
     stages = [s["id"] for s in (d.get("cycle") or L.DEFAULT_CYCLE)["stages"]]
     today = L.utc_now()[:10]
-    said, event = [], None
+    said, event, changed = [], None, False
     if a.stage:
         if kind == "item" and a.stage not in stages:
             raise Usage("stage %r is not a cycle stage (%s)" % (a.stage, ", ".join(stages)))
         if not a.stage.strip():
             raise Usage("a release stage cannot be empty")
-        said.append("%s %s -> %s" % (a.id, obj.get("stage"), a.stage))
-        obj["stage"], event = a.stage, event_for(kind, a.stage)
+        if obj.get("stage") != a.stage:
+            said.append("%s %s -> %s" % (a.id, obj.get("stage"), a.stage))
+            obj["stage"], event = a.stage, event_for(kind, a.stage)
+            changed = True
     if a.status is not None:
         if kind != "item" or not a.status.strip():
             raise Usage("--status takes non-empty text and applies to plan items")
         obj["status"] = a.status
+        changed = True
         said.append("%s status set" % a.id)
     if a.task:
         if a.state not in TASK_STATES:
             raise Usage("--state must be one of %s" % ", ".join(TASK_STATES))
-        hits = [t for t in obj.get("tasks") or [] if t.get("name") == a.task
-                or L.work_id(t.get("name")) == a.task]
+        hits = [t for t in obj.get("tasks") or [] if isinstance(t, dict)
+                and (t.get("name") == a.task or L.work_id(t.get("name")) == a.task)]
         if len(hits) != 1:
             raise Usage("task %r matches %d tasks of %s" % (a.task, len(hits), a.id))
         said.append("task %r %s -> %s" % (hits[0]["name"], hits[0].get("state"), a.state))
         hits[0]["state"] = a.state
+        changed = True
+    if a.outcome is not None and a.to != "done":
+        raise Usage("--outcome goes with --to done")
     if a.to:
         plans = d["plans"]
         if a.to == "done":
             if not (a.outcome and a.outcome.strip()):
                 raise Usage("--to done needs --outcome \"<what it produced>\"")
+            changed = True
             plans[bucket].remove(obj)
             plans.setdefault("done", []).append(
                 {k: v for k, v in (("name", obj["name"]), ("period", today), ("outcome", a.outcome),
@@ -101,14 +114,21 @@ def apply(d, a):
         elif a.to != bucket:
             if a.to == "now" and not (obj.get("status") or "").strip():
                 raise Usage("--to now needs --status: an active item says where it stands")
+            others = [p.get("name") for p in plans.get("now") or [] if isinstance(p, dict)]
+            if a.to == "now" and others and not d.get("meta", {}).get("allow_multiple_active"):
+                raise Refused("--to now would leave two active items; %s is active (finish it, or set "
+                              "meta.allow_multiple_active)" % ", ".join(map(str, others)))
             plans[bucket].remove(obj)
             plans.setdefault(a.to, []).append(obj)
-        said.append("%s plans.%s -> plans.%s" % (a.id, bucket, a.to))
-    if not said:
+            changed = True
+            said.append("%s plans.%s -> plans.%s" % (a.id, bucket, a.to))
+    if not (a.stage or a.status is not None or a.task or a.to):
         raise Usage("nothing to move: give --stage, --status, --task/--state or --to")
+    if not changed:
+        return "no change: %s is already there" % a.id, None, False
     if kind == "item" and a.to != "done":
         obj["updated"] = today
-    return "; ".join(said), event
+    return "; ".join(said), event, True
 
 
 def main():
@@ -131,9 +151,20 @@ def main():
     if err:
         print("  move: %s" % err)
         return 2
+    stamp_file = L.controller_state_path(p["root"])
     if a.adopt:
         if a.id:
             print("  move: --adopt takes no id")
+            return 2
+        if not (cfg and cfg["one_writer"]):
+            print("  move: meta.controller.one_writer is off: nothing to adopt")
+            return 2
+        if os.path.exists(stamp_file) and L.controller_state(p["root"]) is None:
+            print(STAMP_UNREADABLE)
+            return 2
+        old = L.controller_state(p["root"]) or {}
+        if "adopted" in old and not isinstance(old["adopted"], list):
+            print(STAMP_UNREADABLE)
             return 2
         import controller
         dups = duplicates(d)
@@ -151,11 +182,13 @@ def main():
             print(STAMP_UNREADABLE)
             return 2
         # (Task 7 inserts the rule check for the accepted stage changes here.)
-        L.write_stamp(p["root"], d, "move.py --adopt")
-        st = L.controller_state(p["root"])
-        st.setdefault("adopted", []).append({"at": L.utc_now(), "changes": changes})
-        L.atomic_write(L.controller_state_path(p["root"]),
-                       json.dumps(st, indent=2, ensure_ascii=False) + "\n")
+        st = dict(old, writes=dict(L.controlled(d), at=L.utc_now(), by="move.py --adopt"))
+        st["adopted"] = list(old.get("adopted") or []) + [{"at": L.utc_now(), "changes": changes}]
+        try:
+            L.atomic_write(stamp_file, json.dumps(st, indent=2, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            print("  move: cannot write %s (%s) -- nothing stamped" % (stamp_file, exc))
+            return 2
         print("  move: adopted the current state (%d change(s) accepted):" % len(changes))
         for c in changes:
             print("    - %s" % c)
@@ -168,6 +201,9 @@ def main():
         return 2
     if cfg and cfg["one_writer"]:
         import controller
+        if os.path.exists(stamp_file) and L.controller_state(p["root"]) is None:
+            print(STAMP_UNREADABLE)
+            return 2
         try:
             pending = controller.one_writer_findings(p["root"], d, cfg)
         except Exception:
@@ -184,15 +220,28 @@ def main():
                 print("    - %s" % f["message"])
             return 1
     try:
-        said, event = apply(d, a)
+        said, event, changed = apply(d, a)
     except Usage as exc:
         print("  move: %s -- nothing written" % exc)
         return 2
+    except Refused as exc:
+        print("  move: refused -- %s; nothing written" % exc)
+        return 1
+    if not changed:
+        print("  move: %s" % said)
+        return 0
     d["meta"]["updated"] = L.utc_now()
-    L.save(d, p["root"])
-    if cfg and cfg["one_writer"]:
-        L.write_stamp(p["root"], d, "move.py " + " ".join(sys.argv[1:]))
-    subprocess.run([sys.executable, os.path.join(HERE, "render.py")], capture_output=True)
+    try:
+        L.save(d, p["root"])
+        if cfg and cfg["one_writer"]:
+            L.write_stamp(p["root"], d, "move.py " + " ".join(sys.argv[1:]))
+    except (OSError, ValueError) as exc:
+        print("  move: cannot write the plan or its stamp (%s)" % exc)
+        return 2
+    rr = subprocess.run([sys.executable, os.path.join(HERE, "render.py")], capture_output=True, text=True)
+    if rr.returncode != 0:
+        print("  WARNING: render.py failed (exit %d); the page is stale until you run it: %s"
+              % (rr.returncode, (rr.stdout + rr.stderr).strip().splitlines()[-1:] or ""))
     print("  move: %s" % said)
     if L.tracker_config(d, p["root"])[0]:
         print("  NEXT: run sync.py --tracker and reconcile the tracker")
