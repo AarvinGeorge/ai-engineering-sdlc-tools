@@ -37,7 +37,7 @@
 | Generic-pattern hits on the tree | the guard's key-shape regex plus `AKIA[0-9A-Z]{16}`, `git grep -cE` on `main` | 2 files, 2 lines each: `plugins/work-log/tests/test_scan.py:40-41` and `docs/superpowers/plans/2026-11-05-work-log.md:480-481` (both deliberate test fakes); 0 in commit messages; 0 binary tracked files (of 193) |
 | Private-list hits | the guard's private list, case-insensitive fixed strings, on `main`, `origin/tracker-controller`, `root-cause-investigation` trees and their commit messages | 0 everywhere. Zero shown able to be non-zero: the list's own first line scanned against the list gives 1. |
 | Version gate on the two bump branches (S2 rule below, applied by hand) | `git diff --name-only main...<b> -- plugins` minus exempt paths | `origin/tracker-controller` (PR #8): only `plan-layer` has release-relevant changes (15 files); plan-layer 0.18.0 → 0.19.0 in plugin.json **and** marketplace.json, README "Current: 0.19.0.", CHANGELOG top `## 0.19.0 — 2026-11-25`: **passes**. Its engineering-method and work-log changes are README-only: exempt. `root-cause-investigation` (local only, not on origin): only `engineering-method` relevant (7 files); 0.3.0 → 0.4.0 in both manifests, README, CHANGELOG `## 0.4.0 — 2026-11-25`: **passes**. Its plan-layer and work-log changes are README-only: exempt. |
-| Plan code prototyped | the Python blocks of this plan extracted to a scratch folder, `python3 -m unittest discover -s tests` | `Ran 38 tests ... OK`. The prototype `version_gate.py` exits 0 on `main` (consistency) and with `--base main` on both branches above (changed `['plan-layer']`, `['engineering-method']`). The prototype `scan_payload.py` with the private list on the tree plus this plan: exactly the 4 known lines, 0 private hits, this plan file 0 hits. The prototype is not the build: the builder still writes tests first and shows them failing. |
+| Plan code prototyped | the Python blocks of this plan extracted to a scratch folder, `python3 -m unittest discover -s tests` | `Ran 38 tests ... OK`; after the review fixes `Ran 40 tests ... OK`. With Step 7's concatenated fakes applied to a copy of the tree, plus the pattern file and this plan: 0 hits with the private list required, and the work-log `test_scan.py` still passes (27 passed). The prototype `version_gate.py` exits 0 on `main` (consistency) and with `--base main` on both branches above (changed `['plan-layer']`, `['engineering-method']`). The prototype `scan_payload.py` with the private list on the tree plus this plan: exactly the 4 known lines, 0 private hits, this plan file 0 hits. The prototype is not the build: the builder still writes tests first and shows them failing. |
 | Not yet passing on those branches | | Both still carry `whenToUse` (S1 strict fails) and the two unmarked test-fake lines (S3 fails) until they rebase onto `main` after this lands. Expected, not a gate defect. |
 | Local guard today | `.git/hooks/pre-push` execs a guard script outside every repo | Scans outgoing added lines (`git log -p`) with one inline key-shape regex (12 shapes) and a private fixed-string file (`grep -F`, case-sensitive); prints counts only; refuses a missing list. It does not read commit messages. |
 
@@ -77,8 +77,8 @@ Rule 1 plus rule 2 together mean: bumped in both manifests, README updated, a ne
 .github/release-gates/tests/test_scan_payload.py
 .github/workflows/release-gates.yml              jobs: validate, version-gate, payload-scan
 .claude-plugin/marketplace.json                  modified: three whenToUse keys removed
-plugins/work-log/tests/test_scan.py              modified: allow marker on lines 40-41 (tests/: exempt)
-docs/superpowers/plans/2026-11-05-work-log.md    modified: allow marker on lines 480-481
+plugins/work-log/tests/test_scan.py              modified: lines 40-41 build their fakes by concatenation (tests/: exempt)
+docs/superpowers/plans/2026-11-05-work-log.md    modified: lines 480-481 the same
 CONTRIBUTING.md                                  modified: "Release gates" section
 ```
 
@@ -471,10 +471,10 @@ Record all three outputs in the task report.
 **Files:** Create `.github/release-gates/secret-patterns.txt`, `.github/release-gates/scan_payload.py`, `.github/release-gates/tests/test_scan_payload.py`. Modify `plugins/work-log/tests/test_scan.py` (lines 40-41) and `docs/superpowers/plans/2026-11-05-work-log.md` (lines 480-481).
 
 **Design.** Two lists, two homes, one reader each place:
-- *Generic shapes* (public knowledge: vendor key prefixes): `secret-patterns.txt`, committed, one extended regular expression per line, read by `scan_payload.py` in CI and by the local guard (Task 5). The patterns are kept to the subset that Python `re` and `grep -E` read the same way (a test enforces it). A line carrying the marker `release-gates: allow` is exempt from generic shapes only; the pattern file itself is exempt from generic shapes (it is their definition).
-- *Private identifiers*: never in the repo. Locally, the guard's existing private file outside every repo. In CI, the repository secret `RELEASE_GATES_PRIVATE_LIST`, written to a temp file. Matched as case-insensitive fixed strings; no allow marker applies.
-- *What ships*: every git-tracked file (the marketplace installs from the repository, and the repository is public, so the tree is the payload), plus the commit messages of the PR range (or the push range on `main`).
-- Output names the file and line (or commit) and the kind ("generic pattern 4", "private list entry"); never the text. Nothing scanned, a missing pattern file, or a required private list that is missing or empty: exit 2.
+- *Generic shapes* (public knowledge: vendor key prefixes): `secret-patterns.txt`, committed, one extended regular expression per line, read by `scan_payload.py` in CI and by the local guard (Task 5). The patterns are kept to the subset that Python `re` and `grep -E` read the same way (a test enforces it). There is no allow marker and no exempt file (review C1, M1): a marker would hide a real secret on the same line, and the pattern file does not match itself (shown in Step 6). A deliberate fake in a test is built by string concatenation, so the file never holds the shape.
+- *Private identifiers*: never in the repo. Locally, the guard's existing private file outside every repo. In CI, the repository secret `RELEASE_GATES_PRIVATE_LIST`, written to a temp file. Matched as case-insensitive fixed strings.
+- *What ships*: every git-tracked file and every tracked path name (the marketplace installs from the repository, and the repository is public, so the tree is the payload), plus the commit messages of the PR range (or the push range on `main`). Commit author names and emails are not scanned (review M2; said in CONTRIBUTING).
+- Output names the file and line, the commit, or `path #<n>` (the n-th line of `git ls-files`, so a hit in a path name never prints the name), and the kind ("generic pattern 4", "private list entry"); never the text. Nothing scanned, a missing pattern file, or a required private list that is missing or empty: exit 2.
 
 - [ ] **Step 1: the pattern file** (the guard's 12 shapes, plus the AWS access key id shape that work-log's scan already checks):
 
@@ -592,12 +592,24 @@ class Files(unittest.TestCase):
             (r.root / "loose.txt").write_text(FAKE_GH)
             self.assertEqual(r.run(), 0)
 
-    def test_allow_marker_exempts_generic_only(self):
+    def test_no_marker_hides_a_secret(self):
         with Repo() as r:
-            r.add("t.py", f"k = '{FAKE_GH}'  # release-gates: allow\n")
-            self.assertEqual(r.run(), 0)
-            r.add("u.py", f"n = '{PRIVATE}'  # release-gates: allow\n")
-            self.assertEqual(r.run("--tokens-file", str(r.tokens)), 1)
+            r.add("plugins/x/scripts/k.py", f"token = '{FAKE_GH}'  # release-gates: allow\n")
+            self.assertEqual(r.run(), 1)
+
+    def test_private_entry_in_path_name_fails_without_printing_it(self):
+        with Repo() as r:
+            r.add(f"notes/{PRIVATE}.md", "fine\n")
+            out = subprocess.run([sys.executable, str(HERE.parent / "scan_payload.py"), "--root", str(r.root),
+                                  "--tokens-file", str(r.tokens)], capture_output=True, text=True)
+            self.assertEqual(out.returncode, 1)
+            self.assertIn("path #", out.stdout)
+            self.assertNotIn(PRIVATE.casefold(), (out.stdout + out.stderr).casefold())
+
+    def test_generic_secret_in_path_name_fails(self):
+        with Repo() as r:
+            r.add(f"{FAKE_AWS}.txt", "fine\n")
+            self.assertEqual(r.run(), 1)
 
     def test_private_entry_is_case_insensitive(self):
         with Repo() as r:
@@ -620,11 +632,10 @@ class Files(unittest.TestCase):
             r.add("img.bin", b"\x00\x01" + FAKE_GH.encode())
             self.assertEqual(r.run(), 0)
 
-    def test_pattern_file_itself_exempt_from_generic(self):
+    def test_pattern_file_does_not_match_itself(self):
         with Repo() as r:
-            pf = r.root / ".github/release-gates/secret-patterns.txt"
-            r.add(".github/release-gates/secret-patterns.txt", pf.read_text() + "# e.g. " + FAKE_GH + "\n")
-            self.assertEqual(r.run(), 0)
+            r.add("a.txt", "1\n")
+            self.assertEqual(r.run("--paths", ".github/release-gates/secret-patterns.txt"), 0)
 
     def test_paths_option_scans_only_given_files(self):
         with Repo() as r:
@@ -705,8 +716,8 @@ Both read the same pattern file, so there is one list of generic shapes.
 Inputs: --root, --patterns (default <root>/.github/release-gates/secret-patterns.txt),
 --tokens-file (private list, one entry per line, # comments), --require-private-list,
 --commits RANGE, --paths FILE... .
-Outputs: one line per hit, "<file>:<line>: <kind>" or "commit <sha>: <kind>", never the
-matched text; then a summary. Exit 0 clean, 1 hits, 2 unusable input or nothing scanned.
+Outputs: one line per hit, "<file>:<line>: <kind>", "path #<n>: <kind>" (a hit in a path
+name; n counts the scanned paths in order) or "commit <sha>: <kind>", never the matched text; then a summary. Exit 0 clean, 1 hits, 2 unusable input or nothing scanned.
 Side effects: none; reads files and runs git read-only.
 """
 import argparse
@@ -716,7 +727,6 @@ import sys
 from pathlib import Path
 
 PATTERN_FILE = ".github/release-gates/secret-patterns.txt"
-ALLOW = "release-gates: allow"
 
 
 def load_lines(path):
@@ -736,14 +746,12 @@ def load_patterns(path):
     return pats
 
 
-def scan_text(text, patterns, tokens, generic=True, allow=True):
+def scan_text(text, patterns, tokens):
     """Yield (line number, kind) for each hit; at most one generic hit per line."""
     for n, line in enumerate(text.splitlines(), 1):
         low = line.casefold()
         if any(t in low for t in tokens):
             yield n, "private list entry"
-        if not generic or (allow and ALLOW in line):
-            continue
         for i, p in enumerate(patterns, 1):
             if p.search(line):
                 yield n, f"generic pattern {i}"
@@ -782,19 +790,20 @@ def main(argv=None):
         if a.require_private_list and not tokens:
             raise ValueError("private list required but missing or empty")
         files = a.paths if a.paths is not None else tracked_files(root)
-        for rel in files:
+        for idx, rel in enumerate(files, 1):
+            for _, kind in scan_text(rel, patterns, tokens):
+                hits.append(f"path #{idx}: {kind}")  # never the name itself
             data = (root / rel).read_bytes()
             if b"\0" in data[:8192]:
                 skipped += 1
                 continue
             scanned += 1
-            generic = Path(rel).as_posix() != PATTERN_FILE
-            for n, kind in scan_text(data.decode("utf-8", "replace"), patterns, tokens, generic=generic):
+            for n, kind in scan_text(data.decode("utf-8", "replace"), patterns, tokens):
                 hits.append(f"{rel}:{n}: {kind}")
         if a.commits:
             for sha, msg in commit_messages(root, a.commits):
                 ncommits += 1
-                for _, kind in scan_text(msg, patterns, tokens, allow=False):
+                for _, kind in scan_text(msg, patterns, tokens):
                     hits.append(f"commit {sha[:12]}: {kind}")
         if scanned == 0 and ncommits == 0:
             raise ValueError("nothing was scanned")
@@ -814,10 +823,17 @@ if __name__ == "__main__":
 ```
 
 - [ ] **Step 5: run and see it pass.** Same command; all OK.
-- [ ] **Step 6: run on the real tree, see the two known fakes.** `python3 .github/release-gates/scan_payload.py; echo $?` expects exactly four hit lines (`plugins/work-log/tests/test_scan.py:40`, `:41`, `docs/superpowers/plans/2026-11-05-work-log.md:480`, `:481`), exit 1. Any other hit stops the task and is reported, not marked.
-- [ ] **Step 7: mark the deliberate fakes.** Append `  # release-gates: allow` to the end of each of those four lines (the plan doc lines are inside a Python code block, so the marker is a comment there too). `tests/` is exempt from the version gate, so work-log is not bumped. Re-run: 0 hits, exit 0. Run the work-log suite: `python3 -m pytest plugins/work-log/tests -q` still passes.
+- [ ] **Step 6: run on the real tree, see the two known fakes.** `python3 .github/release-gates/scan_payload.py; echo $?` expects exactly four hit lines (`plugins/work-log/tests/test_scan.py:40`, `:41`, `docs/superpowers/plans/2026-11-05-work-log.md:480`, `:481`), exit 1. Any other hit stops the task and is reported. The pattern file must not appear (it does not match itself).
+- [ ] **Step 7: build the deliberate fakes by concatenation** (as line 40's `"ghp_" + "a1" * 12` already does), so the committed lines hold no secret shape and the Step 9 commit passes the guard's own regex. In both files replace the two lines with (indentation as in each file; the runtime values are unchanged):
+
+```python
+        for k in ["sk-" + "ant-abcdefghijklmnop1234", "AK" + "IAABCDEFGHIJKLMNOP", "ghp_" + "a1" * 12,
+                  "xox" + "b-1234567890-abc", "-----BEGIN " + "PRIVATE KEY", "Zx9" * 12]:
+```
+
+The plan doc is a record, but these two lines are code in it and a public file; the edit changes no meaning. `tests/` is exempt from the version gate, so work-log is not bumped. Re-run: 0 hits, exit 0. Run the work-log suite: `python3 -m pytest plugins/work-log/tests -q` still passes.
 - [ ] **Step 8: private list, locally.** `python3 .github/release-gates/scan_payload.py --tokens-file "$PRIVATE_LIST" --require-private-list --commits origin/main..HEAD; echo $?` where `$PRIVATE_LIST` is the path the guard already reads (the owner supplies it; never written into a file in this repo). Expect 0 hits. Control: `head -n1 "$PRIVATE_LIST" > "$TMPDIR/ctl.txt"; python3 .github/release-gates/scan_payload.py --paths "$TMPDIR/ctl.txt" --tokens-file "$PRIVATE_LIST"; echo $?; rm "$TMPDIR/ctl.txt"` expects 1 with a line naming only the temp path.
-- [ ] **Step 9: commit** `S3: whole-payload scan and the shared generic pattern file; mark the two deliberate test fakes`.
+- [ ] **Step 9: commit** `S3: whole-payload scan and the shared generic pattern file; test fakes built by concatenation`. Before it, run the guard's own check on the outgoing lines: `git diff --cached | grep '^+' | grep -cE -f .github/release-gates/secret-patterns.txt` prints 0.
 
 ### Task 4: the workflow
 
@@ -898,7 +914,7 @@ jobs:
           printf '%s\n' "$PRIVATE_LIST" > "$RUNNER_TEMP/private-list.txt"
       - name: Control runs (a scan that never fired is not shown able to)
         env:
-          REQUIRE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          REQUIRE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         run: |
           set -uo pipefail
           printf 'AK%s%s\n' 'IA' 'CCCCCCCCCCCCCCCC' > "$RUNNER_TEMP/ctl-generic.txt"
@@ -913,7 +929,7 @@ jobs:
           rm -f "$RUNNER_TEMP"/ctl-*.txt
       - name: Scan every tracked file and the commit messages
         env:
-          REQUIRE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+          REQUIRE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
           RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
         run: |
           set -uo pipefail
@@ -923,7 +939,7 @@ jobs:
           if [ "$REQUIRE" = "true" ]; then
             args+=(--tokens-file "$RUNNER_TEMP/private-list.txt" --require-private-list)
           else
-            echo "::warning::Pull request from a fork: repository secrets are not available, so the private list is not checked here; it runs on the push to main."
+            echo "::warning::Fork or Dependabot pull request: the private list is not available here. The maintainer runs scan_payload.py --tokens-file on this head before merging; CI checks it again on the push to main (detection after publish)."
           fi
           python .github/release-gates/scan_payload.py "${args[@]}"
       - name: Remove the private list
@@ -939,9 +955,9 @@ The `validate` job uses the runner's preinstalled Node. If the pinned CLI refuse
 
 ### Task 5: owner-run steps and CONTRIBUTING
 
-**Files:** Modify `CONTRIBUTING.md` (new section "Release gates" after "Versioning and changelogs"; list the three gates, the S2 rule verbatim from this plan, the allow marker and that it never covers private entries, and "pre-push guard and CI read `.github/release-gates/secret-patterns.txt`"). Commit `CONTRIBUTING: release gates`.
+**Files:** Modify `CONTRIBUTING.md` (new section "Release gates" after "Versioning and changelogs"; list the three gates; the S2 rule verbatim from this plan; "pre-push guard and CI read `.github/release-gates/secret-patterns.txt`"; there is no allow marker, so a fake in a test is built by string concatenation; commit author names and emails are not scanned; for a pull request from a fork or from Dependabot, the maintainer runs `python3 .github/release-gates/scan_payload.py --tokens-file <private list> --require-private-list` on its head before merging, because CI cannot read the secret there and its check on the push to `main` is detection after publish). Commit `CONTRIBUTING: release gates`.
 
-Owner-run (founder gates: credentials and repository settings; not done by an agent; each says how to undo):
+Owner-run (founder gates: credentials and repository settings; not done by an agent; each says how to undo). **Step 1 is done before the branch's first pull request is opened**: without the secret, every same-repository PR fails payload-scan by design (required list empty, exit 2).
 
 1. **Secret.** `gh secret set RELEASE_GATES_PRIVATE_LIST < "$PRIVATE_LIST"` (reads the file the guard already uses; nothing typed or echoed). Undo: `gh secret delete RELEASE_GATES_PRIVATE_LIST`.
 2. **Guard reads the shared file** (edit to the guard script outside the repo, which `.git/hooks/pre-push` execs; back it up first). Replace the inline key-shape assignment with:
@@ -952,7 +968,7 @@ Owner-run (founder gates: credentials and repository settings; not done by an ag
    if [ -s "$shared" ]; then PAT=$(grep -v '^[[:space:]]*\(#\|$\)' "$shared" | paste -sd'|' -); else PAT='<the existing inline value>'; fi
    ```
 
-   pass the joined pattern with `-e "$PAT"` (one shape starts with `-----`, which `grep` would otherwise read as an option if it ever came first), and add `-i` to the private-list `grep` so local and CI matching agree (case-insensitive). Control: a commit adding a fake built at the shell (`printf 'AK%s%s\n' IA CCCCCCCCCCCCCCCC`) is refused by a push to a throwaway remote. Undo: restore the backup.
+   Keep the fallback inline value and add the AWS shape `AKIA[0-9A-Z]{16}` to it, so both copies start equal. Pass the joined pattern with `-e "$PAT"` (one shape starts with `-----`, which `grep` would otherwise read as an option if it ever came first), and add `-i` to the private-list `grep` so local and CI matching agree (case-insensitive), and add the outgoing commit messages to the scanned text (one line: `msgs=$(git log --format=%B $range)`, appended to `added` before the two counts). The guard has no allow marker either. Its private file is read with `grep -Ff`, which treats every line as a token, `#` lines included, while the scanner strips `#` and blank lines: keep that file free of comments and blank lines (a blank line would match everything). Control: a commit adding a fake built at the shell (`printf 'AK%s%s\n' IA CCCCCCCCCCCCCCCC`) is refused by a push to a throwaway remote. Undo: restore the backup.
 3. **Required checks**, after the first green run on a PR: `gh api -X POST repos/{owner}/{repo}/branches/main/protection/required_status_checks/contexts -f 'contexts[]=validate' -f 'contexts[]=version-gate' -f 'contexts[]=payload-scan' -f 'contexts[]=gate-tests'`. Read back with `gh api repos/{owner}/{repo}/branches/main/protection/required_status_checks`. Undo: the same call with `-X DELETE`.
 
 ### Task 6: whole-branch review (Fable 5.2, fresh worktree)
@@ -962,15 +978,15 @@ Brief (diff plus this plan, not the corpus). The reviewer must execute:
 - Plant, in a scratch commit on a throwaway branch: a generic fake in a skill file (scan exits 1), a private-list stand-in via a temp tokens file (exit 1, output does not contain it), a script change without a bump (version gate exits 1), a README-only change (exit 0).
 - Re-run Task 2 Step 6 on `origin/tracker-controller` and `root-cause-investigation`; confirm exit 0 and the control exit 1.
 - Check every `uses:` SHA against PRs #2 and #3.
-- Fit check: no second pattern list exists anywhere in the repo (`git grep -n 'sk-ant-'` lists only the pattern file, the marked fakes and this plan's pattern block); no private identifier in any committed file (run the scan with the owner's list).
+- Fit check: no second pattern list exists anywhere in the repo (`git grep -n 'sk-ant-'` lists only the pattern file and this plan's pattern block; the work-log fakes no longer match); no private identifier in any committed file (run the scan with the owner's list).
 - Report findings as Critical / Important / Minor with the probe that showed each; an unreproduced finding is labelled a hypothesis.
 
 Done means: three gates green on this branch, both version-bump branches pass the version gate as written, controls fire, review findings closed or answered.
 
-## Open design questions (each with a recommendation)
+## Rulings (owner, after the Fable 5.2 plan review)
 
-1. **Fork pull requests** cannot read the secret, so the private list runs only on the push to `main`, after merge. Recommend: accept for now (outside contributions are rare); if they grow, require a maintainer re-run label before merge.
-2. **Case sensitivity.** CI matches the private list case-insensitively; the guard matches case-sensitively today. Recommend: add `-i` to the guard (owner step 2) so the two agree.
-3. **The guard's fallback inline pattern** stays for the owner's other repositories that do not carry the shared file. That is a second copy outside this repo. Recommend: accept; or point the guard at a fixed checkout of this repo's file if the copies drift.
-4. **Commit messages in the guard.** The guard scans added lines, not messages; CI now scans messages. Recommend: add `git log --format=%B $range` to the guard's input in owner step 2 (one line).
-5. **The engineering-method reference** still says the list "lives outside every repository"; true for the private list, now not for generic shapes. Recommend: a one-sentence edit riding the next engineering-method release (after 0.4.0), not this branch.
+1. **Fork and Dependabot pull requests:** accepted. Never use `pull_request_target`. CI cannot read the secret there, so its private-list check on the push to `main` is detection after publish, said plainly; the maintainer runs `scan_payload.py --tokens-file` on the head before merging (CONTRIBUTING).
+2. **Guard matching:** case-insensitive (`-i`), as CI.
+3. **Guard fallback list:** kept for the owner's other repositories, with the AWS shape added so both copies start equal.
+4. **Guard scans commit messages:** yes, one line (owner step 2).
+5. **engineering-method wording** (the list "lives outside every repository"): deferred to the release after 0.4.0.
