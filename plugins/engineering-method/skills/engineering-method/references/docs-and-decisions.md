@@ -102,7 +102,49 @@ the instructions file (SKILL.md principle 7).
 - Each entry: its id (`D-001`, below), the date and time (measured), the decision, who made it,
   the reason, and what it supersedes.
 - Instructions files (`CLAUDE.md`) carry context and navigation; findings and analysis go in dated
-  documents; decisions go in the log.
+  documents; decisions go in the log. One that outgrows its cap is compressed by the next section.
+
+## Keeping instruction files small
+
+A file loaded on every turn (a project `CLAUDE.md`, an agent's instructions, a memory index) holds
+binding rules and current pointers only. The baseline is Anthropic's: "target under 200 lines per
+CLAUDE.md file. Longer files consume more context and reduce adherence"; `@`-imports "don't reduce
+its context cost" (code.claude.com/docs/en/memory, "Write effective instructions"), so detail moves
+to files read by path when needed. Recall falls as context grows ("context rot",
+anthropic.com/engineering/effective-context-engineering-for-ai-agents). `/doctor prompt-audit`
+finds outdated and conflicting lines; its report feeds step 3. What this adds: a compression is a
+change that can drop rules and invent facts, so it is archived, classified, checked and reviewed
+like code. Report each step done with its evidence:
+
+1. **Measure** every always-loaded file: bytes, lines, sections (`wc -c -l`, `grep -c '^#'`).
+2. **Archive the whole file first, verbatim,** and prove the copy equals the committed file
+   (`git show HEAD:<file> | cmp - <copy>`, exit 0). Nothing is deleted: what leaves the file lives
+   in the archive, the decision log or a dated document.
+3. **Classify each section:** binding rule · current pointer · frozen text · stale state · history ·
+   reference list.
+4. **Keep by class.** Binding rules: rule + reason + decision id or date. Current pointers: in the
+   resume block only. Frozen sections: byte-identical, each extracted by its heading from the copy
+   and the new file and compared (`shasum` equal, or an empty `diff`).
+5. **Move by class.** Stale state, superseded tables, incident narratives and document lists go to
+   the archive, the decision log, or a one-line pointer to the index.
+6. **Every fact the rewrite adds carries its source** (command, file and line, decision id). In the
+   first real run, most errors the review found were new claims, not drops.
+7. **Grep for the one-liners.** Before rewriting, list the short single-line rules (names never to
+   use, guard tests, branch rules, naming traps); afterwards, grep the new file for each. They are
+   the easiest to lose.
+8. **An independent reviewer before the commit:** a different model diffs old against new, lists
+   each lost rule and each wrong new claim with its evidence, and confirms the frozen sections;
+   its findings are applied before committing (principle 10).
+9. **Write the size rule into the file itself:** its cap; old resume entries move to the archive
+   verbatim; findings go to dated documents.
+10. **Scan for secrets and personal data before the push** (live-system-changes.md, "Pushing and
+   backups").
+
+*Why:* a file read every turn grows a little each session until its rules are followed less, and a
+one-pass rewrite drops short rules and adds confident, wrong facts that only an independent diff
+catches. *Test:* the archive `cmp` exits 0; each frozen section compares equal; every listed
+one-liner is found in the new file; each review finding is applied or answered before the commit;
+the file states its cap.
 
 ## Using the record
 
