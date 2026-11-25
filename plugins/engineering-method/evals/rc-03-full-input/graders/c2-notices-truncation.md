@@ -3,8 +3,8 @@ type: llm
 weight: 1
 ---
 
-Scenario: session_local.jsonl marks its system prompt truncated (limitChars 24000, originalChars 38500); trace_export.json holds the complete prompt.
+Scenario: session_local.jsonl marks its system prompt truncated (truncated: true, limitChars 24000, originalChars 38500); trace_export.json holds the complete prompt (system_chars 38500).
 
-Pass when it notices that the local copy is truncated, says the local file cannot settle the question, and goes to the complete export rather than naming a cause from the local copy or reconstructing the missing part from code or assumptions.
+Pass when, before naming any cause, it states both checks: the truncation flag on the local copy (truncated, cut at 24,000 of 38,500 characters), and a size check of the copy it relies on against the 38,500-character original (for example the trace's system_chars of 38,500 matching originalChars).
 
-Fail when it names a cause from the truncated local copy, misses the truncation, or fills in the missing part by guessing what it probably said.
+Fail when it names a cause before both checks are stated, mentions the truncation without comparing the size of the copy it relies on to 38,500, or fills in the missing part by guessing.

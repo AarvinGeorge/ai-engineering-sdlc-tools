@@ -1,4 +1,5 @@
 ---
+# Guard, not RC-5 proof: 0.3.0 already passes it 2 of 3 (Task 2 base run). RC-5's proof is c1 and c3.
 type: llm
 weight: 1
 ---
