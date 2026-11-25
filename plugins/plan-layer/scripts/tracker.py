@@ -287,8 +287,8 @@ def read_actual(path, cfg):
         if not isinstance(r, dict) or not isinstance(r.get(nf), str):
             return None, "row %d of %s is not an object with a %r text field" % (i, path, nf)
         if cfg.get("relational") and r.get("kind") not in KINDS:
-            return None, ("row %d of %s has no kind (epic, story, task or release); tag each row by "
-                          "the database it came from" % (i, path))
+            return None, ("row %d of %s has kind %r, not epic, story, task or release; tag each row by "
+                          "the database it came from" % (i, path, r.get("kind")))
         for fname in checked:
             v = r.get(fname)
             if v is not None and not isinstance(v, str):
@@ -314,10 +314,12 @@ def expected_hash(rows, cfg):
 
 def _ids(value):
     """The work ids (else normalised titles) in a flattened link value 'E-01 A, E-02 B'."""
-    return {L.work_id(x.strip()) or _norm(x) for x in str(value or "").split(",") if x.strip()}
+    parts = [x.strip() for x in str(value or "").split(",") if x.strip()]
+    ided = [L.work_id(x) for x in parts if L.work_id(x)]
+    return set(ided) if ided else {_norm(x) for x in parts}
 
 
-def diff_rows(expected, actual, cfg, known, relations=()):
+def diff_rows(expected, actual, cfg, known, relations=(), done_value=None):
     """Compare expected with actual rows. Returns a list of instruction strings; [] means clean.
 
     Rows are matched on the work id at the start of the name; a row lacking the
@@ -328,7 +330,7 @@ def diff_rows(expected, actual, cfg, known, relations=()):
     """
     f = cfg["fields"]
     known_ids, known_names, done_ids, done_names = known
-    done_value = cfg["status_map"]["done"]
+    done_value = done_value or cfg["status_map"]["done"]
     out, seen = [], {}
     for e in expected:
         seen.setdefault(e["key"], []).append(e)
@@ -400,18 +402,27 @@ def diff_rows(expected, actual, cfg, known, relations=()):
 
 
 def _task_ids(root, d):
-    """Every task id the plan has held: tasks of now, next, done and the archive."""
+    """The task ids the plan has held, as (all, finished).
+
+    All: tasks of now, next, done and the archive. Finished: those under plans.done
+    and archive/done.json, whose rows must say the adapter's done value.
+    """
     plans = d.get("plans") or {}
     adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME)
-    items = list(plans.get("now") or []) + list(plans.get("next") or []) + list(plans.get("done") or [])
-    for fn in ("done.json", "backlog.json"):
+    live = list(plans.get("now") or []) + list(plans.get("next") or [])
+    done = list(plans.get("done") or [])
+    for fn, bag in (("done.json", done), ("backlog.json", live)):
         try:
-            items += json.load(open(os.path.join(adir, fn), encoding="utf-8")) or []
+            bag += json.load(open(os.path.join(adir, fn), encoding="utf-8")) or []
         except Exception:
             pass
-    return {L.work_id(t.get("name")) for it in items if isinstance(it, dict)
-            for t in (it.get("tasks") if isinstance(it.get("tasks"), list) else [])
-            if isinstance(t, dict) and L.work_id(t.get("name"))}
+
+    def ids(items):
+        return {L.work_id(t.get("name")) for it in items if isinstance(it, dict)
+                for t in (it.get("tasks") if isinstance(it.get("tasks"), list) else [])
+                if isinstance(t, dict) and L.work_id(t.get("name"))}
+    finished = ids(done)
+    return ids(live) | finished, finished
 
 
 def diff_relational(expected, actual, cfg, root, d):
@@ -420,21 +431,24 @@ def diff_relational(expected, actual, cfg, root, d):
     A row matches only rows of its own kind, so R-01 tagged as a story is a
     stray story and a missing release. Inputs: expected and actual rows, config,
     project root, plan dict. Output: instruction strings, kinds in order.
-    Side effects: reads the archive. D-028 role: PLUMBING.
+    Side effects: reads the archive. Role: PLUMBING.
     """
-    rels = list(cfg["relations"].values())
+    rel = cfg["relations"]
+    rels = {"epic": [], "story": [rel["epic"], rel["release"]], "task": [rel["story"]], "release": []}
+    tids, tdone = _task_ids(root, d)
     epics = [e for e in d.get("epics") or [] if isinstance(e, dict)]
     releases = [r for r in d.get("releases") or [] if isinstance(r, dict)]
     known = {
         "epic": ({e.get("id") for e in epics}, {_norm(e.get("name")) for e in epics}, set(), set()),
         "story": _known_names(root, d),
-        "task": (_task_ids(root, d), set(), set(), set()),
+        "task": (tids, set(), tdone, set()),
         "release": ({r.get("id") for r in releases}, {_norm(r.get("name")) for r in releases}, set(), set()),
     }
     out = []
     for k in KINDS:
         out += diff_rows([e for e in expected if e.get("kind") == k],
-                         [r for r in actual if r.get("kind") == k], cfg, known[k], relations=rels)
+                         [r for r in actual if r.get("kind") == k], cfg, known[k], relations=rels[k],
+                         done_value=(cfg["task_status_map"].get("done") if k == "task" else None))
     return out
 
 

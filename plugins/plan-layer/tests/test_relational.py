@@ -264,6 +264,36 @@ class TestRelationalDiff(RelBase):
         self.assertEqual(r.returncode, 2, r.stdout)
         self.assertIn("kind", r.stdout)
 
+    def test_finished_story_task_left_in_progress_is_set_to_done(self):
+        self.d["plans"]["done"] = [{"name": "E-01.S1 Signup", "period": "p", "outcome": "o",
+                                    "tasks": [{"name": "E-01.S1.T1 form", "state": "done"}]}]
+        rows = self.good() + [{"kind": "task", "Name": "E-01.S1.T1 form", "Status": "In progress",
+                               "Story": "E-01.S1 Signup"}]
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("set Status of 'E-01.S1.T1 form' to 'Done'", r.stdout)
+
+    def test_a_link_belonging_to_another_kind_is_not_compared(self):
+        rows = self.good()
+        for row in rows:
+            if row["key"] == "E-01":
+                row["Release"] = "R-99 elsewhere"
+        self.assertEqual(self.diff(rows).returncode, 0)
+
+    def test_comma_in_a_retitled_epic_still_matches_on_the_work_id(self):
+        rows = self.good()
+        for row in rows:
+            if row["key"] == "E-01.S2":
+                row["Epic"] = "E-01 Accounts, sessions and more"
+        self.assertEqual(self.diff(rows).returncode, 0)
+
+    def test_unreadable_kind_is_printed(self):
+        rows = self.good()
+        rows[0]["kind"] = "bogus"
+        r = self.diff(rows)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("'bogus'", r.stdout)
+
     def test_stray_epic_is_flagged(self):
         rows = self.good() + [{"kind": "epic", "Name": "E-07 Billing", "Status": "Planned"}]
         r = self.diff(rows)
