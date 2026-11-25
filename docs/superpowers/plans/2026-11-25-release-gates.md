@@ -833,7 +833,7 @@ if __name__ == "__main__":
 
 The plan doc is a record, but these two lines are code in it and a public file; the edit changes no meaning. `tests/` is exempt from the version gate, so work-log is not bumped. Re-run: 0 hits, exit 0. Run the work-log suite: `python3 -m pytest plugins/work-log/tests -q` still passes.
 - [ ] **Step 8: private list, locally.** `python3 .github/release-gates/scan_payload.py --tokens-file "$PRIVATE_LIST" --require-private-list --commits origin/main..HEAD; echo $?` where `$PRIVATE_LIST` is the path the guard already reads (the owner supplies it; never written into a file in this repo). Expect 0 hits. Control: `head -n1 "$PRIVATE_LIST" > "$TMPDIR/ctl.txt"; python3 .github/release-gates/scan_payload.py --paths "$TMPDIR/ctl.txt" --tokens-file "$PRIVATE_LIST"; echo $?; rm "$TMPDIR/ctl.txt"` expects 1 with a line naming only the temp path.
-- [ ] **Step 9: commit** `S3: whole-payload scan and the shared generic pattern file; test fakes built by concatenation`. Before it, run the guard's own check on the outgoing lines: `git diff --cached | grep '^+' | grep -cE -f .github/release-gates/secret-patterns.txt` prints 0.
+- [ ] **Step 9: commit** `S3: whole-payload scan and the shared generic pattern file; test fakes built by concatenation`. Before it, run the guard's own check on the outgoing lines: `PAT=$(grep -v '^[[:space:]]*\(#\|$\)' .github/release-gates/secret-patterns.txt | paste -sd'|' -); git diff --cached | grep '^+' | grep -cE -e "$PAT"` prints 0 (the owner-step-2 form: comment lines stripped, joined, passed with `-e`; `-f` on the raw file would read the comments as patterns).
 
 ### Task 4: the workflow
 
