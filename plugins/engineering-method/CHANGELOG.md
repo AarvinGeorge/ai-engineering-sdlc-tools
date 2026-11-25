@@ -43,9 +43,30 @@ a pointer.
 `rc-01` to `rc-10`, `rc-activation-loads-reference`, `rc-near-miss-rename` (a regression guard that
 should pass on both versions), `instruction-file-compression` and `fix-loop-bounded`; `rc-03-full-input`
 needs `--scaffold`, and `rc-05-diff` c2 is a guard that 0.3.0 already passes 2 runs of 3.
-`evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43). Eval results, 0.3.0 base versus
-0.4.0 head, with cost: not yet measured at the time of this entry; to be filled from the measured run,
-never estimated.
+`evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43).
+
+**Eval results** (Opus agent, Sonnet judge, 3 runs, ablation none, `-j 1`; criterion-runs passed,
+base 0.3.0 versus head 0.4.0). The head run is not green; this release is held on these results.
+- The reference loads: the hook prints `stage debug ... read references/root-cause-investigation.md`
+  on a debugging prompt; `rc-activation-loads-reference` c1 3 of 3; `rc-near-miss-rename` c1 3 of 3
+  (no read). A kept trace of an `rc-01` run shows the reference read after the skill fired.
+- RC criteria (11 cases, 25 criteria): base 5/75, head 30/75. Green on head (2 or 3 of 3): 10 of 25
+  (`rc-02` c1, `rc-04` c2, `rc-05` c1 and c2 (guard), `rc-06` c1, `rc-07` c1 and c2, `rc-10` c2,
+  activation c1 and c2). Still red: `rc-01` c1 c2, `rc-02` c2, `rc-03` c1 c2 c3, `rc-04` c1, `rc-05`
+  c3, `rc-06` c2, `rc-08` c1 c2 c3, `rc-09` c1 c2, `rc-10` c1. The judges were read and hold: the
+  reference is read but the answer leads with a cause or suspect list before the step that comes first.
+- `instruction-file-compression`: base 0/10 (two judged runs), head 11/15; c4 red 0/3 (the grader
+  says findings "applied", the reference and every answer say "applied or answered").
+- `fix-loop-bounded`: base 0/9, head 2/9, red. Each answer names the stall and the cap, then writes
+  the round-4 dispatch as asked: the push-back-then-comply default outranks the stop.
+- Eight touched cases: base 49/57, head 46/57; no criterion changed its 2-of-3 verdict
+  (`reviewer-different-model` run 1 was a judge miss; `live-deploy-safeguards` 0/3 on both).
+- Thirteen other cases on head against base: the five criteria red on 0.3.0 head stay red. Two drops,
+  re-run at 6 runs on each version: `deploy-helper-fault-triage` c1 base 6/6, head 3/6 (head waits
+  for the owner to approve the rule change before the bench goes on); `intent-over-literal` c3 base
+  3/6, head 1/6 (head defaults to a finite cache expiry). Both are release stops until explained.
+- Cost: $29.89 for the head runs, two missing base runs, base checks of the two drops and one
+  diagnostic run; the base runs of the new cases cost $23.09 earlier.
 
 ## 0.3.0 — 2026-11-16
 
