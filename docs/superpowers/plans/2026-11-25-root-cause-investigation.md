@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** engineering-method 0.4.0 gains a `debug` stage and a reference, `references/root-cause-investigation.md`, holding ten named investigation steps (RC-1 to RC-10) that a model invokes one at a time at its trigger, each with a behaviour eval that fails on 0.3.0 and passes on 0.4.0.
+**Goal:** engineering-method 0.4.0 gains (1) a `debug` stage and a reference, `references/root-cause-investigation.md`, holding ten named investigation steps (RC-1 to RC-10) that a model invokes one at a time at its trigger, each with a behaviour eval that fails on 0.3.0 and passes on 0.4.0, RC-5 starting from the working case; (2) a ten-step procedure for compressing an always-loaded instruction file without losing rules (`docs-and-decisions.md`, "Keeping instruction files small", Task 7); (3) a round cap and a concrete stall rule on review and fix loops (`review-loop.md`, "Fix rounds", Task 8). Items (2) and (3) each ship with one eval, red on 0.3.0 and green on 0.4.0.
 
-**Architecture:** the steps live in one on-demand reference beside the eight that exist, in the house form (rule, *Why:*, *Test:*). `scripts/method_hook.py` gains a `debug` stage that names `superpowers:systematic-debugging` plus the new reference, so a debugging prompt stops being routed to the build stage. SKILL.md changes by five small edits that stay inside its word budget. CONTRIBUTING.md gains the maintainer loop that turns an uncovered investigation lesson into a toolkit change with a red eval. Project-specific executors (pulling a turn's full input from a trace store, ssh, log queries) stay in each project; the reference names only their contract.
+**Architecture:** the steps live in one on-demand reference beside the eight that exist, in the house form (rule, *Why:*, *Test:*). `scripts/method_hook.py` gains a `debug` stage that names `superpowers:systematic-debugging` plus the new reference, so a debugging prompt stops being routed to the build stage. SKILL.md changes by five small edits that stay inside its word budget. CONTRIBUTING.md gains the maintainer loop that turns an uncovered investigation lesson into a toolkit change with a red eval. Project-specific executors (pulling a turn's full input from a trace store, ssh, log queries) stay in each project; the reference names only their contract. The compression procedure and the loop bound extend two existing references in place; neither touches SKILL.md (it has 2 words left after Task 4), so they are reached through the stage map: `plan` names `docs-and-decisions.md`, `review` names `review-loop.md`.
 
 **Tech stack:** Python 3.10+ standard library (hook and unittest), Markdown (skill, reference, eval cases), `claude plugin eval` for behaviour evals.
 
@@ -33,14 +33,19 @@
 | Eval cases | 21 (`evals/` holds 21 case dirs + `COVERAGE.md`) | `ls plugins/engineering-method/evals \| wc -l` = 22 |
 | Routing today | "debug", "debugging" are words of the `build` stage (`scripts/method_hook.py:45`, inside `STAGES` lines 36-77), so a debugging prompt loads `test-driven-development`, never `systematic-debugging` | read |
 | Drift | `docs-and-decisions.md:196` says "principle 17's five steps"; SKILL.md principle 17 has four REQUIRED lines (Exists, Extends, Unlocks, Goals) | `grep -n "five steps"` |
+| Instruction files today | `docs-and-decisions.md` 12,160 bytes; its only rule on them is lines 104-105 ("Instructions files (`CLAUDE.md`) carry context and navigation; findings and analysis go in dated documents; decisions go in the log"); no procedure for shrinking one | `wc -c`; `grep -n -i "instructions file" references/*.md` |
+| Fix loops today | `review-loop.md:59-60` and `model-routing-and-cost.md:23-24` say the same thing twice ("early rounds resume the implementer; later rounds … at least one tier up"); neither names a cap, a stop or a stall | `grep -n -i -E "round\|tier up" references/*.md` |
 
-## Vendor facts (Claude Code docs, read 25 Nov 2026)
+## Vendor and baseline facts (read 25 Nov 2026)
 
 - **Skills load on demand; supporting files load only when needed.** "A skill's body loads only when it's used"; supporting files let Claude "access detailed reference material only when needed"; "Keep `SKILL.md` under 500 lines. Move detailed reference material to separate files." (code.claude.com/docs/en/skills, "Supporting files"). The `description` + `when_to_use` listing is truncated at 1,536 characters (same page, frontmatter table).
 - **Commands are the older format.** "Custom commands have been merged into skills … Prefer a skill for new work" (code.claude.com/docs/en/skills); "Commands are the older format, and skills supersede them for new work" (code.claude.com/docs/en/plugins/components, "Commands").
 - **Plugin agents** live in `agents/*.md`, are named `<plugin>:<name>`, support `name`, `description`, `model`, `tools`, `skills` and a few more fields; `permissionMode`, `hooks` and `mcpServers` are ignored in plugin agents (code.claude.com/docs/en/plugins/components, "Frontmatter fields in plugin agents").
 - **Plugin hooks fire on their events once the plugin loads**, not only when a skill runs (same page, "When plugin hooks fire").
 - **Evals:** `claude plugin eval` "loads the target plugin's skills, hooks, and agents"; in a run "other installed plugins … and skills are absent", so Superpowers is not loaded inside an eval; the case definitions are hidden from the agent. Grader types: `regex`, `tool_used` (`tool`, `input_match`, `min`, `max`), `tool_order`, `file_exists`, `llm`, `baseline`. `--runs` defaults to 3; `--case` takes a glob; `--ablation none` runs one arm and scores every grader; `--max-cost-usd` stops new runs at a list-price ceiling (exit 2, partial results); `case.yaml` with `schema_version: "1.1"`, `name` and `context.add_dirs` grants read-only fixture directories (code.claude.com/docs/en/plugin-evals, "Grader types", "Command options", "Seed the workspace or conversation", "How runs are isolated").
+- **Instruction-file size** (code.claude.com/docs/en/memory, "Write effective instructions", read 25 Nov 2026): "target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence." Imports "help you organize a long file but don't reduce its context cost, because imported files load together with the CLAUDE.md that imports them." Same page, "Audit your instruction files": `/doctor prompt-audit` reports outdated or conflicting instructions and changes nothing until asked. So detail moves to files read by path on demand, never to `@`-imports.
+- **Context rot** (anthropic.com/engineering/effective-context-engineering-for-ai-agents, read 25 Nov 2026): "as the number of tokens in the context window increases, the model's ability to accurately recall information from that context decreases"; aim for "the smallest possible set of high-signal tokens".
+- **Fix-loop baselines.** Superpowers 6.2.0 `subagent-driven-development/SKILL.md` (lines 319-360, read from the installed plugin 25 Nov 2026): "A fix round is one fix dispatch plus one scoped re-review. Five rounds maximum per task"; rounds 1-3 resume the implementer, rounds 4-5 a fresh implementer on a more capable model; "When round 5's re-review still leaves findings open, stop dispatching. Adjudicate each open finding". GSD `get-shit-done/references/gates.md` (github.com/gsd-build/get-shit-done, read 25 Nov 2026), Revision Gate: "Bounded by iteration cap … The loop also escalates early if issue count does not decrease between consecutive iterations (stall detection). After max iterations, escalates unconditionally"; plan-checker "max 3 iterations".
 - **Hypothesis (not settled by the pages read):** the path at which an `add_dirs` directory appears to the agent. Task 2 measures it. The plan does not depend on `--eval-dir` pointing a base plugin at the head's cases; it copies the cases instead.
 
 ---
@@ -56,6 +61,9 @@
 4. Nothing from Superpowers' systematic-debugging or principle 17 is restated; the two steps that specialise systematic-debugging say so, and the departures are named.
 5. The `docs-and-decisions.md:196` drift is fixed and a test stops it recurring.
 6. The outer loop runs in two halves: RC-9 makes every investigation end by mapping its lessons to the steps and recording any uncovered lesson in the project's own method record; CONTRIBUTING.md's maintainer loop turns such a lesson into a toolkit change with an eval that fails first.
+7. RC-5 starts from the working case: when one instance works and another fails, the working run is found first and the two served inputs are diffed (section 2; one more grader on `rc-05-diff`).
+8. `docs-and-decisions.md` holds "Keeping instruction files small", the ten-step compression procedure in rule / *Why:* / *Test:* form, with the vendor baseline named; its eval `instruction-file-compression` is red on 0.3.0 and green on 0.4.0 (Task 7).
+9. `review-loop.md` "Fix rounds" holds one rule (not two) for escalation, a five-round cap and a stall rule defined so a ledger line can show it; `model-routing-and-cost.md` points at it instead of restating it; its eval `fix-loop-bounded` is red on 0.3.0 and green on 0.4.0 (Task 8).
 
 **The case, project-neutral.** A deployed LLM agent refused a request from its verified operator. The deterministic code had proven the sender and served the model a verdict ("verified operator, full access"), but the fact linking the sender's visible address to that verdict was dropped by a guard that returned nothing on one-to-one messages, on the stated assumption that there was nothing to add. The model saw a name it could not match to the visible address and judged it a likely impersonation. Other instances worked only because a per-instance operator name happened to resemble the address, or because the message itself said who was writing. The investigation took seven stages and about seventy minutes. It went wrong in recurring ways: a root was written to the durable record and pushed three times before the full model input was read; a logged character count that pointed at the gap was decoded only at the end; randomness was offered as the explanation; an independent investigator was briefed with the controller's hypothesis and returned it confirmed, after reconstructing a truncated input instead of reading the untruncated trace; remedies moved from a new fact, to a tool-description edit, to a new general principle, while an existing mechanism already rendered the missing fact and was switched off on that path. The stage table, lessons and anti-patterns stay in the project's own record; only the general lessons ship here.
 
@@ -114,13 +122,13 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 *Why:* the case's first hypothesis blamed the message's wording; the model's own reasoning named a different fact, and the code's decision was right while the text sent to the model left out its basis. *Test:* the three lines exist, each with a source.
 
 ### RC-5 Diff the served inputs
-**Rule.** This specialises systematic-debugging's Phase 2 ("list every difference") for a model decision: diff the **rendered model inputs** block by block, a failing run against a working run from each population the reporter named, and run the identical input N times and report k of N. A decision that flips on an identical input is evidence that the input is ambiguous or missing a fact; it is not an explanation.
+**Rule.** This specialises systematic-debugging's Phase 2 ("list every difference") for a model decision. When one instance or run works and another fails, find the working case first and diff the two served inputs: the working case is evidence, not an anecdote. Diff the **rendered model inputs** block by block, a failing run against a working run from each population the reporter named, and run the identical input N times and report k of N. A decision that flips on an identical input is evidence that the input is ambiguous or missing a fact; it is not an explanation.
 - **Trigger:** "it works elsewhere", "it worked yesterday", or a model decision that varies.
 - **Input:** one failing run, working runs, RC-1's table. **Output:** the block diff; k of N; each difference sorted as mechanism candidate or correlate.
-- **Prevents:** randomness as the explanation; a correlate (a name, a phrasing) taken for the mechanism; comparing only the nearest sibling.
-- **Evidence:** the diff with run ids; N and k.
+- **Prevents:** randomness as the explanation; a correlate (a name, a phrasing) taken for the mechanism; comparing only the nearest sibling; the working instance waved off as luck.
+- **Evidence:** the working run's id, named before any cause; the diff with run ids; N and k.
 
-*Why:* "the model is not deterministic" closed the case's inquiry for an hour; a diff of served inputs would have shown that no instance received the fact and that only names and phrasing varied. *Test:* the report shows the block diff and k of N and never gives randomness as a cause.
+*Why:* "the model is not deterministic" closed the case's inquiry for an hour; a diff of served inputs would have shown that no instance received the fact and that only names and phrasing varied. *Test:* the working run is named before any cause is offered, the report shows the block diff and k of N, and it never gives randomness as a cause.
 
 ### RC-6 Inventory the concept
 **Rule.** Before proposing any new fact, tool, rule, prompt text or principle, list every mechanism that already touches the concept (proofs, records, rendered lines, lookups, learned data, earlier fixes): what it computes, where it is rendered, the condition that suppresses it, and whether it **fired** on this event. For an earlier fix, "fired" needs two readings: its revision is in what runs (`git merge-base --is-ancestor <fix> <running>`) and its code path executed on the failing event (a log line, a trace span, a served field). Deployed is not fired. The table fills principle 17's **Exists** line from the running code.
@@ -202,7 +210,7 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 | `rc-02-decision-record` | RC-2 | A refund agent declined; the log shows `policy: role=supervisor route=act outcome=declined_by_model served=(612 + 0 + 940 chars)`. | c1 separates what the code decided (supervisor, act) from the model's decline; c2 maps each of the three numbers to a block and treats the empty middle block as the lead |
 | `rc-03-full-input` | RC-3 | A ticket-triage agent refused to escalate. `resources/session_local.jsonl` (flag `"truncated": true`, `"limitChars": 24000`, `"originalChars": 38500`, cut before the requester block) and `resources/trace_export.json` (complete; its requester block reads `requester_role:` with an empty value on this single-requester ticket). | c1 names the empty `requester_role` on this ticket, a fact present only in `trace_export.json`, as the lead; c2 notices the truncation and does not name a root from the local copy or rebuild the missing part from code; c3 labels any root [hypothesis] until the full input is read |
 | `rc-04-objection` | RC-4 | An invoicing agent refused to send a credit note; a colleague says "the word 'urgent' tripped injection detection". The model's reasoning (in the prompt) objects that the requester's account id differs from the one in the header. | c1 quotes the model's stated reason and names the input fact it objected to; c2 writes decided / told / judged as separate lines and drops the colleague's motive guess as unsupported |
-| `rc-05-diff` | RC-5 | A booking assistant confirms the same request on one instance and refuses it on another; "it's non-deterministic, 3 of 10 fail". | c1 asks for or performs a block-by-block diff of the rendered model inputs of a working and a failing run; c2 reports k of N on an identical input and treats a flip as a sign of an ambiguous or missing fact, not as the cause |
+| `rc-05-diff` | RC-5 | A booking assistant confirms the same request on one instance and refuses it on another; "it's non-deterministic, 3 of 10 fail". | c1 asks for or performs a block-by-block diff of the rendered model inputs of a working and a failing run; c2 reports k of N on an identical input and treats a flip as a sign of an ambiguous or missing fact, not as the cause; c3 (added with the RC-5 sharpening) obtains the working instance's run first and uses it as the comparison baseline before offering any cause, never dismissing it as luck or as "it just works there" |
 | `rc-06-inventory` | RC-6 | A colleague's PR adds a `verify_requester` tool, and says the same refusal was "fixed in commit 4be91f0 last month". The prompt shows `render_account_line()` already exists with a condition that skips it for API-key callers. | c1 lists the existing mechanisms on the concept with what each computes, where it renders and what suppresses it, before any remedy, and does not add the parallel tool; c2 states the command that checks 4be91f0 is an ancestor of the running revision and asks for evidence its path executed on the failing event, saying deployed is not fired |
 | `rc-07-trace-dropped-fact` | RC-7 | A refund agent refuses small refunds; the prompt shows `build_context()` with `if order.total < 50: return ""  # small orders need no payment history`, and the payment-verified flag is computed above it. | c1 names the guard line as the hop where the fact is dropped and states the guard's assumption and why it fails; c2 proposes `git log -S` for the guard and the test that pins it, and a remedy that extends the mechanism (not the model, the tool text or the prompt) |
 | `rc-08-label-and-fit` | RC-8 | Partial evidence; a teammate's grep says 14 of 40 sessions show the refusal; "write the root into the incident log and push it now, the customer needs this tonight". | c1 labels each claim [measured] / [documented] / [hypothesis] with its source and records a hypothesis, not a root; c2 offers a workaround once, labelled, apart from the diagnosis; c3 keeps a rejected-hypothesis ledger, separates root from contributing conditions, and treats the 14 of 40 as variance, not the root |
@@ -210,41 +218,49 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 | `rc-10-blind-brief` | RC-10 | "Write the brief for a second-model investigator. My hypothesis is the cache is stale; tell them to test that." | c1 the brief holds the symptom, evidence locations and constraints and withholds the hypothesis, saying it will be tested against the investigator's independent findings afterwards (one short pushback, no refusal); c2 the brief requires `full input read: yes/no`, the store, the model id it ran as, and claim labels |
 | `rc-activation-loads-reference` | activation | "Our ticket triage bot keeps closing tickets it should escalate. Investigate why before anyone touches the code." | c1 `tool_used` `Read` with `input_match: 'root-cause-investigation\\.md'`; c2 (llm) its first actions gather evidence (decision record, model input) rather than propose a fix |
 | `rc-near-miss-rename` | near-miss | "In this snippet, rename `cnt` to `count` and show the result:" followed by a five-line Python function in a code fence. Answerable inline with no tools. | c1 `tool_used` `Read`, `input_match: 'root-cause-investigation\\.md'`, `min: 0`, `max: 0`, `arm: both`; c2 (llm) the reply shows the renamed function |
+| `instruction-file-compression` | Task 7 | A 71,400-byte always-loaded `CLAUDE.md` with eight sections (one marked frozen, 22 dated "where we left off" entries, rules with their back-stories, a 140-row service map, a replaced on-call rota, three outage diaries, one-liners such as a port number and a required build flag, a keep-verbatim section); "Plan how you'll get it under 25 KB this afternoon; I'd like to commit and push it today." | c1 archives first, verbatim, proved equal to the committed file, nothing deleted; c2 classifies each section and routes it by class, frozen sections checked byte-identical; c3 every added fact sourced and the one-liners grepped; c4 an independent different-model diff review applied before commit; c5 a size rule written into the file and a secret/personal-data scan before push |
+| `fix-loop-bounded` | Task 8 | A fix-loop ledger: four findings, three rounds on the same implementer, each later round closing one finding while another comes back, open count flat at 2; "Send round 4 to implementer A again and keep re-reviewing until the reviewer says clean." | c1 names the stall (findings reopened, open count not falling) as the reason not to continue as asked; c2 does not resume implementer A and stops dispatching: rules on each open finding (park with a ruling, or blocked for the owner) or brings them to the user; c3 refuses the open-ended loop, states the cap and what happens to each open finding at the stop, one pushback |
 
 **Runs.** Every case runs at the default 3 runs (the docs' default; a single run is noisy), on base and on head.
 
 **Red, then green.** Run the new cases on 0.3.0 (base, red) before the reference exists, then on 0.4.0 (head, green). A criterion that already passes on base tests nothing new and is rewritten until it fails (behaviour-evals.md); the near-miss case is the exception, a regression guard that should pass on both.
 
-**Regression, like for like.** The three existing cases this change touches (`fix-fits-what-exists`, whose principle 17 sentence changes; `activation-without-trigger-words` and `stage-change-activation`, whose routing changes) run on base 0.3.0 and on head, 3 runs each, compared run for run. The other 18 existing cases run on head at 3 runs and are compared with the 0.3.0 results in the 0.3.0 CHANGELOG (also 3 runs). Any drop stops the release until explained (principle 18).
+**Regression, like for like.** The six existing cases this change touches (`fix-fits-what-exists`, whose principle 17 sentence changes; `activation-without-trigger-words` and `stage-change-activation`, whose routing changes; `settled-ruling-synonyms`, whose reference `docs-and-decisions.md` gains a section in Task 7; `blocked-release-first` and `reviewer-different-model`, whose reference `review-loop.md` changes in Task 8) run on base 0.3.0 and on head, 3 runs each, compared run for run. The first three are run on base in Task 2, the other three in Tasks 7 and 8. The other 15 existing cases run on head at 3 runs and are compared with the 0.3.0 results in the 0.3.0 CHANGELOG (also 3 runs). Any drop stops the release until explained (principle 18).
 
 **Cost plan** (behaviour-evals.md, "Cost plan before any run"). Agent model: the model that will use the method (Opus); judge: Sonnet (`--judge-model sonnet`); `--ablation none` (base and head are compared as two versions, not as with/without plugin).
 - Calibration: `claude plugin eval <base>/plugins/engineering-method --case rc-01-pin-what-ran --runs 1 --ablation none --judge-model sonnet --max-cost-usd 3`. Record the reported cost per run as `c`.
-- New cases: 12 cases × 3 runs × 2 versions = 72 × `c`.
-- Regression: 3 cases × 3 runs × 2 versions + 18 cases × 3 runs = 72 × `c`.
-- Total at most 144 × `c` plus the calibration run. Every command carries `--max-cost-usd` set to its stage's sum × 1.25, written in the task before the run. A run that exits 2 (cap hit) is reported as partial, never counted as pass or fail.
+- New cases: 14 cases (12 `rc-*` plus `instruction-file-compression` and `fix-loop-bounded`) × 3 runs × 2 versions = 84 × `c`.
+- Regression: 6 cases × 3 runs × 2 versions + 15 cases × 3 runs = 81 × `c`.
+- Total at most 165 × `c` plus the calibration run. Every command carries `--max-cost-usd` set to its stage's sum × 1.25, written in the task before the run. A run that exits 2 (cap hit) is reported as partial, never counted as pass or fail.
 
-**Showing the reference loads.** Three pieces of evidence, all recorded in Task 8: the hook's own output on a debugging prompt (`echo '{"prompt":"investigate why the bot refused","session_id":"x"}' | python3 scripts/method_hook.py --prompt` prints the debug message); `rc-activation-loads-reference` c1 passing in 3 of 3 head runs; and `rc-near-miss-rename` c1 passing (no read) in 3 of 3.
+**Showing the reference loads.** Three pieces of evidence, all recorded in Task 10: the hook's own output on a debugging prompt (`echo '{"prompt":"investigate why the bot refused","session_id":"x"}' | python3 scripts/method_hook.py --prompt` prints the debug message); `rc-activation-loads-reference` c1 passing in 3 of 3 head runs; and `rc-near-miss-rename` c1 passing (no read) in 3 of 3.
 
-**Coverage.** `evals/COVERAGE.md` gains a section "Root-cause investigation (0.4.0)" with one row per step and activation case: rule, gap id (G30 to G41, new), grader path.
+**Coverage.** `evals/COVERAGE.md` gains a section "Root-cause investigation (0.4.0)" with one row per step and activation case: rule, gap id (G30 to G41, new), grader path; the `rc-05-diff` c3 row shares RC-5's gap id. Two more rows under "Rules added in 0.4.0": instruction-file compression (G42, `instruction-file-compression/graders/c1…c5`) and bounded fix loops (G43, `fix-loop-bounded/graders/c1…c3`).
 
 ## 6. Fit with what exists
 
 - **Exists:** Superpowers systematic-debugging (iron law; Phase 1 root cause, including step 4's evidence gathering at every component boundary in a multi-component system and backward tracing; Phase 2 pattern analysis, including "Identify Differences … list every difference"; Phase 3 one hypothesis; Phase 4 failing test then fix; `root-cause-tracing.md`; `defense-in-depth.md`); principle 17 (replay first, cause a hypothesis until run, Exists / Extends / Unlocks / Goals); principle 2 (`merge-base --is-ancestor`); principle 4 and `measurement-and-state-claims.md` (proven zeros, counts read entry by entry, labels [measured] / [documented] / [hypothesis] at line 82); principle 10 and `review-loop.md` (executing reviewers, briefs); principle 22 (floor in code, meaning to the model); `live-system-changes.md` (observation log, red-gate investigation inputs, a repeat fault changes the mechanism, push guard); `docs-and-decisions.md` ("Using the record", "Plans"); the hook's stage map; the `fix-fits-what-exists` eval; CONTRIBUTING's review rule. Absent: any step for reading a model's full input, quoting its objection, diffing served inputs, proving a fix fired, finding a suppression guard in context assembly, briefing blind, or closing the loop; any route from a debugging prompt to systematic-debugging; any written path from an investigation lesson to a toolkit change.
+  - For Task 7: `docs-and-decisions.md:104-105` (instructions files carry context and navigation; findings to dated docs; decisions to the log), "Layout" (`archive/`, nothing deleted without asking), "Decision log" (append-only); `live-system-changes.md` "Pushing" (secret and personal-data guard with a planted control); principle 10 (different-model reviewer that executes); the vendor's `/doctor prompt-audit` (finds outdated and conflicting lines, edits nothing unasked). Absent: any procedure for shrinking an always-loaded file, any check that a rewrite kept frozen text byte-identical or kept its one-line rules, any rule that facts a rewrite adds carry a source.
+  - For Task 8: `review-loop.md:59-60` and `model-routing-and-cost.md:23-24` (the same escalation sentence twice, deferring to Superpowers); `review-loop.md` "Fix rounds" (scoped re-reviews, record a residual); `progress-ladder.md:60` (each review round indented under its task: round, verdict, fix commit); Superpowers' five-round cap and breaker. Absent from the method: a stop, a stall definition, and a ledger field that shows either.
 - **Extends:**
   - `STAGES` and SKILL.md §3: one row (EXTENDS).
   - Principle 17: its first sentence points at the reference (EXTENDS, no new principle).
   - `references/`: one new file (NEW, because no reference covers investigation; it EXTENDS principles 4, 10, 17 and 22 and systematic-debugging's Phases 1 and 2 by naming the steps that fill them for model-driven systems).
   - RC-8 reuses the existing label set (EXTENDS `measurement-and-state-claims.md`; no second set).
   - CONTRIBUTING.md: a maintainer-loop section (EXTENDS).
-  - `evals/`: 12 cases (EXTENDS the suite); `COVERAGE.md` (EXTENDS).
+  - RC-5's working-case-first sentence (EXTENDS RC-5 and `rc-05-diff`; no new step, no new case).
+  - `docs-and-decisions.md` "Keeping instruction files small" (NEW section, because no reference covers shrinking a file; it EXTENDS the existing instructions-file line 104-105, which gains a pointer, the archive and decision-log rules, the push guard and principle 10, and uses `/doctor prompt-audit` as an input rather than duplicating it).
+  - `review-loop.md` "Fix rounds": the escalation bullet is replaced by one rule carrying escalation, cap and stall (EXTENDS; adopts Superpowers' cap and adds GSD's stall detection, defined for this method's ledger); `model-routing-and-cost.md` rule 2 becomes a pointer to it (EXTENDS, removes the duplicate rather than adding a second rule).
+  - `evals/`: 14 cases (EXTENDS the suite); `COVERAGE.md` (EXTENDS).
   - `tests/`: new hook cases (EXTENDS `test_method_hook.py`); a structure test for the reference (NEW file `tests/test_root_cause_reference.py`, because the budget test checks SKILL.md only); one drift assertion (EXTENDS `test_skill_budget.py`).
-- **Unlocks:** any project that runs a model-driven product gets the same investigation order without copying a project's notes; each investigation leaves its uncovered lessons where a maintainer can turn them into an eval-backed change, so the toolkit learns without anyone remembering to; the fix-word precedence and the near-miss case keep ordinary build prompts on build.
+- **Unlocks:** any project that runs a model-driven product gets the same investigation order without copying a project's notes; each investigation leaves its uncovered lessons where a maintainer can turn them into an eval-backed change, so the toolkit learns without anyone remembering to; the fix-word precedence and the near-miss case keep ordinary build prompts on build. The compression procedure lets any always-loaded file (a project's `CLAUDE.md`, an agent's instructions, a memory index) shrink without silently dropping a rule, so the size cap can be kept rather than abandoned. The loop bound applies to every review loop the method runs (task, plan, deploy file), not only code fix rounds.
 - **Goals:**
-  - Project-neutral: no names, hosts, tracker ids or identifiers; fixtures synthetic; identifier scan in Task 9.
+  - Project-neutral: no names, hosts, tracker ids or identifiers; fixtures synthetic; identifier scan in Task 11.
   - Reusable: on-demand reference plus hook routing; executors named by contract, not shipped.
   - Each step invocable: named headings RC-1 to RC-10, reported done or skipped, structure test over every field.
   - Reliable: one eval per step at 3 runs, red then green; activation and near-miss cases; like-for-like regression on the touched cases.
-  - Inside the budget: 2,198 / 2,200 words and 1,526 / 1,536 characters measured on a scratch copy; re-measured in Task 4.
+  - Inside the budget: 2,198 / 2,200 words and 1,526 / 1,536 characters measured on a scratch copy; re-measured in Task 4. Tasks 7 and 8 do not touch SKILL.md; each re-runs `test_skill_budget.py` to show it.
+  - Reliable (Tasks 7, 8): one eval each, red on base then green on head; their stage words route through the existing `plan` and `review` rows. **Known limit:** a request with no stage word ("slim down CLAUDE.md") relies on the trigger text, which has 10 characters left after Task 4, so no trigger phrase is added (raising a limit is out of scope).
 
 **Not duplicated from systematic-debugging.** Its iron law, the four phases, reproduce-first, check recent changes, one hypothesis at a time, the failing test before the fix, "3 or more failed fixes means question the architecture", backward call-stack tracing and defense-in-depth are not restated; the reference opens by pointing at them. Two steps **specialise** its generic steps for LLM agents and keep only the specialised half: RC-5 specialises Phase 2's "list every difference" to the rendered model input and k-of-N decisions (the generic "compare working and broken" is left to Phase 2); RC-7 specialises Phase 1's component-boundary instrumentation and backward tracing to the context-assembly path, finding the suppression guard with `git log -S` and its pinning test (the generic "trace the data flow back" is left to Phase 1). **Not duplicated from principle 17.** The replay sentence and the four REQUIRED lines stay in SKILL.md; RC-6 fills the Exists line, RC-8 calls the fit check by name.
 
@@ -263,21 +279,25 @@ The text below is the reference's text for each step; Task 3 copies it, tighteni
 plugins/engineering-method/
   skills/engineering-method/references/root-cause-investigation.md   NEW: RC-1..RC-10      (Task 3)
   skills/engineering-method/SKILL.md                                 5 edits                (Task 4)
-  skills/engineering-method/references/docs-and-decisions.md         line 196               (Task 5)
+  skills/engineering-method/references/docs-and-decisions.md         line 196 (Task 5); new section + pointer (Task 7)
+  skills/engineering-method/references/review-loop.md                "Fix rounds" rule      (Task 8)
+  skills/engineering-method/references/model-routing-and-cost.md     rule 2 → pointer       (Task 8)
   scripts/method_hook.py                                             debug stage            (Task 4)
   tests/test_method_hook.py                                          DebugStage + 3 edits   (Task 4)
   tests/test_root_cause_reference.py                                 NEW: structure         (Task 3)
   tests/test_skill_budget.py                                         drift assertion        (Task 5)
   evals/rc-01-… … rc-10-…/, rc-activation-loads-reference/,
   evals/rc-near-miss-rename/                                         NEW: 12 cases          (Task 1)
-  evals/COVERAGE.md, README.md, CHANGELOG.md, .claude-plugin/plugin.json                    (Task 7)
+  evals/instruction-file-compression/                                NEW: 1 case            (Task 7)
+  evals/fix-loop-bounded/                                            NEW: 1 case            (Task 8)
+  evals/COVERAGE.md, README.md, CHANGELOG.md, .claude-plugin/plugin.json                    (Task 9)
 CONTRIBUTING.md                                                      maintainer loop        (Task 6)
-.claude-plugin/marketplace.json, README.md (root)                                           (Task 7)
+.claude-plugin/marketplace.json, README.md (root)                                           (Task 9)
 ```
 
 ## Lanes and models
 
-Serial, one writer per worktree (the reference, the SKILL row and the hook depend on each other, and the evals must exist before the reference). Builders: Opus for Tasks 1, 3 and 6 (judgement in text and scenarios), Sonnet for Tasks 4, 5 and 7 (the plan carries the literal code). Reviewer for every task and the whole branch: a fresh Fable 5.2 agent in its own worktree that runs the tests and probes (principle 10). Every agent reports the model id it ran as.
+Serial, one writer per worktree (the reference, the SKILL row and the hook depend on each other, and the evals must exist before the reference). Builders: Opus for Tasks 1, 3, 6, 7 and 8 (judgement in text and scenarios; Tasks 7 and 8 carry their literal text but each writes an eval case that must go red on base and may need rewording), Sonnet for Tasks 4, 5 and 9 (the plan carries the literal code). Order: Task 7 runs after Task 5, because both edit `docs-and-decisions.md` (Task 5 changes the "Plans" line; Task 7 adds a section above it and a pointer in "Decision log"); Task 8 touches different files and could run beside Task 7 in its own worktree, but stays serial because both finish with eval runs on the same base worktree and budget. Reviewer for every task and the whole branch: a fresh Fable 5.2 agent in its own worktree that runs the tests and probes (principle 10). Every agent reports the model id it ran as.
 
 ---
 
@@ -295,7 +315,7 @@ Serial, one writer per worktree (the reference, the SKILL row and the hook depen
 - Create: `plugins/engineering-method/evals/<case>/prompt.md`, `graders/cN-<slug>.md`, `graders/skill-fired.md` for each of the 12 cases in section 5.
 - Create: `plugins/engineering-method/evals/rc-03-full-input/case.yaml`, `resources/session_local.jsonl`, `resources/trace_export.json`.
 
-**Interfaces:** Produces case directory names exactly as in section 5, all starting `rc-`; Tasks 2 and 8 select them with `--case 'rc-*'`.
+**Interfaces:** Produces case directory names exactly as in section 5, all starting `rc-`; Tasks 2 and 10 select them with `--case 'rc-*'`.
 
 - [ ] **Step 1: Write each prompt in full** from its section 5 row. Frontmatter for every case:
 
@@ -656,34 +676,309 @@ A lesson without a failing eval is not a method change yet.
 - [ ] **Step 2: Check:** `grep -n "RC-9" CONTRIBUTING.md plugins/engineering-method/skills/engineering-method/references/root-cause-investigation.md` names the step in both files.
 - [ ] **Step 3: Commit** (`CONTRIBUTING: maintainer loop for investigation lessons`).
 
-### Task 7: Docs, coverage, version 0.4.0
+### Task 7: Keeping instruction files small (the compression procedure)
+
+**Files:**
+- Create: `plugins/engineering-method/evals/instruction-file-compression/prompt.md`; `graders/c1-archive-verbatim-first.md`, `c2-classify-and-route.md`, `c3-new-claims-sourced-one-liners-kept.md`, `c4-independent-diff-review.md`, `c5-size-rule-and-push-scan.md`, `skill-fired.md`
+- Modify: `plugins/engineering-method/skills/engineering-method/references/docs-and-decisions.md` (a pointer in "Decision log"; a new section between "Decision log" and "Using the record")
+
+**Sequencing:** after Task 5, which edits the same file's "Plans" paragraph. Start from the Task 5 commit; the old strings below do not overlap Task 5's line.
+
+**Interfaces:** Produces section heading `## Keeping instruction files small`; Task 9 cites it in the CHANGELOG and COVERAGE (gap G42).
+
+- [ ] **Step 1: Write the eval case first.** `evals/instruction-file-compression/prompt.md`, verbatim:
+
+````markdown
+---
+max_turns: 8
+allowed_tools: [Read, Glob, Grep, Skill]
+description: "contamination strings: 71,400 bytes; port 8443; --no-cache"
+---
+
+Plan how you'll get our warehouse-scheduling service's `CLAUDE.md` under 25 KB this afternoon. It loads on every turn and has grown to 71,400 bytes, 1,020 lines. Its sections:
+
+| § | Section | Bytes | Notes |
+|---|---|---|---|
+| 1 | Mission | 2,100 | its header says "FROZEN: only the tech lead edits this section" |
+| 2 | Where we left off | 18,900 | 22 dated entries, 14 Sep to 24 Nov; most point at handoff notes since replaced |
+| 3 | Working rules | 14,200 | 31 rules, many followed by a paragraph on the night it was learned |
+| 4 | Service map | 11,600 | 140 rows: service, owning team, dashboard link, status |
+| 5 | On-call rota (Q3) | 3,800 | names and weeks for July to September; the rota moved to the pager tool on 2 Nov |
+| 6 | War stories | 9,700 | three outages, hour by hour |
+| 7 | Odds and ends | 1,400 | one-liners: "the local API listens on 8443, not 8080", "always pass `--no-cache` to the image build", "migrations run before the worker starts, never after" |
+| 8 | Parked questions | 9,700 | its header says "keep verbatim" |
+
+I'd like to commit and push it today; just tell me the steps you'll take.
+````
+
+The request comes first because the table holds report and test stage words ("status", "tests", "bench"): with "Plan" as the first stage word the hook names `docs-and-decisions.md` (section 6, "Reliable (Tasks 7, 8)"); with the request last it routed to `report` (measured on the 0.3.0 hook while writing this plan). Check before committing the case: pipe the prompt body as `{"prompt": …}` into `python3 plugins/engineering-method/scripts/method_hook.py --prompt`; the output says `stage plan`. Graders, verbatim, each with the frontmatter `type: llm` / `weight: 1` used in Task 1 Step 2, then:
+
+`c1-archive-verbatim-first.md`:
+```markdown
+Scenario: a 71,400-byte CLAUDE.md that loads on every turn is to be cut under 25 KB and committed today.
+
+Pass when, before editing anything, it copies the whole file verbatim to an archive location and proves the copy equals the committed version (cmp, diff or a hash against the file at HEAD), and says nothing is deleted outright: every part that leaves the file lives in the archive, the decision log or another named document.
+
+Fail when it edits the file in place first, archives only the removed parts or a summary of them, deletes sections, or never shows that the copy is identical.
+```
+
+`c2-classify-and-route.md`:
+```markdown
+Scenario: the eight sections differ in kind (a frozen mission, 22 dated "where we left off" entries, rules with their back-stories, a 140-row service map, a replaced on-call rota, three outage diaries, one-liners, a keep-verbatim section).
+
+Pass when it sorts the sections by kind (binding rules, current pointers, frozen or keep-verbatim text, stale state, history, reference lists) and treats each kind differently: binding rules kept but compressed to rule plus reason plus a decision id or date; only entries that are still current kept in section 2; sections 1 and 8 left byte-identical and checked so (a diff or a hash per section, before and after); the replaced entries, the Q3 rota and the outage diaries moved to the archive or the decision log; the service map replaced by a pointer to where it is kept.
+
+Fail when it applies one treatment to every section (for example "summarise each section"), trims or rewords section 1 or 8, or keeps the service map, the rota or the outage diaries inline.
+```
+
+`c3-new-claims-sourced-one-liners-kept.md`:
+```markdown
+Scenario: a compressed rewrite can lose short rules and can also state new facts in new words.
+
+Pass when it requires every fact the rewrite adds or restates to carry its source (a command, a file and line, or a decision id), and lists the one-line rules from section 7 (the 8443 port, the `--no-cache` flag, migrations before the worker) as a checklist it greps for in the new file after the rewrite.
+
+Fail when it treats lost rules as the only risk and says nothing about new claims, or relies on rereading the new file to see that the one-liners survived.
+```
+
+`c4-independent-diff-review.md`:
+```markdown
+Scenario: the user wants the rewrite committed and pushed today.
+
+Pass when, before the commit, a reviewer on a different model from the one doing the rewrite diffs the old file against the new one, lists every lost rule and every wrong new claim with its evidence, confirms the frozen sections are unchanged, and its findings are applied before committing.
+
+Fail when the rewrite is only self-checked, the review comes after the commit or the push, or the reviewer is only asked whether the new file reads well.
+```
+
+`c5-size-rule-and-push-scan.md`:
+```markdown
+Scenario: the file grew to 71,400 bytes over a few months and is about to be pushed.
+
+Pass when the new file states its own size rule (a cap, old resume entries move to the archive, findings go to dated documents) and a scan for secrets and personal data runs before the push.
+
+Fail when no size rule is written into the file itself, or the push happens without a secret and personal-data scan.
+```
+
+`skill-fired.md`: copy `evals/fix-fits-what-exists/graders/skill-fired.md` unchanged.
+
+- [ ] **Step 2: Commit the case** (`engineering-method evals: instruction-file compression case, written before the rule`).
+- [ ] **Step 3: Red on base.** Copy the case directory into `<scratch>/em-base/plugins/engineering-method/evals/` (the base worktree from Task 2), then:
+  - `claude plugin eval <scratch>/em-base/plugins/engineering-method --case instruction-file-compression --runs 3 --ablation none --judge-model sonnet --max-cost-usd <3 × c × 1.25>`
+  - `claude plugin eval <scratch>/em-base/plugins/engineering-method --case settled-ruling-synonyms --runs 3 --ablation none --judge-model sonnet --max-cost-usd <3 × c × 1.25>` (touched-case base, section 5).
+
+  Read the failing answers. Expected: c2 to c5 red in at least 2 of 3 runs. c1 may pass on base (archiving first is a common habit); if any criterion is green in 2 or more of 3, sharpen its Pass line (for c1: the proof of identity against HEAD, not only a copy) and re-run until red; record before and after in the PR draft.
+- [ ] **Step 4: Write the section.** In `docs-and-decisions.md`, replace
+
+```
+- Instructions files (`CLAUDE.md`) carry context and navigation; findings and analysis go in dated
+  documents; decisions go in the log.
+
+## Using the record
+```
+
+with
+
+```markdown
+- Instructions files (`CLAUDE.md`) carry context and navigation; findings and analysis go in dated
+  documents; decisions go in the log. One that outgrows its cap is compressed by the next section.
+
+## Keeping instruction files small
+
+A file loaded on every turn (a project `CLAUDE.md`, an agent's instructions, a memory index) holds
+binding rules and current pointers only. The baseline is Anthropic's: "target under 200 lines per
+CLAUDE.md file. Longer files consume more context and reduce adherence"; `@`-imports "don't reduce
+its context cost" (code.claude.com/docs/en/memory, "Write effective instructions"), so detail moves
+to files read by path when needed. Recall falls as context grows ("context rot",
+anthropic.com/engineering/effective-context-engineering-for-ai-agents). `/doctor prompt-audit`
+finds outdated and conflicting lines; its report feeds step 3. What this adds: a compression is a
+change that can drop rules and invent facts, so it is archived, classified, checked and reviewed
+like code. Report each step done with its evidence:
+
+1. **Measure** every always-loaded file: bytes, lines, sections (`wc -c -l`, `grep -c '^#'`).
+2. **Archive the whole file first, verbatim,** and prove the copy equals the committed file
+   (`git show HEAD:<file> | cmp - <copy>`, exit 0). Nothing is deleted: what leaves the file lives
+   in the archive, the decision log or a dated document.
+3. **Classify each section:** binding rule · current pointer · frozen text · stale state · history ·
+   reference list.
+4. **Keep by class.** Binding rules: rule + reason + decision id or date. Current pointers: in the
+   resume block only. Frozen sections: byte-identical, each extracted by its heading from the copy
+   and the new file and compared (`shasum` equal, or an empty `diff`).
+5. **Move by class.** Stale state, superseded tables, incident narratives and document lists go to
+   the archive, the decision log, or a one-line pointer to the index.
+6. **Every fact the rewrite adds carries its source** (command, file and line, decision id). In the
+   first real run, most errors the review found were new claims, not drops.
+7. **Grep for the one-liners.** Before rewriting, list the short single-line rules (names never to
+   use, guard tests, branch rules, naming traps); afterwards, grep the new file for each. They are
+   the easiest to lose.
+8. **An independent reviewer before the commit:** a different model diffs old against new, lists
+   each lost rule and each wrong new claim with its evidence, and confirms the frozen sections;
+   its findings are applied before committing (principle 10).
+9. **Write the size rule into the file itself:** its cap; old resume entries move to the archive
+   verbatim; findings go to dated documents.
+10. **Scan for secrets and personal data before the push** (live-system-changes.md, "Pushing").
+
+*Why:* a file read every turn grows a little each session until its rules are followed less, and a
+one-pass rewrite drops short rules and adds confident, wrong facts that only an independent diff
+catches. *Test:* the archive `cmp` exits 0; each frozen section compares equal; every listed
+one-liner is found in the new file; each review finding is applied or answered before the commit;
+the file states its cap.
+
+## Using the record
+```
+
+- [ ] **Step 5: Contamination grep.** `tr '\n' ' ' < plugins/engineering-method/skills/engineering-method/references/docs-and-decisions.md | tr -s ' ' | grep -c -E '8443|no-cache|71,400|warehouse|on-call rota|service map|war stor'` prints `0` (joined into one line so a phrase wrapped across lines is still caught). Prove the grep can fire: `printf 'the on-call\n  rota\n' | tr '\n' ' ' | tr -s ' ' | grep -c -E 'on-call rota'` prints `1`.
+- [ ] **Step 6: Suites.** `set -o pipefail; python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`. Expected: `Ran 69 tests`, `OK` (no test added; `test_skill_budget.py` passes unchanged because SKILL.md is untouched, and Task 5's drift assertion still passes). `grep -n "^## " plugins/engineering-method/skills/engineering-method/references/docs-and-decisions.md` shows `## Keeping instruction files small` between `## Decision log` and `## Using the record`.
+- [ ] **Step 7: Commit** (`docs-and-decisions: keeping instruction files small, a ten-step compression procedure`).
+
+### Task 8: Bounded review and fix loops (round cap and stall rule)
+
+**Files:**
+- Create: `plugins/engineering-method/evals/fix-loop-bounded/prompt.md`; `graders/c1-stall-named.md`, `c2-stops-and-escalates.md`, `c3-cap-and-ledger-counts.md`, `skill-fired.md`
+- Modify: `plugins/engineering-method/skills/engineering-method/references/review-loop.md` (the "Escalate by Superpowers' fix rounds" bullet, lines 59-60 on `main`)
+- Modify: `plugins/engineering-method/skills/engineering-method/references/model-routing-and-cost.md` (rule 2, lines 23-24 on `main`)
+
+**Interfaces:** Produces the ledger form `fix round R/5: closed X, reopened Y, open Z` (and a trailing `stall`); Task 9 cites the rule in the CHANGELOG and COVERAGE (gap G43).
+
+**Reconciled with what exists.** The method's text today is one sentence, written twice: "early rounds resume the implementer; later rounds take a fresh implementer at least one tier up" (review-loop.md:59-60, model-routing-and-cost.md:23-24). The new rule replaces the review-loop.md bullet in place and turns model-routing-and-cost.md rule 2 into a pointer, so there is one rule. It keeps Superpowers' five-round cap, its escalation and its adjudication options, adds GSD's stall detection, and names both departures from Superpowers' "adjudicate only at the cap": the first stall on a task escalates early to a fresh, more capable implementer, and a second stall on the task stops the loop before the cap and the controller adjudicates as at the cap.
+
+- [ ] **Step 1: Write the eval case first.** `evals/fix-loop-bounded/prompt.md`, verbatim:
+
+````markdown
+---
+max_turns: 8
+allowed_tools: [Read, Glob, Grep, Skill]
+description: "contamination strings: E-07.S1.T2; implementer A"
+---
+
+The re-review of fix round 3 just came back on task E-07.S1.T2 of our invoicing service (an internal tool). The task ledger so far:
+
+```
+T2 review     reviewer: model B       4 findings: F1 Critical, F2 Important, F3 Important, F4 Important
+fix round 1   implementer A resumed   re-review: F1 addressed, F2 addressed                               open: F3, F4
+fix round 2   implementer A resumed   re-review: F3 addressed; F2 NOT addressed (broken again by the round-2 diff)   open: F2, F4
+fix round 3   implementer A resumed   re-review: F2 addressed; F3 NOT addressed (broken again by the round-3 diff)   open: F3, F4
+```
+
+Send round 4 to implementer A again and keep re-reviewing until the reviewer says clean. I don't mind how many rounds it takes. Write the dispatch.
+````
+
+The first stage word is "review" (in "re-review"; hyphens split words), so the hook names `review-loop.md`; the ledger sits in a code fence, which the hook strips, so its "fix" words do not count. Check before committing the case the same way as Task 7; the output says `stage review`. Graders (frontmatter as in Task 7), verbatim:
+
+`c1-stall-named.md`:
+```markdown
+Scenario: in rounds 2 and 3 each re-review found a finding an earlier round had addressed broken again, and the open count stayed at 2.
+
+Pass when it calls the loop stalled under a stated rule (it says what counts as a stall, such as a reopened finding or an open count that does not fall, and what follows from a stall), cites rounds 2 and 3 from the ledger as meeting it, and gives that rule as the reason not to continue as asked.
+
+Fail when it treats round 4 as routine, does not notice the reopened findings, or only restates that findings broke again without applying a rule about what that means for the loop.
+```
+
+`c2-stops-and-escalates.md`:
+```markdown
+Scenario: the user asks for round 4 to the same implementer, with no limit on rounds.
+
+Pass when it does not dispatch round 4 to implementer A and stops dispatching fix rounds, then either rules on each open finding (F3, F4) itself, parking it with a stated ruling or marking it blocked for the owner, or brings the open findings with their fix history to the user for a decision.
+
+Fail when it writes the round 4 dispatch to implementer A as asked, or only swaps the model and carries on with no stop.
+```
+
+`c3-cap-and-ledger-counts.md`:
+```markdown
+Scenario: the user wants rounds to continue "until the reviewer says clean".
+
+Pass when it declines the open-ended loop in one short pushback, states a round cap, says what happens to findings still open at the cap, and records each round with counts of findings closed, reopened and still open (or an equivalent stall marker).
+
+Fail when it agrees to unbounded rounds, names a cap without saying what happens at it, or keeps the ledger without per-round counts.
+```
+
+`skill-fired.md`: copy `evals/fix-fits-what-exists/graders/skill-fired.md` unchanged.
+
+- [ ] **Step 2: Commit the case** (`engineering-method evals: bounded fix loop case, written before the rule`).
+- [ ] **Step 3: Red on base.** Copy the case into `<scratch>/em-base/plugins/engineering-method/evals/`, then:
+  - `claude plugin eval <scratch>/em-base/plugins/engineering-method --case fix-loop-bounded --runs 3 --ablation none --judge-model sonnet --max-cost-usd <3 × c × 1.25>`
+  - the touched-case base runs, one command each, same flags and cap: `--case blocked-release-first`, `--case reviewer-different-model`.
+
+  Read the failing answers. Expected: c1 to c3 red in at least 2 of 3 runs. 0.3.0's "later rounds take a fresh implementer at least one tier up" may let c2 half-pass by a model swap; its Fail line already excludes a swap with no stop. Any criterion green in 2 or more of 3 is sharpened and re-run until red; record before and after.
+- [ ] **Step 4: Write the rule.** In `review-loop.md`, replace
+
+```
+- **Escalate by Superpowers' fix rounds** (`subagent-driven-development`): early rounds resume the
+  implementer; later rounds take a fresh implementer at least one tier up.
+```
+
+with
+
+```markdown
+- **Escalate, cap, and stop on a stall** (one rule; model-routing-and-cost.md points here). A fix
+  round is one fix dispatch plus its scoped re-review (or the controller's read of a test-only or
+  docs-only fix, above); Z is the number of open Critical and Important findings after it.
+  Baseline, Superpowers' `subagent-driven-development`: at most five rounds per task; rounds 1-3
+  resume the implementer, rounds 4-5 take a fresh implementer on a more capable model; after round
+  5 the controller adjudicates each open finding (park it with a ruling, or BLOCKED to the owner).
+  GSD's `gates.md` adds stall detection: escalate early when the issue count does not fall between
+  iterations. **A round stalls** when it closes no open finding, when a finding marked addressed
+  comes back open, or when Z is above zero and not lower than after the previous round (the review
+  itself, for round 1). Stalls count per task, across rounds. Two departures from Superpowers,
+  which adjudicates only at the cap, both taken from GSD's stall rule: on the first stall on the
+  task, the next round goes to a fresh implementer on a more capable model, whatever the round
+  number; on a second stall on the task, dispatching stops before the cap and the controller
+  adjudicates as at the cap (park with a ruling, or BLOCKED to the owner). The cap is five for every
+  review loop, plan and deploy-file reviews included, not GSD's three for plans: the stall rule
+  already ends a loop that is not converging, and one number for every loop is one rule to check.
+  *Why:* the escalation line named no stop, so a loop had no stated end, and a round that reopens
+  what it closed spends review capacity without converging. *Test:* each round's ledger line reads
+  `fix round R/5: closed X, reopened Y, open Z`, ending `stall` when the rule says so; no task shows
+  a round after a second stall on it or after round 5.
+```
+
+- [ ] **Step 5: Point, do not restate.** In `model-routing-and-cost.md`, replace
+
+```
+2. **Escalate on failure** by Superpowers' fix rounds (`subagent-driven-development`): early rounds
+   resume the implementer; later rounds go to a fresh implementer at least one tier up.
+```
+
+with
+
+```markdown
+2. **Escalate on failure** by the one fix-round rule in `review-loop.md` ("Fix rounds": who takes
+   each round, the five-round cap, the stall rule).
+```
+
+- [ ] **Step 6: Checks.**
+  - One rule, not two: `grep -rl "at least one tier up" plugins/engineering-method/skills/engineering-method/` prints nothing (the old sentence is gone from both files; prove the grep can fire by running it on `main` first, where it lists both). `grep -rn "A round stalls" plugins/engineering-method/skills/engineering-method/references/` prints exactly one line, in `review-loop.md`.
+  - Contamination: `tr '\n' ' ' < plugins/engineering-method/skills/engineering-method/references/review-loop.md | tr -s ' ' | grep -c -E 'E-07\.S1\.T2|implementer A|until the reviewer says clean|broken again'` prints `0` (joined into one line so a phrase wrapped across lines is still caught); the same pipeline on `printf 'until the\n  reviewer says clean\n'` prints `1`.
+  - Suite: `set -o pipefail; python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`. Expected: `Ran 69 tests`, `OK` (SKILL.md untouched; its §4 gloss of review-loop.md, "fix rounds", still holds).
+- [ ] **Step 7: Commit** (`review-loop: one fix-round rule with a five-round cap and a stall rule; model-routing points at it`).
+
+### Task 9: Docs, coverage, version 0.4.0
 
 **Files:** `plugins/engineering-method/README.md`, `evals/COVERAGE.md`, `CHANGELOG.md`, `.claude-plugin/plugin.json`; `.claude-plugin/marketplace.json`; root `README.md`.
 
-- [ ] **Step 1:** README: the hook's stage list gains `debug`; one sentence under "What it does": "Debugging: a debug stage loads Superpowers' systematic-debugging and a reference of ten named investigation steps, most of them for systems where a model makes the decision." The evals paragraph names the root-cause cases.
-- [ ] **Step 2:** COVERAGE.md: new section "Root-cause investigation (0.4.0)", one row per case and criterion, gap ids G30 to G41.
+- [ ] **Step 1:** README: the hook's stage list gains `debug`; one sentence under "What it does": "Debugging: a debug stage loads Superpowers' systematic-debugging and a reference of ten named investigation steps, most of them for systems where a model makes the decision." The evals paragraph names the root-cause cases, `instruction-file-compression` and `fix-loop-bounded`.
+- [ ] **Step 2:** COVERAGE.md: new section "Root-cause investigation (0.4.0)", one row per case and criterion, gap ids G30 to G41 (the `rc-05-diff` c3 row under RC-5's id); under a heading "Rules added in 0.4.0", one row for instruction-file compression (G42, `instruction-file-compression/c1…c5`) and one for bounded fix loops (G43, `fix-loop-bounded/c1…c3`).
 - [ ] **Step 3:** Versions: `"version": "0.4.0"` in `plugin.json` and the engineering-method entry of `marketplace.json`; root README "Current: 0.4.0". Check: `grep -n '"version"' plugins/engineering-method/.claude-plugin/plugin.json .claude-plugin/marketplace.json` shows 0.4.0 for engineering-method only.
-- [ ] **Step 4:** CHANGELOG entry `## 0.4.0 — <date of release>`, newest first: the debug stage, its fix-word precedence and its known limit (symptom-only prompts rely on the trigger text); the reference and its ten steps; principle 17 points at it; the drift fix and its test; the CONTRIBUTING maintainer loop; test count; eval results base versus head with cost, filled from Task 8's measured output (never estimated).
-- [ ] **Step 5: Commit** (`engineering-method 0.4.0: root-cause investigation`).
+- [ ] **Step 4:** CHANGELOG entry `## 0.4.0 — <date of release>`, newest first: the debug stage, its fix-word precedence and its known limit (symptom-only prompts rely on the trigger text); the reference and its ten steps, RC-5 starting from the working case; principle 17 points at it; the drift fix and its test; the CONTRIBUTING maintainer loop; "Keeping instruction files small" (ten steps, Anthropic's size guidance as baseline, `/doctor prompt-audit` as input); the fix-round rule (Superpowers' five-round cap kept, GSD's stall detection added, the first-stall departure named, the duplicate in model-routing-and-cost.md replaced by a pointer); test count; eval results base versus head with cost, filled from Task 10's measured output (never estimated).
+- [ ] **Step 5: Commit** (`engineering-method 0.4.0: root-cause investigation, instruction-file compression, bounded fix loops`).
 
-### Task 8: Head run (GREEN), regression run, load evidence
+### Task 10: Head run (GREEN), regression run, load evidence
 
 - [ ] **Step 1:** `claude plugin eval plugins/engineering-method --case 'rc-*' --runs 3 --ablation none --judge-model sonnet --max-cost-usd <36 × c × 1.25>`. Expected: every criterion green in at least 2 of 3 runs; `rc-activation-loads-reference` c1 and `rc-near-miss-rename` c1 in 3 of 3.
-- [ ] **Step 2:** Regression, touched cases: the three cases from Task 2 Step 4 on head, same flags and caps; compare run for run with base.
-- [ ] **Step 3:** Regression, the other 18 existing cases on head, one command per case or one glob that selects them, `--runs 3`, total cap `<54 × c × 1.25>`; compare per case with the 0.3.0 CHANGELOG results. Any drop stops the release until explained (principle 18).
-- [ ] **Step 4:** Read the failing answers of any red criterion; fix the case if the judge is wrong, the reference if the behaviour is.
-- [ ] **Step 5:** Record the hook output from section 5 ("Showing the reference loads"), base, head and regression counts and spend in the CHANGELOG (Task 7 Step 4) and amend that commit.
+- [ ] **Step 2:** The two Task 7 and 8 cases on head, one command each: `--case instruction-file-compression` and `--case fix-loop-bounded`, `--runs 3 --ablation none --judge-model sonnet --max-cost-usd <3 × c × 1.25>`. Expected: every criterion green in at least 2 of 3 runs.
+- [ ] **Step 3:** Regression, touched cases: the six cases of section 5 (three from Task 2 Step 4, one from Task 7 Step 3, two from Task 8 Step 3) on head, same flags and caps; compare run for run with base.
+- [ ] **Step 4:** Regression, the other 15 existing cases on head, one command per case or one glob that selects them, `--runs 3`, total cap `<45 × c × 1.25>`; compare per case with the 0.3.0 CHANGELOG results. Any drop stops the release until explained (principle 18).
+- [ ] **Step 5:** Read the failing answers of any red criterion; fix the case if the judge is wrong, the reference if the behaviour is.
+- [ ] **Step 6:** Record the hook output from section 5 ("Showing the reference loads"), base, head and regression counts and spend in the CHANGELOG (Task 9 Step 4) and amend that commit.
 
-### Task 9: Full suites and identifier scan
+### Task 11: Full suites and identifier scan
 
 - [ ] **Step 1:** `set -o pipefail; (cd plugins/plan-layer && python3 -m unittest tests/*.py 2>&1 | tail -3)`; `python3 -m pytest plugins/work-log/tests -q 2>&1 | tail -3`; `python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`. Each shows its OK or `passed` line with no failure.
 - [ ] **Step 2:** `git diff main --stat` lists only the files in "File structure".
-- [ ] **Step 3:** Identifier scan of `git diff main` for tracker hosts, tracker ids, private project names, personal addresses and the owner's own identifiers (the list kept outside the repo); prove the scan can fire by planting one listed value in a scratch file and seeing it reported. Expected on the diff: 0 hits, apart from synthetic `example.invalid` addresses.
+- [ ] **Step 3:** Identifier scan of `git diff main` and of the branch's commit messages (`git log main..HEAD --format=%B`) for tracker hosts, tracker ids, private project names, personal addresses and the owner's own identifiers (the list kept outside the repo); prove the scan can fire by planting one listed value in a scratch file and seeing it reported. Expected on the diff and the messages: 0 hits, apart from synthetic `example.invalid` addresses.
 
-### Task 10: Whole-branch review
+### Task 12: Whole-branch review
 
-- [ ] **Step 1:** A fresh Fable 5.2 reviewer in its own worktree receives the diff, this plan, and a brief written by RC-10's rule (no conclusion; it runs the suites, runs the hook on its own prompts, re-counts the budget, greps the reference for every eval's distinctive strings, and reports its model id).
-- [ ] **Step 2:** Fix rounds per review-loop.md; a re-review covers the delta only.
+- [ ] **Step 1:** A fresh Fable 5.2 reviewer in its own worktree receives the diff, this plan, and a brief written by RC-10's rule (no conclusion; it runs the suites, runs the hook on its own prompts, re-counts the budget, greps the reference for every eval's distinctive strings, checks that `review-loop.md` and `model-routing-and-cost.md` hold one fix-round rule between them, and reports its model id).
+- [ ] **Step 2:** Fix rounds per review-loop.md, now bounded by Task 8's rule; a re-review covers the delta only.
 - [ ] **Step 3:** Stop. Push, PR and marketplace publish wait for the owner's word.
 
 ---
@@ -699,6 +994,7 @@ A lesson without a failing eval is not a method change yet.
 - The case's stage table and anti-pattern list: kept in the project's record, not shipped.
 - Tracker entries: kept in the local, git-excluded notes; none in this repo.
 - Push, PR, tag or publish.
+- For Tasks 7 and 8: any SKILL.md edit or trigger phrase (no budget left; the stage map reaches both references); a unit test over the wording of the new rules (the evals test the behaviour; a text-presence test would only pin prose); a script that performs the compression (the steps are project-agnostic commands, and the file layouts differ per project); compressing any real instructions file as part of this release.
 
 ## Review
 
@@ -711,3 +1007,5 @@ Before Task 1, this plan is reviewed by a fresh agent on a different model from 
 - reports findings with file and line and the probe that produced each, labels any unreproduced finding a hypothesis, and reports its model id.
 
 Its brief follows RC-10: the goal, this file, the repo path and the constraints; not the author's view of the plan's weak points. (First round done 25 Nov 2026 by claude-fable-5-2: "approve with fixes", twelve findings, all applied in this revision.)
+
+**Addendum review.** Tasks 7 and 8, the RC-5 sharpening and the renumbering of the former Tasks 7-10 to 9-12 were added after that round. A scoped re-review on a different model from the author covered that delta only (done 25 Nov 2026 by Fable 5.2: "approve with fixes", ten findings, all applied): it applies Task 7 Step 4 and Task 8 Steps 4-5 to a scratch copy at the Task 5 state, runs the suite and the Step 6 greps, checks the eval prompts route to the stated stage with `method_hook.py --prompt`, and checks the quoted vendor and baseline lines against their sources.
