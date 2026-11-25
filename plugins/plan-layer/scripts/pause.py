@@ -61,8 +61,10 @@ def git_per_item(root, d):
         if not wid:
             continue
         slug = wid.split(".")[0].lower()
-        mine = [b for b in branches if slug in b.lower()] or ["no branch names %s" % slug]
-        last = L.git(root, "log", "-1", "--format=%h %s", "--fixed-strings", "--grep=" + wid)
+        slug_re = re.compile(r"(^|[^0-9a-z])%s([^0-9]|$)" % re.escape(slug))
+        mine = [b for b in branches if slug_re.search(b.lower())] or ["no branch names %s" % slug]
+        last = L.git(root, "log", "-1", "--format=%h %s", "-E",
+                     "--grep=%s([^0-9]|$)" % re.escape(wid))
         out.append("- %s: branches %s; last commit naming it: %s"
                    % (wid, ", ".join(mine), last or "none"))
     return out or ["- nothing active"]
@@ -74,19 +76,32 @@ def decisions_since(root, cfg, since_head):
     Use when: the handoff must carry decisions made since the previous one.
     Inputs: project root; resolved controller config; the previous handoff's HEAD or None.
     Output: list of markdown bullet lines; a bullet saying why when it cannot measure.
+    Ids added but not yet committed at the last handoff are listed again next time (the safe
+    direction). An unmeasurable diff says so and never reads "none": a missing or untracked
+    log, or a base with no merge-base, gives "cannot measure"; a previous head git no longer
+    knows falls back to the merge-base and says so.
     Side effects: read-only git.
     Role: fact for the reader of the handoff; decides nothing.
     """
     log = cfg.get("decision_log")
     if not log:
         return ["- no decision log configured (meta.controller.decision_log)"]
+    if not os.path.isfile(os.path.join(root, log)):
+        return ["- cannot measure: %s is not a file" % log]
+    if not L.git(root, "ls-files", "--error-unmatch", log):
+        return ["- cannot measure: %s is not tracked by git" % log]
+    note = ""
+    if since_head and not L.git(root, "cat-file", "-t", since_head + "^{commit}"):
+        note = " (the last handoff's head %s is unknown to git; used the merge-base with %s)" % (
+            since_head[:7], cfg["base"])
+        since_head = None
     since = since_head or L.git(root, "merge-base", cfg["base"], "HEAD")
     if not since:
         return ["- cannot measure: no earlier handoff and no merge-base with %r" % cfg["base"]]
     added = [ln[1:] for ln in L.git(root, "diff", since, "--", log).splitlines()
              if ln.startswith("+") and not ln.startswith("+++")]
     ids = sorted({m for ln in added for m in DECISION_ID.findall(ln)})
-    return ["- added to %s since %s: %s" % (log, since[:7], ", ".join(ids) or "none")]
+    return ["- added to %s since %s: %s%s" % (log, since[:7], ", ".join(ids) or "none", note)]
 
 
 def render_handoff(d, git_line, read_at, fails, drifts, extra=None):
@@ -156,9 +171,14 @@ def pause(p):
         extra += ["", "## Decisions since the last handoff", ""] + decisions_since(root, cfg, prev)
         extra += ["- Agent step: search this session's transcript for decisions given in passing "
                   "and append each to the decision log before ending.", ""]
-        st = L.controller_state(root) or {}
-        st["handoff"] = {"at": at, "head": head}
-        L.atomic_write(L.controller_state_path(root), json.dumps(st, indent=2) + "\n")
+        stp = L.controller_state_path(root)
+        st = L.controller_state(root)
+        if st is None and os.path.exists(stp):
+            extra.insert(-1, "- handoff record not written: controller-state.json unreadable")
+        else:
+            st = st or {}
+            st["handoff"] = {"at": at, "head": head}
+            L.atomic_write(stp, json.dumps(st, indent=2) + "\n")
     L.atomic_write(os.path.join(p["dir"], HANDOFF),
                    render_handoff(d, git_line, at, [m for _, m in fails], [m for _, m in drifts],
                                   extra))

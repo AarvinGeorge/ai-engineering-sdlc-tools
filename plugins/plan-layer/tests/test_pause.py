@@ -259,6 +259,75 @@ class TestHandoffReconcile(PauseBase):
         st = json.load(open(os.path.join(self.dir, "plan", "controller-state.json")))
         self.assertEqual(len(st["handoff"]["head"]), 40)
 
+    def decisions(self):
+        h = self.handoff()
+        return h.split("## Decisions since the last handoff")[1].split("\n## ")[0]
+
+    def test_unknown_previous_head_falls_back_to_merge_base_and_says_so(self):
+        self.pause()
+        stp = os.path.join(self.dir, "plan", "controller-state.json")
+        st = json.load(open(stp))
+        st["handoff"]["head"] = "0" * 40
+        json.dump(st, open(stp, "w"))
+        with open(os.path.join(self.dir, "docs", "decisions.md"), "a") as fh:
+            fh.write("- D-010 later decision\n")
+        git(self.dir, "add", "-A")
+        git(self.dir, "commit", "-q", "-m", "decisions")
+        self.pause()
+        t = self.decisions()
+        self.assertIn("D-010", t)
+        self.assertIn("merge-base", t)
+        self.assertNotIn("none", t)
+
+    def test_untracked_decision_log_is_cannot_measure_not_none(self):
+        git(self.dir, "rm", "-q", "--cached", "docs/decisions.md")
+        with open(os.path.join(self.dir, "docs", "decisions.md"), "a") as fh:
+            fh.write("- D-010 not yet committed\n")
+        self.pause()
+        t = self.decisions()
+        self.assertIn("cannot measure", t)
+        self.assertNotIn("none", t)
+
+    def test_missing_decision_log_is_cannot_measure_not_none(self):
+        git(self.dir, "rm", "-q", "-f", "docs/decisions.md")
+        self.pause()
+        t = self.decisions()
+        self.assertIn("cannot measure", t)
+        self.assertNotIn("none", t)
+
+    def test_unreadable_controller_state_is_kept_and_said(self):
+        stp = os.path.join(self.dir, "plan", "controller-state.json")
+        open(stp, "w").write("<<<<<<< broken")
+        r = self.pause()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(open(stp).read(), "<<<<<<< broken")
+        self.assertIn("handoff record not written: controller-state.json unreadable", self.handoff())
+
+    def test_epic_slug_and_work_id_do_not_match_longer_ones(self):
+        self.d["plans"]["now"][0]["name"] = "E-01.S2 Login page"
+        self.write()
+        git(self.dir, "branch", "e-010-other")
+        open(os.path.join(self.dir, "y.txt"), "w").write("y")
+        git(self.dir, "add", "y.txt")
+        git(self.dir, "commit", "-q", "-m", "E-01.S20: someone else")
+        self.pause()
+        t = self.handoff().split("## Git per active item")[1].split("\n## ")[0]
+        self.assertNotIn("e-010-other", t)
+        self.assertNotIn("S20", t)
+
+    def test_pause_under_one_writer_keeps_the_gate_clean(self):
+        self.d["meta"]["controller"]["one_writer"] = True
+        self.d["meta"].pop("tracker")
+        self.write()
+        self.assertEqual(run("move.py", "--adopt", project=self.dir).returncode, 0)
+        r = self.pause()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run("move.py", "E-01.S2", "--status", "after pause", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run("check.py", "--json", project=self.dir)
+        found = json.loads(r.stdout).get("controller", [])
+        self.assertEqual([f for f in found if f["level"] == "FAIL"], [], found)
+
 
 if __name__ == "__main__":
     unittest.main()
