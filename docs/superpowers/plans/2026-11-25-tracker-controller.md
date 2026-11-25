@@ -2361,7 +2361,7 @@ git commit -m "plan-layer: inventory parity: a declared inventory against every 
 
 **Files:**
 - Modify: `plugins/plan-layer/skills/plan-layer/SKILL.md` (new "Controller" section; commands table gains `/plan-layer move`; the writer matrix as a table between `<!-- writer-matrix -->` and `<!-- /writer-matrix -->`; "What the gate checks" lists the new FAILs; `description` mentions `move`)
-- Modify: `plugins/plan-layer/README.md` (section "Tracker mirror, and pause" becomes "Controller: one writer, tracker, rules, inventory, handoff")
+- Modify: `plugins/plan-layer/README.md` (section "Tracker mirror, and pause" becomes "Controller: one writer, tracker, rules, inventory, handoff"; two entries in "Use cases", Step 3b)
 - Modify: `plugins/plan-layer/trackers/README.md` (relational mode, `kind`, relations, `relational_fetch`)
 - Modify: `plugins/plan-layer/CHANGELOG.md`, `plugins/plan-layer/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (0.19.0)
 - Modify (**rebase after 0.4.0**): `plugins/engineering-method/skills/engineering-method/SKILL.md` §2 principle 15, `plugins/engineering-method/skills/engineering-method/references/docs-and-decisions.md`
@@ -2413,6 +2413,15 @@ CHANGELOG `## 0.19.0 — <date measured at commit>`: one paragraph per story (S8
 engineering-method, shipped as **engineering-method 0.4.1** (rebase after 0.4.0; a one-line CHANGELOG entry; word-neutral in SKILL.md):
 - SKILL.md principle 15: replace `reconciled at every progress report (plan-layer: \`/plan-layer sync --tracker\`;` with `reconciled on events by plan-layer's controller (\`move.py\`, \`sync --tracker\`;` and confirm the body word count is unchanged or lower (`python3 -m unittest tests/test_skill_budget.py`).
 - docs-and-decisions.md, after the sentence ending "not another line in the instructions file (SKILL.md principle 7)." (line 95 at base): add one sentence: "With plan-layer, a "changed X, so Y must change" rule is a co-change rule in `meta.controller.rules`, fired on a stage event."
+
+- [ ] **Step 3b: README use cases**
+
+Rebase onto `readme-use-cases` first (it merges before this branch and adds the "Use cases" section to `plugins/plan-layer/README.md`). Add two entries to that section in its format (one-line situation, what the plugin does, the exact command typed and what comes back). Copy the printed lines from real runs of the built scripts on a scratch fixture; never write them from this plan. The shape:
+
+- **Someone edits a stage by hand while the tracker is mirrored.** The controller notices that the state differs from `move.py`'s last write, and the gate goes red. Typed: `python3 scripts/check.py`. Back: `FAIL   stage of E-01.S2 is 'verified' but move.py last wrote 'building' — changed by hand; run move.py E-01.S2 --stage verified (or revert the edit)`. Then `move.py E-01.S2 --stage verified` prints `move: E-01.S2 building -> verified` and `NEXT: run sync.py --tracker and reconcile the tracker`.
+- **A backup job lists five agents of ten.** The inventory check compares the declared agents with the backup file and fails on the gap. Typed: `python3 scripts/check.py`. Back: `FAIL   inventory 'agents': list 'nightly backup' covers 5 of 10 — missing agent-06, agent-07, agent-08, agent-09, agent-10`.
+
+Generic names only (`E-01.S2`, `agent-01`, `ops/backup.sh`).
 
 - [ ] **Step 4: Run to verify**
 
