@@ -21,6 +21,7 @@ Stdlib only, no arguments needed.
   check.py           # human output, exit 1 on any FAIL
   check.py --json    # machine output for the session hooks
   check.py --strict  # exit 1 on DRIFT as well
+  check.py --event <name>  # the controller's event rules fire for that event
   check.py --verify  # run the plan's assertions against the real system
                      # (explicit only — never run from a hook)
 """
@@ -35,6 +36,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
 import tracker  # noqa: E402
+import controller  # noqa: E402
 
 VALID_BUILD = {"done", "active", "partial", "not-started"}
 VALID_PLAN = {"planned", "partial", "none"}
@@ -470,7 +472,7 @@ def check_stalled(d):
     return drifts
 
 
-def run(root=None):
+def run(root=None, event=None):
     fails, drifts = [], []
     P = L.paths(root)
     root, SRC, OUT = P["root"], P["src"], P["out"]
@@ -738,6 +740,20 @@ def run(root=None):
         fails.append("meta.paused is %r — it must be {\"at\": an ISO-8601 UTC time}; "
                      "pause.py writes it" % (meta_["paused"],))
 
+    # The controller's diff (0.19.0): one function, read by the gate, the
+    # handoff and the hooks, so nothing computes it twice. A crash inside it
+    # is a FAIL, never silence: the Stop hook fails open on an exception, so
+    # an uncaught one would switch the whole gate off (review I3).
+    try:
+        found = controller.findings(root, d, event)
+    except Exception as exc:
+        found = [{"check": "config", "level": "FAIL",
+                  "message": "controller crashed (%s: %s) — the plan's controller inputs are malformed"
+                             % (exc.__class__.__name__, exc)}]
+    for f in found:
+        (fails if f["level"] == "FAIL" else drifts).append(f["message"])
+    controller_on = "controller" in d.get("meta", {}) or "inventory" in d
+
     log = d.get("meta", {}).get("changelog", [])
     if log and log[-1].get("version") != d.get("meta", {}).get("plan_version"):
         fails.append("plan_version is %s but the newest changelog entry is %s"
@@ -865,6 +881,8 @@ def run(root=None):
             for i in d.get("invariants", []) if i.get("state") != "holding"],
         "open_founder_actions": d.get("founder_actions", []),
     }
+    if controller_on:
+        summary["controller"] = found
     # Staleness detection (0.8.0). Structure was never the thing that rotted;
     # the page quietly disagreeing with itself was.
     if full:
@@ -902,12 +920,22 @@ def main():
             print("  assertions_verified stamped %s" % d["meta"]["assertions_verified"])
         return 1 if bad else 0
 
-    fails, drifts, summary = run()
+    event = None
+    if "--event" in sys.argv:
+        i = sys.argv.index("--event")
+        if i + 1 >= len(sys.argv) or sys.argv[i + 1].startswith("--"):
+            print("  usage: check.py --event <stop|session-start|sync|pause|stage:<id>|release:<stage>>")
+            return 2
+        event = sys.argv[i + 1]
+    fails, drifts, summary = run(event=event)
 
     if "--json" in sys.argv:
-        print(json.dumps({"fails": [f for _, f in fails],
-                          "drifts": [f for _, f in drifts],
-                          "summary": summary}, indent=1))
+        out = {"fails": [f for _, f in fails],
+               "drifts": [f for _, f in drifts],
+               "summary": summary}
+        if "controller" in summary:
+            out["controller"] = summary["controller"]
+        print(json.dumps(out, indent=1))
         return 1 if fails else 0
 
     for kind, msg in fails:

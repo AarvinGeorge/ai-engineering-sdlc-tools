@@ -131,3 +131,151 @@ class TestFixRound1(ControllerBase):
         self.assertEqual(L.controller_config(self.d), (None, None))
         self.d["meta"] = {"naming": "work-ids", "controller": {"base": " main "}}
         self.assertEqual(L.controller_config(self.d)[0]["base"], "main")
+
+
+def stamp_now(test):
+    """Stamp the plan as move.py would, without move.py (Task 3 builds it)."""
+    test.write()
+    L.write_stamp(test.dir, test.d, "test")
+
+
+class TestOneWriterGate(ControllerBase):
+    def test_off_without_controller(self):
+        del self.d["meta"]["controller"]
+        self.write()
+        _, fails, drifts = self.gate()
+        self.assertEqual(ctl(fails + drifts), [])
+
+    def test_on_without_stamp_fails_and_says_adopt(self):
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("move.py --adopt" in f for f in fails), fails)
+
+    def test_clean_after_stamp(self):
+        stamp_now(self)
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_hand_edit_of_stage_fails_naming_item_field_and_writer(self):
+        stamp_now(self)
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        rc, fails, _ = self.gate()
+        self.assertEqual(rc, 1)
+        hit = [f for f in fails if "E-01.S2" in f and "stage" in f and "by hand" in f]
+        self.assertTrue(hit, fails)
+        self.assertIn("revert the hand edit, or run move.py --adopt", hit[0])
+
+    def test_hand_edit_of_task_state_fails_but_prose_status_is_free(self):
+        stamp_now(self)
+        self.d["plans"]["now"][0]["status"] = "rewritten by hand"
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], "prose status is not controlled (ruling 2)")
+        self.d["plans"]["now"][0]["tasks"][0]["state"] = "done"
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-01.S2.T1 form" in f and "done" in f for f in fails), fails)
+
+    def test_two_live_items_with_one_work_id_fail(self):
+        stamp_now(self)
+        self.d["plans"]["next"].append(item("E-01.S2 Login page, again"))
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-01.S2" in f and "rename the duplicate" in f for f in fails), fails)
+
+    def test_json_has_no_controller_key_when_off(self):
+        del self.d["meta"]["controller"]
+        self.write()
+        run("render.py", project=self.dir)
+        out = json.loads(run("check.py", "--json", project=self.dir).stdout)
+        self.assertNotIn("controller", out)
+        self.assertNotIn("controller", out["summary"])
+
+    def test_a_crash_inside_the_controller_is_a_fail_not_silence(self):
+        stamp_now(self)
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            json.dump({"writes": {"items": {"E-01.S2": "not-a-dict"}}}, fh)
+        _, fails, _ = self.gate()
+        self.assertTrue(any("controller crashed" in f for f in fails), fails)
+
+    def test_new_idea_in_next_at_first_stage_is_planning_not_a_hand_move(self):
+        stamp_now(self)
+        self.d["plans"]["next"].append(item("E-01.S4 Profile page"))
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertEqual(ctl(fails), [], fails)
+
+    def test_new_item_straight_into_now_fails(self):
+        stamp_now(self)
+        self.d["plans"]["now"].append(item("E-02.S1 Search", "building", status="s", updated="u",
+                                           plan_file="docs/q.md"))
+        self.d["meta"]["allow_multiple_active"] = True
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-02.S1" in f and "plans.now" in f for f in fails), fails)
+
+    def test_hand_move_to_done_fails_but_a_roll_does_not(self):
+        stamp_now(self)
+        s2 = self.d["plans"]["now"].pop(0)
+        self.d["plans"]["done"].append({"name": s2["name"], "period": "2026-01-02", "outcome": "o"})
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-01.S2" in f and "left" in f for f in fails), fails)
+        os.makedirs(os.path.join(self.dir, "plan", "archive"), exist_ok=True)
+        with open(os.path.join(self.dir, "plan", "archive", "done.json"), "w") as fh:
+            json.dump([{"name": s2["name"]}], fh)
+        self.d["plans"]["done"] = []
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertEqual([f for f in fails if "E-01.S2" in f and "left" in f], [], fails)
+
+    def test_release_stage_hand_edit_fails(self):
+        self.d["releases"] = [{"id": "R-01", "name": "R-01 Accounts", "stage": "build", "stories": []}]
+        stamp_now(self)
+        self.d["releases"][0]["stage"] = "production"
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("R-01" in f and "move.py --adopt" in f for f in fails), fails)
+
+    def test_bad_config_is_a_fail(self):
+        self.d["meta"]["controller"] = {"one_writer": "yes"}
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("meta.controller.one_writer" in f for f in fails), fails)
+
+    def test_json_output_carries_structured_findings(self):
+        self.write()
+        run("render.py", project=self.dir)
+        r = run("check.py", "--json", project=self.dir)
+        out = json.loads(r.stdout)
+        self.assertTrue(any(f["check"] == "one_writer" and f["level"] == "FAIL"
+                            for f in out["controller"]), out.get("controller"))
+
+    def test_event_flag_is_accepted_and_unknown_flag_value_is_usage(self):
+        stamp_now(self)
+        run("render.py", project=self.dir)
+        self.assertEqual(run("check.py", "--event", "stop", project=self.dir).returncode, 0)
+        self.assertEqual(run("check.py", "--event", project=self.dir).returncode, 2)
+
+
+class TestDuplicates(ControllerBase):
+    def test_duplicate_release_ids_are_found(self):
+        self.d["releases"] = [{"id": "R-01", "name": "a", "stage": "build"},
+                              {"id": "R-01 again", "name": "b", "stage": "build"}]
+        self.assertEqual(L.duplicate_ids(self.d), ["R-01"])
+
+    def test_two_releases_with_one_id_fail_the_gate(self):
+        self.d["releases"] = [{"id": "R-01", "name": "a", "stage": "build"}]
+        stamp_now(self)
+        self.d["releases"].append({"id": "R-01", "name": "b", "stage": "build"})
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("R-01" in f and "rename the duplicate" in f for f in fails), fails)
+
+    def test_duplicate_task_names_in_one_item_fail_the_gate(self):
+        stamp_now(self)
+        self.d["plans"]["now"][0]["tasks"].append({"name": "E-01.S2.T1 form", "state": "todo"})
+        self.write()
+        _, fails, _ = self.gate()
+        self.assertTrue(any("E-01.S2.T1 form" in f and "more than once" in f for f in fails), fails)

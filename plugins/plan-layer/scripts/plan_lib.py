@@ -573,7 +573,7 @@ def controlled(d):
 
 
 def duplicate_ids(d):
-    """Work ids carried by more than one item in plans.now and plans.next, sorted. Pure."""
+    """Work ids carried by more than one item in plans.now and plans.next, or by more than one release, sorted. Pure."""
     seen, dup = set(), set()
     for bucket in ("now", "next"):
         for it in (d.get("plans") or {}).get(bucket) or []:
@@ -582,6 +582,12 @@ def duplicate_ids(d):
                 dup.add(wid)
             elif wid:
                 seen.add(wid)
+    for r in d.get("releases") or []:
+        rid = work_id(r.get("id")) if isinstance(r, dict) else None
+        if rid and rid.startswith("R-"):
+            if rid in seen:
+                dup.add(rid)
+            seen.add(rid)
     return sorted(dup)
 
 
