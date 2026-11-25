@@ -77,8 +77,8 @@ review. This file says who reviews, what they must do, and when to stop.
   owner.** The agent never starts a round past the cap, or after a second stall, on its own. When
   the owner explicitly asks for more rounds, it pushes back once: it names the stall and the rounds
   that meet it, states the cap and what happens to findings open at it, and recommends stopping.
-  If the owner still asks, the owner's word wins (SKILL.md: push back once, then do it as asked):
-  it dispatches as asked and keeps the ledger counts. *Why:* the escalation line said who takes
+  The instruction already stands, so in the same reply it dispatches as asked, with no second
+  pushback, and keeps the ledger counts. *Why:* the escalation line said who takes
   each round but never when the rounds end, and a round that reopens what it closed spends review
   capacity without converging. *Test:* the review's ledger line states the starting Z; each round's
   line is Superpowers' (`Task N: fix round R/5 (...; commits a..b)`) carrying
