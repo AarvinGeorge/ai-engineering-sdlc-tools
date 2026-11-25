@@ -45,8 +45,8 @@ should pass on both versions), `instruction-file-compression` and `fix-loop-boun
 needs `--scaffold`, and `rc-05-diff` c2 is a guard that 0.3.0 already passes 2 runs of 3.
 `evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43).
 
-**Eval results** (Opus agent, Sonnet judge, 3 runs, ablation none, `-j 1`; criterion-runs passed,
-base 0.3.0 versus head 0.4.0). The head run is not green; this release is held on these results.
+**Eval results, before fix round A (graders since changed)** (Opus agent, Sonnet judge, 3 runs,
+ablation none, `-j 1`; criterion-runs passed, base 0.3.0 versus head 0.4.0). The head run is not green; this release is held on these results.
 - The reference loads: the hook prints `stage debug ... read references/root-cause-investigation.md`
   on a debugging prompt; `rc-activation-loads-reference` c1 3 of 3; `rc-near-miss-rename` c1 3 of 3
   (no read). A kept trace of an `rc-01` run shows the reference read after the skill fired.
