@@ -83,5 +83,15 @@ class StageMapMatchesHook(unittest.TestCase):
         self.assertEqual(got, expected)
 
 
+class RuleCountsAgree(unittest.TestCase):
+    """docs-and-decisions.md no longer miscounts principle 17's lines."""
+
+    def test_no_five_steps_for_principle_17(self):
+        ref = os.path.join(PLUGIN, "skills", "engineering-method", "references",
+                           "docs-and-decisions.md")
+        with open(ref, encoding="utf-8") as fh:
+            self.assertNotIn("principle 17's five steps", fh.read())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -193,7 +193,7 @@ Tier b: a short decision note, and a numbered plan only when the work spans sess
 numbered plan before building, with verifiable steps, an explicit
 out-of-scope list, and each capability marked EXTENDS or NEW. Update the plan's stage when the work
 moves, not afterwards. **A plan for a fix carries a "Fit with what exists" section** holding
-SKILL.md principle 17's five steps, one row each, plus a row per stated quality goal. *Test:* the
+SKILL.md principle 17's four REQUIRED lines (Exists, Extends, Unlocks, Goals), one row each, plus a row per stated quality goal. *Test:* the
 section exists and has every row. **Every finding has a home before a plan is called complete:** a coverage
 table maps each finding from the traces and reviews to the story that fixes it, or to a stated
 deferral. *Why:* fixes were dropped between the trace and the plan. *Test:* the table has no
