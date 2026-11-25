@@ -7,8 +7,8 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from test_light_and_budget import Base, run  # noqa: E402
-from test_tracker import TrackerBase, item  # noqa: E402
+from test_light_and_budget import run  # noqa: E402
+from test_tracker import TrackerBase  # noqa: E402
 import plan_lib as L  # noqa: E402
 import tracker  # noqa: E402
 
@@ -51,7 +51,7 @@ class RelBase(TrackerBase):
         d = L.load(self.dir)
         cfg, err = L.tracker_config(d, self.dir)
         self.assertIsNone(err)
-        return {r["key"]: r for r in tracker.expected_rows(d, cfg)}
+        return {r["key"]: r for r in tracker.expected_rows(d, cfg, self.dir)}
 
 
 class TestFlatUnchanged(TrackerBase):
@@ -113,10 +113,101 @@ class TestRelationalFaults(RelBase):
              "E-01.S3.T1"),
         ]
         for mutate, word in cases:
-            self.setUp()
-            mutate(self.d)
-            faults = tracker.relational_faults(self.d)
-            self.assertTrue(any(word in f for f in faults), (word, faults))
+            with self.subTest(word=word):
+                self.setUp()
+                self.addCleanup(self.tearDown)
+                mutate(self.d)
+                faults = tracker.relational_faults(self.d)
+                self.assertTrue(any(word in f for f in faults), (word, faults))
+
+    def faults_after(self, mutate):
+        mutate(self.d)
+        return tracker.relational_faults(self.d)
+
+    def test_task_named_with_the_story_id_is_a_fault_not_a_duplicate_key(self):
+        def m(d):
+            d["plans"]["now"][0]["tasks"].append({"name": "E-01.S2 polish", "state": "todo"})
+        self.assertTrue(any("E-01.S2" in f and "task" in f for f in self.faults_after(m)))
+        cfg = self.cfg()
+        keys = [r["key"] for r in tracker.expected_rows(self.d, cfg, self.dir)]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertIn("E-01.S2: E-01.S2 polish", tracker.not_mirrored(self.d))
+
+    def cfg(self):
+        self.write()
+        return L.tracker_config(L.load(self.dir), self.dir)[0]
+
+    def test_wrong_story_and_finding_tasks_are_listed_not_mirrored(self):
+        def m(d):
+            d["plans"]["now"][0]["tasks"] += [{"name": "E-01.S3.T1 x", "state": "todo"},
+                                              {"name": "E-01.F1 odd", "state": "todo"}]
+        self.faults_after(m)
+        nm = tracker.not_mirrored(self.d)
+        self.assertIn("E-01.S2: E-01.S3.T1 x", nm)
+        self.assertIn("E-01.S2: E-01.F1 odd", nm)
+        self.assertNotIn("E-01.S2: E-01.S2.T1 form", nm)
+
+    def test_item_with_a_declared_epic_id_is_a_fault(self):
+        def m(d):
+            d["plans"]["next"].append({"name": "E-01 Whole epic", "why": "w", "unblocks": "u",
+                                       "stage": "intent", "plan_file": None})
+        self.assertTrue(any("E-01" in f and "epic" in f for f in self.faults_after(m)))
+
+    def test_release_listing_an_unknown_story_is_a_fault(self):
+        def m(d):
+            d["releases"][0]["stories"] = ["E-01.S9"]
+        self.assertTrue(any("E-01.S9" in f for f in self.faults_after(m)))
+
+    def test_malformed_epics_and_releases_are_skipped_and_reported(self):
+        def m(d):
+            d["epics"] += ["E-02", {"id": "E-03"}]
+            d["releases"] += [{"id": "R-02", "name": "R-02 x"}, "R-03"]
+        faults = self.faults_after(m)
+        self.assertTrue(any("epics[1]" in f for f in faults), faults)
+        self.assertTrue(any("epics[2]" in f for f in faults), faults)
+        self.assertTrue(any("releases[1]" in f for f in faults), faults)
+        self.assertTrue(any("releases[2]" in f for f in faults), faults)
+        self.write()
+        d = L.load(self.dir)
+        cfg, _ = L.tracker_config(d, self.dir)
+        keys = {r["key"] for r in tracker.expected_rows(d, cfg, self.dir)}
+        self.assertEqual({k for k in keys if k[0] in "ER" and "." not in k}, {"E-01", "R-01"})
+
+
+class TestEpicStatusFromAllFinishedWork(RelBase):
+    def done_items(self, n, epic="E-02"):
+        return [{"name": "%s.S%d old" % (epic, i), "period": "p", "outcome": "o"}
+                for i in range(1, n + 1)]
+
+    def test_finished_epic_outside_the_recent_done_window_is_done(self):
+        self.d["epics"].append({"id": "E-02", "name": "E-02 Billing"})
+        self.d["meta"]["tracker"]["recent_done"] = 0
+        self.d["plans"]["done"] = self.done_items(7)
+        self.assertEqual(self.rows()["E-02"]["Status"], "Done")
+
+    def test_finished_epic_whose_stories_are_only_in_the_archive_is_done(self):
+        self.d["epics"].append({"id": "E-02", "name": "E-02 Billing"})
+        self.write()
+        os.makedirs(os.path.join(self.dir, "plan", "archive"), exist_ok=True)
+        with open(os.path.join(self.dir, "plan", "archive", "done.json"), "w") as fh:
+            json.dump(self.done_items(2), fh)
+        d = L.load(self.dir)
+        cfg, _ = L.tracker_config(d, self.dir)
+        r = {x["key"]: x for x in tracker.expected_rows(d, cfg, self.dir)}
+        self.assertEqual(r["E-02"]["Status"], "Done")
+
+
+class TestConfigFetch(RelBase):
+    def test_relational_adapter_without_a_fetch_instruction_gives_empty_fetch(self):
+        os.makedirs(os.path.join(self.dir, "plan", "trackers"), exist_ok=True)
+        with open(os.path.join(self.dir, "plan", "trackers", "notion.json"), "w") as fh:
+            json.dump({"kind": "notion", "fields": {"name": "Name", "status": "Status"},
+                       "status_map": {"paused": "Paused", "done": "Done"},
+                       "relations": {"epic": "Epic", "story": "Story", "release": "Release"}}, fh)
+        self.write()
+        cfg, err = L.tracker_config(L.load(self.dir), self.dir)
+        self.assertIsNone(err)
+        self.assertEqual(cfg["fetch"], "")
 
 
 if __name__ == "__main__":

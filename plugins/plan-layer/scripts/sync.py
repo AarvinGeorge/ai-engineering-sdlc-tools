@@ -55,7 +55,7 @@ def tracker_step():
         print("  sync: tracker reconcile against %s" % sys.argv[i + 1])
         return tracker.reconcile(sys.argv[i + 1])
     print("  sync: tracker mirror")
-    return tracker.next_step(d, cfg)
+    return tracker.next_step(d, cfg, L.paths()["root"])
 
 
 def main():

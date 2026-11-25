@@ -417,7 +417,7 @@ def tracker_config(d, root=None):
             "recent_done": rd, "relational": rel, "relations": relations,
             "task_status_map": dict(adapter.get("task_status_map") or {}),
             "release_status_map": dict(adapter.get("release_status_map") or {}),
-            "fetch": adapter.get("relational_fetch") if rel else adapter.get("fetch", "")}, None
+            "fetch": (adapter.get("relational_fetch") or "") if rel else adapter.get("fetch", "")}, None
 
 
 def tracker_state_path(root=None):

@@ -728,7 +728,7 @@ def run(root=None, event=None):
         if not st or not st.get("at"):
             drifts.append("tracker mirror (%s) was never reconciled — fetch its rows and run "
                           "tracker.py diff --actual <file>" % tcfg["kind"])
-        elif st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg), tcfg):
+        elif st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg, root), tcfg):
             drifts.append("tracker mirror (%s): the rows the plan now expects differ from those last "
                           "reconciled (%s) — fetch the rows and reconcile again" % (tcfg["kind"], st["at"]))
         elif st.get("drift"):

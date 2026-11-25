@@ -21,6 +21,7 @@ plan `updated` it was compared against) so the gate can say when it is stale.
 import hashlib
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -88,6 +89,24 @@ def _flat_rows(d, cfg):
     return rows
 
 
+def _epics(d):
+    """The well-formed epics: dicts with a string id and name. Malformed ones are faults, never rows."""
+    return [e for e in d.get("epics") or []
+            if isinstance(e, dict) and isinstance(e.get("id"), str) and isinstance(e.get("name"), str)]
+
+
+def _releases(d):
+    """The well-formed releases: string id, name and stage, a list (or absent) stories."""
+    return [r for r in d.get("releases") or []
+            if isinstance(r, dict) and all(isinstance(r.get(k), str) for k in ("id", "name", "stage"))
+            and isinstance(r.get("stories") or [], list)]
+
+
+def _task_of(sid, tid):
+    """True when tid is a task id of story sid (E-01.S2 -> E-01.S2.T<n>)."""
+    return bool(sid and tid and re.fullmatch(re.escape(sid) + r"\.T[0-9]+", tid))
+
+
 def _story_rows(d, cfg):
     """The flat rows, each tagged kind=story with its epic and release links.
 
@@ -95,9 +114,9 @@ def _story_rows(d, cfg):
     plan dict, config. Output: list of row dicts. Side effects: none.
     """
     rel = cfg["relations"]
-    epics = {e["id"]: e["name"] for e in d.get("epics") or [] if isinstance(e, dict)}
+    epics = {e["id"]: e["name"] for e in _epics(d)}
     in_release = {}
-    for r in d.get("releases") or []:
+    for r in _releases(d):
         for s in r.get("stories") or []:
             in_release[s] = r["name"]
     rows = _flat_rows(d, cfg)
@@ -111,13 +130,16 @@ def _story_rows(d, cfg):
     return rows
 
 
-def expected_rows(d, cfg):
+def expected_rows(d, cfg, root=None):
     """The rows the tracker should hold, derived from the plan alone.
 
     Flat mode (the default) is the 0.18 mirror, unchanged. In relational mode:
-    epics, stories, tasks and releases, each with "kind" and its links; tasks
-    without a task id are listed by not_mirrored(). Inputs: plan dict, config.
-    Output: list of row dicts keyed by "key". No side effects.
+    epics, stories, tasks and releases, each with "kind" and its links; a task
+    is mirrored only when its id is <its story id>.T<n> (others are listed by
+    not_mirrored()). An epic's status comes from all the work the plan has held
+    (plans.done plus the archive when root is given), not from mirrored rows.
+    Inputs: plan dict, config, optional project root. Output: list of row dicts
+    keyed by "key". No side effects.
     """
     if not cfg.get("relational"):
         return _flat_rows(d, cfg)
@@ -125,14 +147,14 @@ def expected_rows(d, cfg):
     tmap = cfg["task_status_map"]
     stories = _story_rows(d, cfg)
     plans = d.get("plans") or {}
+    known_ids, _n, done_ids, _dn = _known_names(root, d)
+    now_ids = {L.work_id(p.get("name")) for p in plans.get("now") or []}
     rows = []
-    for e in d.get("epics") or []:
-        mine = [s for s in stories if s["key"].split(".")[0] == e["id"]]
-        live = [s for s in mine if s[f["status"]] != smap["done"]]
-        now_ids = {L.work_id(p.get("name")) for p in plans.get("now") or []}
-        if mine and not live:
+    for e in _epics(d):
+        mine = {i for i in known_ids if re.fullmatch(re.escape(e["id"]) + r"\.S[0-9]+", i)}
+        if mine and mine <= done_ids:
             status = smap["done"]
-        elif any(s["key"] in now_ids for s in mine):
+        elif mine & now_ids:
             status = smap["paused"] if L.paused_at(d) else smap.get("building", "building")
         else:
             status = smap.get("planned" if mine else "intent")
@@ -142,12 +164,11 @@ def expected_rows(d, cfg):
         for p in plans.get(bucket) or []:
             sid = L.work_id(p.get("name"))
             for t in p.get("tasks") or []:
-                tid = L.work_id(t.get("name"))
-                if tid and tid.rsplit(".T", 1)[0] == sid:
-                    rows.append({"key": tid, "kind": "task", f["name"]: t["name"],
+                if _task_of(sid, L.work_id(t.get("name"))):
+                    rows.append({"key": L.work_id(t["name"]), "kind": "task", f["name"]: t["name"],
                                  f["status"]: tmap.get(t.get("state"), t.get("state")),
                                  rel["story"]: p["name"]})
-    for r in d.get("releases") or []:
+    for r in _releases(d):
         row = {"key": r["id"], "kind": "release", f["name"]: r["name"],
                f["status"]: cfg["release_status_map"].get(r["stage"], r["stage"])}
         if f.get("stage"):
@@ -157,37 +178,52 @@ def expected_rows(d, cfg):
 
 
 def not_mirrored(d):
-    """Tasks of live items whose name carries no task id, as 'E-01.S2: name' (said, never silent)."""
+    """Tasks of live items that relational mode does not mirror, as 'E-01.S2: name'.
+
+    Covers a task with no id, one whose id names another story, and one carrying a
+    finding or story id: said, never silent. Pure.
+    """
     out = []
     for bucket in ("now", "next"):
         for p in (d.get("plans") or {}).get(bucket) or []:
+            sid = L.work_id(p.get("name"))
             for t in p.get("tasks") or []:
-                if not L.work_id(t.get("name")):
-                    out.append("%s: %s" % (L.work_id(p.get("name")) or p.get("name"), t.get("name")))
+                if not _task_of(sid, L.work_id(t.get("name"))):
+                    out.append("%s: %s" % (sid or p.get("name"), t.get("name")))
     return out
 
 
-def relational_faults(d):
+def relational_faults(d, root=None):
     """Why a plan cannot be mirrored relationally, as FAIL strings; [] means it can."""
     out = []
     if (d.get("meta") or {}).get("naming") != "work-ids":
         out.append("meta.tracker.relational keys rows by work id — set meta.naming to \"work-ids\"")
-    epics = {e.get("id") for e in d.get("epics") or [] if isinstance(e, dict)}
+    for key, good in (("epics", _epics(d)), ("releases", _releases(d))):
+        for i, e in enumerate(d.get(key) or []):
+            if not any(e is g for g in good):
+                out.append("%s[%d] is malformed (id, name%s must be strings); it is not mirrored"
+                           % (key, i, ", stage" if key == "releases" else ""))
+    epics = {e["id"] for e in _epics(d)}
+    known_ids = _known_names(root, d)[0]
     seen = {}
-    for r in d.get("releases") or []:
+    for r in _releases(d):
         for s in r.get("stories") or []:
             if s in seen:
-                out.append("story %s is in two releases (%s, %s)" % (s, seen[s], r.get("id")))
-            seen[s] = r.get("id")
+                out.append("story %s is in two releases (%s, %s)" % (s, seen[s], r["id"]))
+            seen[s] = r["id"]
+            if s not in known_ids:
+                out.append("release %s lists story %s, which the plan does not hold" % (r["id"], s))
     for bucket in ("now", "next"):
         for p in (d.get("plans") or {}).get(bucket) or []:
             sid = L.work_id(p.get("name"))
-            if sid and sid.split(".")[0] not in epics:
+            if sid in epics:
+                out.append("item %s carries the declared epic id %s; a story id is E-NN.Sn" % (p.get("name"), sid))
+            elif sid and sid.split(".")[0] not in epics:
                 out.append("story %s: its epic %s is not declared in epics[]" % (sid, sid.split(".")[0]))
             for t in p.get("tasks") or []:
                 tid = L.work_id(t.get("name"))
-                if tid and tid.rsplit(".T", 1)[0] != sid:
-                    out.append("task %s sits under %s; a task id names its own story" % (tid, sid))
+                if tid and not _task_of(sid, tid):
+                    out.append("task %s sits under %s; a task id is its own story's id plus .T<n>" % (tid, sid))
     return out
 
 
@@ -200,9 +236,11 @@ def _known_names(root, d):
     Finished = plans.done plus plan/archive/done.json.
     """
     plans = d.get("plans") or {}
-    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME)
+    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME) if root else None
 
     def archived(fn):
+        if adir is None:
+            return []
         try:
             v = json.load(open(os.path.join(adir, fn), encoding="utf-8"))
             return v if isinstance(v, list) else []
@@ -350,7 +388,7 @@ def record(root, d, cfg, drift):
     L.atomic_write(L.tracker_state_path(root), json.dumps(
         {"at": L.utc_now(), "drift": drift, "kind": cfg["kind"],
          "plan_updated": (d.get("meta") or {}).get("updated"),
-         "expected_hash": expected_hash(expected_rows(d, cfg), cfg)}, indent=2) + "\n")
+         "expected_hash": expected_hash(expected_rows(d, cfg, root), cfg)}, indent=2) + "\n")
 
 
 def reconcile(actual_path, quiet=False):
@@ -369,7 +407,7 @@ def reconcile(actual_path, quiet=False):
     if err:
         print("  tracker: %s -- nothing was compared" % err)
         return 2
-    exp = expected_rows(d, cfg)
+    exp = expected_rows(d, cfg, p["root"])
     known = _known_names(p["root"], d)
     todo = diff_rows(exp, actual, cfg, known)
     record(p["root"], d, cfg, len(todo))
@@ -383,9 +421,9 @@ def reconcile(actual_path, quiet=False):
     return 0
 
 
-def next_step(d, cfg):
+def next_step(d, cfg, root=None):
     """Print the expected-rows summary and the exact next step for the agent. Returns 0."""
-    exp = expected_rows(d, cfg)
+    exp = expected_rows(d, cfg, root)
     f = cfg["fields"]
     print("  tracker: %s %s -- %d expected row(s):" % (cfg["kind"], cfg["target"], len(exp)))
     for r in exp:
@@ -409,7 +447,7 @@ def main():
     if cmd == "expected":
         out = {"tracker": cfg["kind"], "target": cfg["target"],
                "plan_updated": (d.get("meta") or {}).get("updated"),
-               "fetch": cfg["fetch"], "rows": expected_rows(d, cfg)}
+               "fetch": cfg["fetch"], "rows": expected_rows(d, cfg, L.paths()["root"])}
         if cfg["relational"]:
             out["not_mirrored"] = not_mirrored(d)
         print(json.dumps(out, indent=2, ensure_ascii=False))
