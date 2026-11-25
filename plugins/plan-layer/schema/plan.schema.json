@@ -106,7 +106,8 @@
             "target": {"type": "string", "description": "The tracker's database url or id."},
             "status_map": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Overrides merged over the adapter's stage -> tracker status values (keys: stage ids, plus paused and done)."},
             "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Overrides merged over the adapter's field names (name, status, stage, updated, link)."},
-            "recent_done": {"type": "integer", "minimum": 0, "description": "How many of the latest finished items to mirror. Default 5."}
+            "recent_done": {"type": "integer", "minimum": 0, "description": "How many of the latest finished items to mirror. Default 5."},
+            "relational": {"type": "boolean", "description": "0.19.0, opt-in. Mirror epics, stories, tasks and releases as linked rows (needs meta.naming work-ids and the adapter's relations). Default false: the flat 0.18 mirror."}
           },
           "description": "0.18.0, opt-in. Mirrors plans.now, plans.next and recent done into an external tracker. plan-layer derives the expected rows (tracker.py expected) and diffs them against rows the agent fetched through the tracker's connector (tracker.py diff --actual). The gate drifts when the last reconcile (plan/tracker-state.json) is missing or its hash of the expected rows differs from the current one. Absent means the feature is off."
         },
@@ -632,6 +633,18 @@
               "stage"
             ]
           }
+        }
+      }
+    },
+    "epics": {
+      "type": "array",
+      "description": "0.19.0. Epics declared for the relational tracker mirror; each story's epic is the id before the first dot.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^E-[0-9]{2,}$"},
+          "name": {"type": "string"}
         }
       }
     },

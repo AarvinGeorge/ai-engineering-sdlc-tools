@@ -52,7 +52,7 @@ def _optional(cfg, key):
     return cfg["fields"].get(key)
 
 
-def expected_rows(d, cfg):
+def _flat_rows(d, cfg):
     """The rows the tracker should hold, derived from the plan alone.
 
     Covers plans.now, plans.next and the last cfg['recent_done'] items of
@@ -86,6 +86,109 @@ def expected_rows(d, cfg):
                     row[f[key]] = value
             rows.append(row)
     return rows
+
+
+def _story_rows(d, cfg):
+    """The flat rows, each tagged kind=story with its epic and release links.
+
+    Why: relational mode needs each story to name its epic and release. Inputs:
+    plan dict, config. Output: list of row dicts. Side effects: none.
+    """
+    rel = cfg["relations"]
+    epics = {e["id"]: e["name"] for e in d.get("epics") or [] if isinstance(e, dict)}
+    in_release = {}
+    for r in d.get("releases") or []:
+        for s in r.get("stories") or []:
+            in_release[s] = r["name"]
+    rows = _flat_rows(d, cfg)
+    for row in rows:
+        row["kind"] = "story"
+        epic = row["key"].split(".")[0]
+        if epic in epics:
+            row[rel["epic"]] = epics[epic]
+        if row["key"] in in_release:
+            row[rel["release"]] = in_release[row["key"]]
+    return rows
+
+
+def expected_rows(d, cfg):
+    """The rows the tracker should hold, derived from the plan alone.
+
+    Flat mode (the default) is the 0.18 mirror, unchanged. In relational mode:
+    epics, stories, tasks and releases, each with "kind" and its links; tasks
+    without a task id are listed by not_mirrored(). Inputs: plan dict, config.
+    Output: list of row dicts keyed by "key". No side effects.
+    """
+    if not cfg.get("relational"):
+        return _flat_rows(d, cfg)
+    f, rel, smap = cfg["fields"], cfg["relations"], cfg["status_map"]
+    tmap = cfg["task_status_map"]
+    stories = _story_rows(d, cfg)
+    plans = d.get("plans") or {}
+    rows = []
+    for e in d.get("epics") or []:
+        mine = [s for s in stories if s["key"].split(".")[0] == e["id"]]
+        live = [s for s in mine if s[f["status"]] != smap["done"]]
+        now_ids = {L.work_id(p.get("name")) for p in plans.get("now") or []}
+        if mine and not live:
+            status = smap["done"]
+        elif any(s["key"] in now_ids for s in mine):
+            status = smap["paused"] if L.paused_at(d) else smap.get("building", "building")
+        else:
+            status = smap.get("planned" if mine else "intent")
+        rows.append({"key": e["id"], "kind": "epic", f["name"]: e["name"], f["status"]: status})
+    rows += stories
+    for bucket in ("now", "next"):
+        for p in plans.get(bucket) or []:
+            sid = L.work_id(p.get("name"))
+            for t in p.get("tasks") or []:
+                tid = L.work_id(t.get("name"))
+                if tid and tid.rsplit(".T", 1)[0] == sid:
+                    rows.append({"key": tid, "kind": "task", f["name"]: t["name"],
+                                 f["status"]: tmap.get(t.get("state"), t.get("state")),
+                                 rel["story"]: p["name"]})
+    for r in d.get("releases") or []:
+        row = {"key": r["id"], "kind": "release", f["name"]: r["name"],
+               f["status"]: cfg["release_status_map"].get(r["stage"], r["stage"])}
+        if f.get("stage"):
+            row[f["stage"]] = r["stage"]
+        rows.append(row)
+    return rows
+
+
+def not_mirrored(d):
+    """Tasks of live items whose name carries no task id, as 'E-01.S2: name' (said, never silent)."""
+    out = []
+    for bucket in ("now", "next"):
+        for p in (d.get("plans") or {}).get(bucket) or []:
+            for t in p.get("tasks") or []:
+                if not L.work_id(t.get("name")):
+                    out.append("%s: %s" % (L.work_id(p.get("name")) or p.get("name"), t.get("name")))
+    return out
+
+
+def relational_faults(d):
+    """Why a plan cannot be mirrored relationally, as FAIL strings; [] means it can."""
+    out = []
+    if (d.get("meta") or {}).get("naming") != "work-ids":
+        out.append("meta.tracker.relational keys rows by work id — set meta.naming to \"work-ids\"")
+    epics = {e.get("id") for e in d.get("epics") or [] if isinstance(e, dict)}
+    seen = {}
+    for r in d.get("releases") or []:
+        for s in r.get("stories") or []:
+            if s in seen:
+                out.append("story %s is in two releases (%s, %s)" % (s, seen[s], r.get("id")))
+            seen[s] = r.get("id")
+    for bucket in ("now", "next"):
+        for p in (d.get("plans") or {}).get(bucket) or []:
+            sid = L.work_id(p.get("name"))
+            if sid and sid.split(".")[0] not in epics:
+                out.append("story %s: its epic %s is not declared in epics[]" % (sid, sid.split(".")[0]))
+            for t in p.get("tasks") or []:
+                tid = L.work_id(t.get("name"))
+                if tid and tid.rsplit(".T", 1)[0] != sid:
+                    out.append("task %s sits under %s; a task id names its own story" % (tid, sid))
+    return out
 
 
 def _known_names(root, d):
@@ -159,6 +262,8 @@ def expected_hash(rows, cfg):
     """
     f = cfg["fields"]
     cols = [f["name"], f["status"]] + ([f["stage"]] if f.get("stage") else [])
+    if cfg.get("relational"):
+        cols = ["kind"] + cols + [cfg["relations"][k] for k in ("epic", "story", "release")]
     body = json.dumps([[r["key"]] + [r.get(c) for c in cols] for r in rows], ensure_ascii=False)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
 
@@ -302,10 +407,12 @@ def main():
         print("  tracker: %s" % (err or "meta.tracker is not set in plan.json"))
         return 2
     if cmd == "expected":
-        print(json.dumps({"tracker": cfg["kind"], "target": cfg["target"],
-                          "plan_updated": (d.get("meta") or {}).get("updated"),
-                          "fetch": cfg["fetch"], "rows": expected_rows(d, cfg)},
-                         indent=2, ensure_ascii=False))
+        out = {"tracker": cfg["kind"], "target": cfg["target"],
+               "plan_updated": (d.get("meta") or {}).get("updated"),
+               "fetch": cfg["fetch"], "rows": expected_rows(d, cfg)}
+        if cfg["relational"]:
+            out["not_mirrored"] = not_mirrored(d)
+        print(json.dumps(out, indent=2, ensure_ascii=False))
         return 0
     if cmd == "diff":
         if "--actual" not in args or args.index("--actual") + 1 >= len(args):

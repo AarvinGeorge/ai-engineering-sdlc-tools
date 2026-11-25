@@ -362,7 +362,8 @@ def tracker_config(d, root=None):
     plugin's trackers/. Only name and status are required fields; stage, updated
     and link are mirrored and compared only when the adapter declares them.
     config = {kind, target, fields, status_map,
-    recent_done, fetch}. Overrides in meta.tracker are merged over the adapter.
+    recent_done, fetch, relational, relations, task_status_map,
+    release_status_map}. Overrides in meta.tracker are merged over the adapter.
     Absent meta.tracker returns (None, None): the feature is off.
     """
     meta = d.get("meta") or {}
@@ -406,8 +407,17 @@ def tracker_config(d, root=None):
     rd = t.get("recent_done", TRACKER_RECENT_DONE_DEFAULT)
     if not (isinstance(rd, int) and not isinstance(rd, bool) and rd >= 0):
         return None, "meta.tracker.recent_done is %r — it must be a whole number, 0 or more" % (rd,)
+    rel = t.get("relational", False)
+    if not isinstance(rel, bool):
+        return None, "meta.tracker.relational is %r — it must be true or false" % (rel,)
+    relations = dict(adapter.get("relations") or {})
+    if rel and not all(relations.get(k) for k in ("epic", "story", "release")):
+        return None, "adapter %r has no relations {epic, story, release}; relational mode needs them" % kind
     return {"kind": kind, "target": target, "fields": fields, "status_map": smap,
-            "recent_done": rd, "fetch": adapter.get("fetch", "")}, None
+            "recent_done": rd, "relational": rel, "relations": relations,
+            "task_status_map": dict(adapter.get("task_status_map") or {}),
+            "release_status_map": dict(adapter.get("release_status_map") or {}),
+            "fetch": adapter.get("relational_fetch") if rel else adapter.get("fetch", "")}, None
 
 
 def tracker_state_path(root=None):
