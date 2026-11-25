@@ -518,7 +518,7 @@ def controller_config(d):
     controller.rule_faults (they need the cycle's stage ids). No side effects.
     """
     meta = d.get("meta") or {}
-    if "controller" not in meta:
+    if not isinstance(meta, dict) or "controller" not in meta:
         return None, None
     c = meta["controller"]
     if not isinstance(c, dict):
@@ -542,7 +542,7 @@ def controller_config(d):
     rules = c.get("rules", [])
     if not isinstance(rules, list):
         return None, "meta.controller.rules is %r — it must be a list" % (rules,)
-    return {"one_writer": ow, "base": base, "decision_log": log, "rules": rules}, None
+    return {"one_writer": ow, "base": base.strip(), "decision_log": log, "rules": rules}, None
 
 
 def controlled(d):
@@ -566,8 +566,9 @@ def controlled(d):
                 "tasks": {str(t.get("name")): t.get("state")
                           for t in it.get("tasks") or [] if isinstance(t, dict)}}
     for r in d.get("releases") or []:
-        if isinstance(r, dict) and work_id(r.get("id")):
-            out["releases"][r["id"]] = r.get("stage")
+        rid = work_id(r.get("id")) if isinstance(r, dict) else None
+        if rid and rid.startswith("R-"):
+            out["releases"][rid] = r.get("stage")
     return out
 
 
@@ -602,8 +603,13 @@ def write_stamp(root, d, by):
     """Record what the one writer just wrote. Side effect: rewrites controller-state.json's "writes".
 
     Other keys (adopted, handoff) are kept. `by` is the command line that wrote it.
+    Raises ValueError when the record exists but is unreadable (never drops its other keys).
     """
-    st = controller_state(root) or {}
+    st = controller_state(root)
+    if st is None:
+        if os.path.exists(controller_state_path(root)):
+            raise ValueError("plan/controller-state.json is unreadable — repair or remove it")
+        st = {}
     st["writes"] = dict(controlled(d), at=utc_now(), by=by)
     atomic_write(controller_state_path(root), json.dumps(st, indent=2, ensure_ascii=False) + "\n")
 

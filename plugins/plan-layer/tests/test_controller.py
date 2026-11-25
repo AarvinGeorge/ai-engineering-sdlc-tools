@@ -98,3 +98,36 @@ class TestPlumbing(ControllerBase):
             self.assertIn(f, fields)
         for w in L.WRITERS:
             self.assertTrue(w["writer"] and w["enforced"], w)
+
+
+class TestFixRound1(ControllerBase):
+    def test_write_stamp_refuses_an_unreadable_record(self):
+        self.write()
+        with open(L.controller_state_path(self.dir), "w") as fh:
+            fh.write("{not json")
+        with self.assertRaises(ValueError) as cm:
+            L.write_stamp(self.dir, self.d, "move.py x")
+        self.assertIn("unreadable", str(cm.exception))
+        self.assertEqual(open(L.controller_state_path(self.dir)).read(), "{not json")
+
+    def test_release_keys_are_work_ids_not_raw_ids(self):
+        self.d["releases"] = [
+            {"id": "R-1", "name": "n", "stage": "build"},
+            {"id": "R-01 Accounts", "name": "n", "stage": "gate"},
+            {"id": "R-02-hotfix", "name": "n", "stage": "build"}]
+        self.assertEqual(L.controlled(self.d)["releases"], {"R-01": "gate", "R-02": "build"})
+
+    def test_schema_release_id_pattern_is_strict(self):
+        import re
+        schema = json.load(open(os.path.join(PLUGIN, "schema", "plan.schema.json")))
+        pat = schema["properties"]["releases"]["items"]["properties"]["id"]["pattern"]
+        self.assertEqual(pat, "^R-[0-9]{2,}$")
+        self.assertTrue(re.match(pat, "R-01"))
+        for bad in ("R-1", "R-01 Accounts", "R-02-hotfix"):
+            self.assertFalse(re.match(pat, bad), bad)
+
+    def test_meta_not_an_object_is_off_and_base_is_trimmed(self):
+        self.d["meta"] = "oops"
+        self.assertEqual(L.controller_config(self.d), (None, None))
+        self.d["meta"] = {"naming": "work-ids", "controller": {"base": " main "}}
+        self.assertEqual(L.controller_config(self.d)[0]["base"], "main")
