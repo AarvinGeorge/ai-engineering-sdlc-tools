@@ -873,3 +873,125 @@ class TestRules(ControllerBase):
         L.write_stamp(self.dir, self.d, "test")
         self.assertEqual(self.move("R-01", "--stage", "production").returncode, 1)
         self.assertEqual(self.move("R-01", "--stage", "gate").returncode, 0)
+
+
+class TestRulesFixRound1(ControllerBase):
+    """Silent passes: subdirectory project, non-ASCII path, full-ref base, git failure; soft base-branch case."""
+
+    V = ("E-01.S2", "--stage", "verified")
+
+    def build(self, sub=None, base=None, branch=True):
+        root = self.dir
+        proj = os.path.join(root, sub) if sub else root
+        self.d["meta"]["controller"]["rules"] = [dict(RULE)]
+        if base:
+            self.d["meta"]["controller"]["base"] = base
+        git(root, "checkout", "-q", "-b", "main")
+        os.makedirs(os.path.join(proj, "src"))
+        os.makedirs(os.path.join(proj, "plan"), exist_ok=True)
+        open(os.path.join(proj, "src", "app.py"), "w").write("x = 1\n")
+        open(os.path.join(proj, "CHANGELOG.md"), "w").write("# log\n")
+        self.dir = proj
+        stamp_now(self)
+        run("render.py", project=proj)
+        git(root, "add", "-A")
+        git(root, "commit", "-q", "-m", "base")
+        if branch:
+            git(root, "checkout", "-q", "-b", "feature")
+        return root, proj
+
+    def test_subdirectory_project_committed_change_is_seen(self):
+        root, proj = self.build(sub="svc")
+        open(os.path.join(proj, "src", "app.py"), "a").write("y = 2\n")
+        git(root, "commit", "-q", "-am", "work")
+        self.assertEqual(self.move(*self.V).returncode, 1)
+
+    def test_subdirectory_project_untracked_change_is_seen(self):
+        root, proj = self.build(sub="svc")
+        open(os.path.join(proj, "src", "new.py"), "w").write("z = 1\n")
+        self.assertEqual(self.move(*self.V).returncode, 1)
+        open(os.path.join(proj, "CHANGELOG.md"), "a").write("- z\n")
+        self.assertEqual(self.move(*self.V).returncode, 0)
+
+    def test_non_ascii_path_is_matched(self):
+        root, proj = self.build()
+        open(os.path.join(proj, "src", "café.py"), "w").write("c = 1\n")
+        git(root, "add", "-A")
+        git(root, "commit", "-q", "-m", "cafe")
+        self.assertEqual(self.move(*self.V).returncode, 1)
+
+    def test_base_spelled_as_a_full_ref_is_still_the_base(self):
+        root, proj = self.build(base="refs/heads/main", branch=False)
+        open(os.path.join(proj, "src", "app.py"), "a").write("y = 2\n")
+        git(root, "commit", "-q", "-am", "on main")
+        r = self.move(*self.V)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("base branch", r.stdout)
+
+    def test_on_base_session_events_are_drift_not_fail(self):
+        root, proj = self.build(branch=False)
+        self.d = self.read()
+        self.d["meta"]["controller"]["rules"] = [dict(RULE, on=["stop"])]
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        r = run("check.py", "--json", "--event", "stop", project=proj)
+        out = json.loads(r.stdout)
+        self.assertFalse([f for f in out["fails"] if "changelog with code" in f], out["fails"])
+        self.assertTrue([m for m in out["drifts"] if "measured nothing: HEAD is the base branch" in m],
+                        out["drifts"])
+        import gate_hook
+        self.assertTrue(any(k in "measured nothing: HEAD is the base branch" for k in gate_hook.WORK_IN_PROGRESS))
+
+    def test_on_base_stage_event_still_refuses(self):
+        self.build(branch=False)
+        self.assertEqual(self.move(*self.V).returncode, 1)
+
+    def test_missing_base_is_fail_even_for_a_session_event(self):
+        self.build()
+        self.d = self.read()
+        self.d["meta"]["controller"].update(base="no-such-branch", rules=[dict(RULE, on=["stop"])])
+        self.write()
+        L.write_stamp(self.dir, self.d, "test")
+        out = json.loads(run("check.py", "--json", "--event", "stop", project=self.dir).stdout)
+        self.assertTrue([f for f in out["fails"] if "cannot measure" in f], out["fails"])
+
+    def test_git_diff_failure_is_unmeasurable_not_empty(self):
+        import controller
+        self.build()
+        real = controller._git_ok
+        controller._git_ok = lambda root, *a: None if "diff" in a else real(root, *a)
+        try:
+            files, why = controller.changed_files(self.dir, "main")
+        finally:
+            controller._git_ok = real
+        self.assertIsNone(files)
+        self.assertIn("cannot measure", why)
+
+    def test_malformed_rules_refuse_the_move_cleanly(self):
+        root, proj = self.build()
+        for bad in ({"then_changed": "CHANGELOG.md"}, {"on": ["stage:verified", "lunch"]}):
+            self.d = self.read()
+            self.d["meta"]["controller"]["rules"] = [dict(RULE, **bad)]
+            self.write()
+            L.write_stamp(self.dir, self.d, "test")
+            before = open(os.path.join(self.dir, "plan", "plan.json")).read()
+            r = self.move(*self.V)
+            self.assertEqual(r.returncode, 1, (bad, r.stdout, r.stderr))
+            self.assertNotIn("Traceback", r.stderr)
+            self.assertIn("then_changed" if "then_changed" in bad else "lunch", r.stdout)
+            self.assertEqual(open(os.path.join(self.dir, "plan", "plan.json")).read(), before)
+
+    def test_adopt_refuses_on_malformed_rules(self):
+        self.build()
+        self.d = self.read()
+        self.d["meta"]["controller"]["rules"] = [dict(RULE, then_changed="CHANGELOG.md")]
+        self.d["plans"]["now"][0]["stage"] = "verified"
+        self.write()
+        r = self.move("--adopt")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+
+    def test_event_with_unknown_stage_is_a_usage_error(self):
+        self.build()
+        r = run("check.py", "--event", "stage:bogus", project=self.dir)
+        self.assertEqual(r.returncode, 2, r.stdout)

@@ -718,7 +718,7 @@ def run(root=None, event=None):
     # The controller's diff (0.19.0): one function, read by the gate, the
     # handoff and the hooks, so nothing computes it twice. A crash inside it
     # is a FAIL, never silence: the Stop hook fails open on an exception, so
-    # an uncaught one would switch the whole gate off (review I3).
+    # an uncaught one would switch the whole gate off.
     try:
         found = controller.findings(root, d, event)
     except Exception as exc:
@@ -906,6 +906,8 @@ def main():
         ev = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
         known = ev in controller.EVENTS or any(ev.startswith(x) and ev[len(x):].strip()
                                                for x in ("stage:", "release:"))
+        if known and ev.startswith("stage:") and L.has_plan():
+            known = ev[6:] in controller.stage_ids(L.load())
         if not known:
             print("  usage: check.py --event <stop|session-start|sync|pause|stage:<id>|release:<stage>>")
             return 2

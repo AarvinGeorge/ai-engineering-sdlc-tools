@@ -188,6 +188,11 @@ def main():
             # existing stage would read as a change and an item already at a
             # rule-bound stage would block opting in at all.
             print("  move: first opt-in: stamping the current state without firing stage rules")
+        elif cfg and controller.rule_faults(cfg["rules"], controller.stage_ids(d)):
+            print("  move: --adopt refused -- meta.controller.rules is malformed; nothing stamped:")
+            for msg in controller.rule_faults(cfg["rules"], controller.stage_ids(d)):
+                print("    - %s" % msg)
+            return 1
         elif cfg:
             blocked = [f["message"] for ev in controller.stage_events(prior, d)
                        for f in controller.rule_findings(p["root"], cfg, ev)]
@@ -224,7 +229,7 @@ def main():
             print(STAMP_UNREADABLE)
             return 2
         if pending:
-            # Restamping now would silently adopt every hand edit (review C1).
+            # Restamping now would silently adopt every hand edit.
             if duplicates(d):
                 print("  move: refused -- rename the duplicate(s) %s first; nothing written:"
                       % "; ".join(duplicates(d)))
@@ -246,6 +251,12 @@ def main():
         return 0
     if event and cfg:
         import controller
+        bad = controller.rule_faults(cfg["rules"], controller.stage_ids(d))
+        if bad:
+            print("  move: refused -- meta.controller.rules is malformed; nothing written:")
+            for msg in bad:
+                print("    - %s" % msg)
+            return 1
         blocked = [f["message"] for f in controller.rule_findings(p["root"], cfg, event)]
         if blocked:
             print("  move: refused -- the %s rules fail; nothing written:" % event)

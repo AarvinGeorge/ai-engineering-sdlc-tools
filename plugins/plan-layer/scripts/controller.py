@@ -51,7 +51,7 @@ def duplicate_tasks(d):
     return out
 
 
-FIX = "revert the hand edit, or run move.py --adopt (with the owner's say-so)"  # the one remedy a hand edit has (review N2: move.py refuses while edits are pending)
+FIX = "revert the hand edit, or run move.py --adopt (with the owner's say-so)"  # the one remedy a hand edit has (move.py refuses while edits are pending)
 
 
 def one_writer_findings(root, d, cfg):
@@ -158,27 +158,48 @@ def rule_faults(rules, stage_ids):
     return out
 
 
+ON_BASE = "measured nothing: HEAD is the base branch"  # also listed in gate_hook.WORK_IN_PROGRESS
+
+
+def _git_ok(root, *args):
+    """Run git, returning stdout or None on any failure or timeout. Side effects: reads git only. Role: helper."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-c", "core.quotePath=false"] + list(args), cwd=root,
+                           capture_output=True, text=True, timeout=10)
+    except Exception:
+        return None
+    return r.stdout.rstrip("\n") if r.returncode == 0 else None
+
+
 def changed_files(root, base):
     """Paths changed since the merge-base with `base`, plus uncommitted and untracked.
 
     Inputs: root, base ref. Side effects: reads git only. Role: gate check.
-    Returns (set, None) or (None, reason). A missing base, or HEAD sitting on the
-    base branch, is a reason, never an empty set: a rule that measured nothing
-    must not pass. Committed changes since the merge-base and the working tree
-    are both measured, so a branch with no commit of its own still counts.
+    Returns (set, None) or (None, reason). A missing base, a git failure, or HEAD
+    sitting on the base branch is a reason, never an empty set: a rule that
+    measured nothing must not pass. The on-base reason starts with ON_BASE.
+    Committed changes since the merge-base and the working tree are both
+    measured, so a branch with no commit of its own still counts. Paths are
+    relative to root (a project in a repository subdirectory sees only its
+    own files) and unquoted (non-ASCII names match).
     """
-    mb = L.git(root, "merge-base", base, "HEAD")
+    mb = _git_ok(root, "merge-base", base, "HEAD")
     if not mb:
         return None, "cannot measure changes: no merge-base between %r and HEAD" % base
-    if L.git(root, "rev-parse", "--abbrev-ref", "HEAD") == base:
-        # On the base branch itself every commit is "the base", so committed
-        # work is invisible (review I2). A fresh branch off the base with no
-        # commit yet is fine: its working tree is measured (review N1).
-        return None, ("cannot measure changes: HEAD is on the base branch %r itself — work on a "
-                      "branch, or set meta.controller.base to a ref behind HEAD" % base)
-    files = set(L.git(root, "diff", "--name-only", mb).splitlines())
-    files |= set(L.git(root, "ls-files", "--others", "--exclude-standard").splitlines())
-    return {f for f in files if f}, None
+    head_ref = _git_ok(root, "rev-parse", "--symbolic-full-name", "HEAD")
+    base_ref = _git_ok(root, "rev-parse", "--symbolic-full-name", base)
+    if head_ref and head_ref == base_ref:
+        # On the base branch every commit is "the base", so committed work is
+        # invisible. A fresh branch off the base with no commit yet differs by
+        # name and is measured from its working tree.
+        return None, ("%s %r itself — work on a branch, or set meta.controller.base to a ref "
+                      "behind HEAD" % (ON_BASE, base))
+    tracked = _git_ok(root, "diff", "--name-only", "--relative", mb)
+    untracked = _git_ok(root, "ls-files", "--others", "--exclude-standard")
+    if tracked is None or untracked is None:
+        return None, "cannot measure changes: git diff failed or timed out"
+    return {f for f in (tracked + "\n" + untracked).splitlines() if f}, None
 
 
 def stage_events(writes, d):
@@ -206,7 +227,12 @@ def rule_findings(root, cfg, event):
         return []
     files, why = changed_files(root, cfg["base"])
     if why:
-        return [_f("rule", "rule %r on %s: %s" % (r["name"], event, why)) for r in mine]
+        # A session event on the base branch (or with git unreadable) measures
+        # nothing but must not block the session: DRIFT. A move, or a missing
+        # base ref, is FAIL.
+        soft = event in EVENTS and (why.startswith(ON_BASE) or "git diff failed" in why)
+        return [_f("rule", "rule %r on %s: %s" % (r["name"], event, why), "DRIFT" if soft else "FAIL")
+                for r in mine]
     out = []
     for r in mine:
         hit = sorted(f for f in files if any(fnmatch.fnmatch(f, p) for p in r["if_changed"]))
