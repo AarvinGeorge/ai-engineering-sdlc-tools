@@ -39,10 +39,16 @@ STAGES = [
                "designed", "spec", "specs"],
      "skill": "superpowers:writing-plans",
      "references": ["docs-and-decisions.md", "parallel-and-worktrees.md"]},
+    {"stage": "debug",
+     "words": ["debug", "debugs", "debugging", "debugged", "investigate", "investigates",
+               "investigating", "investigated", "investigation", "diagnose", "diagnoses",
+               "diagnosing", "diagnosed", "diagnosis", "bug", "bugs"],
+     "skill": "superpowers:systematic-debugging",
+     "references": ["root-cause-investigation.md", "measurement-and-state-claims.md"]},
     {"stage": "build",
      "words": ["build", "builds", "building", "built", "implement", "implements",
                "implementing", "implemented", "fix", "fixes", "fixing", "fixed",
-               "refactor", "refactors", "refactoring", "refactored", "debug", "debugging"],
+               "refactor", "refactors", "refactoring", "refactored"],
      "skill": "superpowers:test-driven-development",
      "references": ["model-routing-and-cost.md", "parallel-and-worktrees.md"]},
     {"stage": "review",
@@ -81,7 +87,10 @@ FALLBACK_BRIEF = "engineering-method active; load the skill before acting"
 # Two-word phrases that name a stage (matched on adjacent words).
 PHRASES = {("roll", "back"): "deploy", ("rolling", "back"): "deploy",
            ("rolled", "back"): "deploy", ("pull", "request"): "merge",
-           ("pull", "requests"): "merge"}
+           ("pull", "requests"): "merge", ("root", "cause"): "debug"}
+
+# Build words that give way to debug when a debug word is also present ("fix the bug").
+FIX_WORDS = ("fix", "fixes", "fixing", "fixed")
 
 # word -> stage lookup, derived from STAGES (never edited by hand)
 _BY_NAME = {s["stage"]: s for s in STAGES}
@@ -260,29 +269,43 @@ def clean_prompt(prompt):
 
 
 def detect_stage(prompt):
-    """Find the stage of the earliest stage word in a prompt.
+    """Find the stage a prompt asks for.
 
-    Why: the first verb usually names the work being asked for. The prompt is
-    cleaned first, a leading slash-command token is skipped ("/plan-layer
-    status" is not "plan"), and "git status" is ignored because it is a
-    command, not a request for a report. Matching is whole-word and
-    case-insensitive over an explicit word list; hyphens split words.
-    Inputs: prompt text. Output: a STAGES entry, or None. Side effects: none.
+    What: the stage of the earliest stage word or phrase, except that when the
+    earliest match is a fix word (FIX_WORDS) and a debug word or phrase appears
+    anywhere in the scanned text, the stage is debug ("fix the bug" investigates
+    first). Other build words keep build. The prompt is cleaned first, a leading
+    slash-command token is skipped, and "git status" is ignored. Whole-word,
+    case-insensitive; hyphens split words.
+    Use when: the --prompt hook decides whether to announce a stage.
+    Inputs: prompt text.
+    Output: a STAGES entry, or None.
+    Side effects: none.
+    Role: routing only; one linear pass over at most MAX_SCAN_CHARS.
     """
     text = clean_prompt(prompt).lstrip()
     if text.startswith("/"):
         parts = text.split(None, 1)
         text = parts[1] if len(parts) > 1 else ""
     words = [m.lower() for m in _WORD_RE.findall(text)]
+    first = None
     for i, w in enumerate(words):
-        if i + 1 < len(words) and (w, words[i + 1]) in PHRASES:
-            return _BY_NAME[PHRASES[(w, words[i + 1])]]
-        if w == "status" and i > 0 and words[i - 1] == "git":
+        nxt = words[i + 1] if i + 1 < len(words) else None
+        if (w, nxt) in PHRASES:
+            stage = _BY_NAME[PHRASES[(w, nxt)]]
+        elif w == "status" and i > 0 and words[i - 1] == "git":
             continue
-        stage = _WORD_TO_STAGE.get(w)
-        if stage:
+        else:
+            stage = _WORD_TO_STAGE.get(w)
+        if stage is None:
+            continue
+        if first is None:
+            first = stage
+            if first["stage"] != "build" or w not in FIX_WORDS:
+                return first
+        elif stage["stage"] == "debug":
             return stage
-    return None
+    return first
 
 
 def stage_message(stage):
