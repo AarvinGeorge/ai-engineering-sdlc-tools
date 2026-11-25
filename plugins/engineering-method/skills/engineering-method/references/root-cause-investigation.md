@@ -3,7 +3,8 @@
 **Evidence before any cause (tier b and c).** The first reply that discusses a cause opens with one
 line each for RC-1 to RC-4 (and RC-5 when a working case exists): `done`, `requested`, or `skipped`
 with the reason; evidence the reporter pasted counts as `done`. No cause, suspect list or fix
-before those lines.
+before those lines. A `requested` line names the exact read, its source and its command. No suspect is cleared or
+blamed by argument while its value is unread; a cause offered after those lines is a [hypothesis] (RC-8).
 
 Superpowers' `superpowers:systematic-debugging` owns the procedure: its iron law, its four phases
 and its tracing technique are not restated here. This file adds the investigation steps it does
