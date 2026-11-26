@@ -78,4 +78,4 @@ planning: measure the budget, then allocate it to the highest-value work first).
 - **Do not drop below the reviewer floor to make reviews fit.** Defer them to the reset instead;
   the defer is stated with the date.
 - **An eval that decides whether something ships runs on the model that will use it, graded by a
-  mid-tier-or-better judge.**
+  judge chosen as behaviour-evals.md "Judges" says.**
