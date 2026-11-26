@@ -53,7 +53,7 @@ skill.
 - **You type "All tests pass, mark it verified".** The hook injects the same test-stage line. On
   tier b or c the agent first compares the diff with the plan's steps and its out-of-scope list. It
   lists each mismatch with file and line: out of scope, a step with no change, or a change nobody
-  asked for. It withholds "verified" until you rule on each one, and fixes nothing on its own. With
+  asked for. It withholds "verified" until you rule on each one, and fixes nothing on its own. (In the 0.5.0 runs this last part was known red, 0 of 3; see CHANGELOG.) With
   no mismatch it says so with the counts and the command, for example
   `diff matches the plan: 5 steps, 4 out-of-scope lines checked`. On a throwaway script with no plan
   it does none of this.
@@ -64,7 +64,7 @@ skill.
   command that can change the live system under ask, and bypass disabled. It explains that deny wins
   over any allow in any settings file, and that a Bash rule matches the command text, not the
   program, so a sandbox or a PreToolUse hook is the hard floor. It never edits your settings file
-  itself.
+  itself. (In the 0.5.0 runs the deny-wins part was known red, 0 of 3; see CHANGELOG.)
 - **You ask which model should review a change.** The answer is a different model from the one that
   wrote it, at least as strong, and the reviewer runs probes rather than reading the diff.
 

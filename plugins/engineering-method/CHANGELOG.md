@@ -109,14 +109,19 @@ case; P pass, F fail). Every target criterion is red on 0.4.0, so each case meas
 - Narrowing: four criteria green on base were narrowed once each, to what the 0.5.0 text adds (the
   pass^k figure; a FAIL condition and no scale even as an option; the owner ruling on each mismatch
   with the choices laid out; deny winning across settings files). Each base green was read and held:
-  the rule was already in 0.4.0 or in model knowledge, not a judge error.
+  the rule was already in 0.4.0 or in model knowledge, not a judge error. Two of the four
+  (`eval-score-code-first` c2, `verified-matches-plan` c4) were reworded once more after their base
+  run (the first only tightened; the second allows a stated recommendation); their 0.4.0 answers
+  were re-read under the shipped wording and still fail, by reading, not a judge count.
 - Cost: 42 agent runs (30 base, 12 narrowing), about $9.03 (an estimate, billed to a subscription),
   against a $14 stage cap. Two caps were overshot by the run in flight.
 
 **Head results on 0.5.0** (same flags, 3 runs per case, base column from the base run above). Read
 under the owner's ruling of 26 Nov 2026: the new criteria are capability evals and are reported; one
-below 2 of 3 on the head is known red; the existing cases are held. **15 of 20 new target criteria
-are 2 of 3 or better on the head** (from 0 of 20 on 0.4.0).
+below 2 of 3 on the head is known red; the existing cases are held. **12 of the 17 target criteria
+are 2 of 3 or better on the head** (0 of 17 on 0.4.0); the three guard criteria of
+`verified-matches-plan` are 3/3 on both versions. Counted with those guards, 15 of 20 (3 of 20 on
+0.4.0).
 - Green: `eval-score-code-first` c1 0/3 → 3/3, c2 0/3 → 3/3; `eval-pass-k-floor` c2 0/3 → 3/3;
   `eval-metrics-report-only` c1 0/3 → 3/3, c2 1/3 → 2/3; `eval-judge-independent-calibrated` c1
   1/3 → 2/3, c3 0/3 → 3/3, c4 0/3 → 2/3; `eval-run-accounting` c1 0/3 → 2/3;
@@ -127,15 +132,20 @@ are 2 of 3 or better on the head** (from 0 of 20 on 0.4.0).
   invalid case without tying it to a kept trace); `verified-matches-plan` c4 0/3 (no reference was
   read in any run: the `test` stage cell alone produced the mismatch list but not the hand-back to the
   owner); `permission-profile-live` c1 0/3 (the reference was read; no answer says the committed
-  deny holds against a teammate's user or local settings).
+  deny holds against a teammate's user or local settings). Three of these
+  (`eval-judge-independent-calibrated` c2, `verified-matches-plan` c4, `permission-profile-live` c1)
+  have not passed in any run on either version in their shipped wording, so it is not yet shown that
+  the grader can pass.
 - Guards hold: `verified-matches-plan` c1, c2, c3 3/3; `eval-near-miss-unit-test` c1, c2 3/3;
   `verified-near-miss-no-plan` c1, c2 3/3; `permission-profile-exploration-light` c1, c2 2/2 valid
   runs (the third was not started: the two runs cost about $0.9 each against about $0.37 on 0.4.0,
   and the second crossed the cap).
 
-**Regression results** (the 35 existing cases, paired: base 0.4.0 and head, 3 runs each). No
-unexplained drop. Five criteria in four cases fell below 2 of 3; each was read and tested (two-sided
-Fisher exact):
+**Regression results** (the 35 existing cases: 26 paired, base 0.4.0 and head, 3 runs each; 9 smoke
+cases with one head run against 3 base runs or the stored 0.4.0 record, `rc-02-decision-record`
+extended to 3 and re-run on the base). No unexplained drop. Criteria already below 2 of 3 on 0.4.0
+stay red and are not drops (listed in `evals/COVERAGE.md`); five of them moved from 1/3 to 0/3.
+Five criteria in four cases fell below 2 of 3; each was read and tested (two-sided Fisher exact):
 - `eval-plan-as-dataset` c4 3/3 → 0/3, pooled to 6 runs per version: base 3/6, head 1/6, p = 0.55.
   The criterion is a coin flip on 0.4.0 too, decided by whether the answer states that the agent
   never sees the graders; noise.
@@ -151,11 +161,16 @@ Fisher exact):
   drop.
 
 **Known issues, for a later release (not fixed here):** two graders disagree with the reference they
-test. `eval-judge-independent-calibrated` c2 asks for true positive and true negative rates even with
-two labels, while the reference, and c3, say that below about 30 labels a side the report gives raw
-counts; every head answer follows the reference. `eval-pass-k-floor` c1 asks for a pass^k figure,
+test. `eval-judge-independent-calibrated` c2 asks for true positive and true negative rates without saying
+what a small label set changes, while the reference, and c3, give raw counts below about 30 labels a
+side. The head answers report raw counts as the reference asks, but none separates agreement on
+answers the owner passed from agreement on answers the owner failed, which the reference also asks;
+the red is part grader wording, part behaviour. `eval-pass-k-floor` c1 asks for a pass^k figure,
 which is stricter than the rule's Test line (floor criteria report n of n). Neither grader was edited
 after the head run, since that would need a fresh base run to keep the two versions comparable.
+At the test stage the plan-conformance rule is routed through `measurement-and-state-claims.md` but
+was not read in any head run (0 Read calls); a routing fix to the SKILL.md `test` cell is planned for
+the next release.
 
 **Cost:** 265 agent sessions in the release (42 base and narrowing, 29 head, 191 regression and
 re-runs, 3 for the `rc-02` base check), about $61.31. These are list-price estimates from the
