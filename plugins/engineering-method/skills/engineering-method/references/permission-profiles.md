@@ -17,7 +17,7 @@ Paste it; never let an agent rewrite a settings file to loosen it.
   `python3 <the skill's base directory>/scripts/permissions_check.py --inline project='<your profile
   as one-line JSON>' --command "<a command the profile must stop>"` (or `--file <scope>=<settings
   file>` when that profile is already saved in a file; the base directory is the one the Skill tool
-  printed when the skill loaded) and paste each block as printed; its CROSS_FILE_PROBE line shows an
+  printed when the skill loaded) and paste each whole block, every line, as printed; its CROSS_FILE_PROBE line shows an
   allow in user or local settings cannot undo the deny.
   Run it as one plain command that starts with python3 and the full path: nothing before or after it
   (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.

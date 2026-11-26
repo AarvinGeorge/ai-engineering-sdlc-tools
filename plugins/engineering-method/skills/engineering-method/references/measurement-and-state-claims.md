@@ -86,7 +86,7 @@ out-of-scope list:
 1. Read the plan's steps and out-of-scope list, then `git diff --stat=200 <base>...HEAD` and the hunks.
    Save the plan text, that diff-stat and the hunks to one file, then
    `python3 <the skill's base directory>/scripts/plan_conformance.py <that file>` does steps 1 and 2 (the base
-   directory is the one the Skill tool printed when the skill loaded); paste its block as printed.
+   directory is the one the Skill tool printed when the skill loaded); paste the whole block, every line, as printed.
    Run it as one plain command that starts with python3 and the full path: nothing before or after
    it (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.
    If it prints ERROR: cannot compare, do steps 1 and 2 by hand and say the script could not read the plan.
