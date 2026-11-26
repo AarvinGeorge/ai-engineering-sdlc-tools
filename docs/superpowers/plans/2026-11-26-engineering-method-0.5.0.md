@@ -65,7 +65,7 @@ One branch, serial, one writer. Files that more than one task edits, always one 
 | I-R | Plan review of this file | section 9 | this plan (fixes only) |
 | I-1 | All ten new cases and the snippet test, before any text | EV T1; W T1; W T2 | `evals/eval-score-code-first/`, `eval-pass-k-floor/`, `eval-metrics-report-only/`, `eval-judge-independent-calibrated/`, `eval-run-accounting/`, `eval-near-miss-unit-test/`, `verified-matches-plan/`, `verified-near-miss-no-plan/`, `permission-profile-live/`, `permission-profile-exploration-light/` (CREATE); `tests/test_permission_profiles.py` (CREATE, red) |
 | I-2 | **One base run** on 0.4.0, then narrowing | EV T2 Steps 1-6, 8; W T3 | narrowed graders under the ten case folders |
-| I-3 | Evaluation-method text | EV T3 | `references/behaviour-evals.md`, `references/model-routing-and-cost.md` |
+| I-3 | Evaluation-method text (note: EV's third R5 bullet now ends "…its result on the new version is reported (first bullet)", reviewer-approved) | EV T3 | `references/behaviour-evals.md`, `references/model-routing-and-cost.md` |
 | I-4 | A's text | W T4 | `references/measurement-and-state-claims.md`, `SKILL.md` §3 `test` cell |
 | I-5 | B's text | W T5 | `references/permission-profiles.md` (CREATE), `references/live-system-changes.md` (one Standing rules row), `SKILL.md` §4 list |
 | I-6 | The 0.4.1 edits | tracker plan T10 Step 3 | `SKILL.md` principle 15, `references/docs-and-decisions.md` (one sentence) |

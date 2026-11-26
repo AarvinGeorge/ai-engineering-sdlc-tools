@@ -35,7 +35,7 @@ near 100%, and a capability case that holds graduates into the regression set.
 
 | Layer | What | When it runs | Repeats |
 |---|---|---|---|
-| **Floor** | a handful of cases for the rules that must never break (safety, sends, spend) | every commit that touches the prompt, tools or model | 3–5; every run passes |
+| **Floor** | a handful of cases for the rules that must never break (safety, sends, spend) | every commit that touches the prompt, tools or model | 3–5; reliable only when every run passes |
 | **Core** | one or more cases per rule, including a near-miss where the rule should not fire | every pull request | once; repeat only a case whose result differs from the baseline |
 | **Extended** | conflicts between rules, long conversations, adversarial pushes | before a release | once; repeat on a difference |
 
@@ -48,8 +48,9 @@ near 100%, and a capability case that holds graduates into the regression set.
   back. A criterion that varies on the old version too is flaky, not regressed: pool more runs on
   both versions before calling a drop.
 - **A run whose inputs never reached the agent is invalid**, reported apart like an errored run. Read
-  a kept trace of one run of each fixture case before counting it. *Why:* a fixture case was scored
-  on runs that never saw their files.
+  a kept trace of one run of each fixture case before counting it. A run invalidated by the harness
+  or a fixture is re-run once the delivery is fixed. *Why:* a fixture case was scored on runs that
+  never saw their files.
 
 ## Scoring: code first, a judge only where code cannot decide
 
@@ -71,6 +72,8 @@ near 100%, and a capability case that holds graduates into the regression set.
 - **A rule that must never break is held to every run: pass^k**, the chance that all k runs pass
   (τ-bench, Yao et al.). Per-trial 75% gives about 42% over three runs (Anthropic, as above). *Test:*
   floor criteria report n of n, and a floor criterion with any failing run is not called reliable.
+  A new floor criterion is still a capability eval for the release; n of n is what lets it be called
+  reliable.
 - **Small samples prove little.** 2 of 3 is consistent with a true rate from about 21% to 94% (95%
   Wilson interval); even 6 of 6 against 3 of 6 is not a significant difference. Compare versions run
   for run on the same cases, model and judge (paired, as in Anthropic's "A statistical approach to
@@ -123,16 +126,17 @@ near 100%, and a capability case that holds graduates into the regression set.
 
 ## Every new rule ships with its eval
 
-- **Test-first, as for code.** Each new rule comes with a case, run on the current instructions,
-  where it should fail, and on the changed ones; both results are kept. A case that passes on the old
-  instructions tests nothing new: narrow it (next bullet). *Why:* most rules added without one could
-  not be shown to have changed anything. *Test:* each rule in the change has its case, with a red
-  result on the old version and the new version's result reported beside it.
+- **Test-first, as for code** (the new result is reported, not required). Each new rule comes with
+  a case, run on the current instructions, where it should fail, and on the changed ones; both
+  results are kept. A case that passes on the old instructions tests nothing new: narrow it (next
+  bullet). *Why:* most rules added without one could not be shown to have changed anything. *Test:*
+  each rule in the change has its case, with a red result on the old version and the new version's
+  result reported beside it.
 - **A criterion that passes on the old version is narrowed to what the rule adds**, at most two
   rewrite rounds; still green after that, it becomes a guard, not proof, and the rule rests on its
   other criteria. Each criterion asks only what the prompt lets the agent do, so a pass on the new
   version is achievable; where the user asks for the opposite of the rule, ask for a recommendation,
-  or the method's "push back once, then do as asked" decides the verdict.
+  or the method's push back once, then do as asked (review-loop.md) decides the verdict.
 - **A stored baseline per artifact.** Each version of the instructions (or prompt, or tool set)
   has its stored result per case; a run compares against the baseline of the version it replaces,
   and the "without" arm is re-run only when that base changes, not on every commit. *Test:* every

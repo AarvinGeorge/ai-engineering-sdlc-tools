@@ -10,7 +10,7 @@ outage.
 |---|---|
 | Read-only by default | Inspection, logs, config reads, benchmarks need no permission. |
 | Ask before mutating | Config edits, restarts, scheduled-job changes, installs, credential changes: state what changes and how to undo it. |
-| Profile before the first live session | Paste the live profile (permission-profiles.md) into the project's committed settings first: every command that can change the live system under ask, bypass disabled. *Test:* the settings file holds it before the session touches the system. |
+| Profile before the first live session | The owner pastes the live profile (permission-profiles.md) into the project's committed settings first: every command that can change the live system under ask, bypass disabled. *Test:* the settings file holds it before the session touches the system. |
 | Never restart blind | Check for in-flight work first; re-read it after any wait or build. |
 | List side effects first | Before any test or setup step that touches a live system or a real account, list what it sends or changes outside the system (messages, notices, invitations, charges); a sent message cannot be unsent. *Test:* the list sits above the step. |
 | Read health before a user-visible step | Read the system's recent errors (model errors, usage limits, failed jobs) before any step real people will see; stop at the first usage-limit error. Keep spend separate between production and test, each with its own hard limit. *Why:* a step relayed through an unhealthy system reached no one, and a shared spend pool let a test loop starve production-adjacent work. |

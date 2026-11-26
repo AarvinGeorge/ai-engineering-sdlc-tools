@@ -90,7 +90,7 @@ out-of-scope list:
    - **step with no change:** a step that nothing in the diff carries out;
    - **unasked:** a change no step asked for.
 3. Report them as findings and withhold "verified" while any stands. The owner rules on each (keep
-   and add it to the plan, revert it, or move it to a later item). Do not revert or fix on your own.
+   and add it to the plan, revert it, move it to a later item, or carry out the step). Do not revert or fix on your own.
 4. None found: say so with the counts and the command, e.g. "diff matches the plan: 5 steps, 4
    out-of-scope lines checked (`git diff --stat <base>...HEAD`)".
 

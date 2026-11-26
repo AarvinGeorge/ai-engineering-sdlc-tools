@@ -15,7 +15,7 @@ Paste it; never let an agent rewrite a settings file to loosen it.
   merge instead of overriding")
 - **Every mode:** deny blocks in every mode, `bypassPermissions` included. A call matching an ask
   rule is never auto-approved in any mode: it prompts, or is denied where no prompt is possible
-  (`dontAsk`). Command-content ask rules fall back to a prompt in auto mode; allow rules do nothing
+  (`dontAsk`); an installed mod is the one exception ("Mods" below). Command-content ask rules fall back to a prompt in auto mode; allow rules do nothing
   in `bypassPermissions`. (permission-modes, "Available modes", "Skip all checks with
   bypassPermissions mode", "How auto mode evaluates actions"; permissions, "Permission modes")
 - **`disableBypassPermissionsMode`:** valid in any settings file, but the docs call it "most useful in
@@ -36,8 +36,8 @@ Paste it; never let an agent rewrite a settings file to loosen it.
   does not stop `/bin/rm …` or `bash -c 'rm …'`. Where the floor must hold, add the sandbox's
   filesystem and network rules or a PreToolUse hook. (permissions, "What a Bash rule doesn't match")
 - **Mods:** without managed settings, a managed MCP file or a Team or Enterprise login, an installed
-  mod can approve some calls a deny rule refuses. Read what a mod does before installing it on a
-  live-tier machine. (permissions, "Precedence among rules, hooks, and mods")
+  mod can approve some calls a deny rule refuses and can skip an ask rule's prompt. Read what a mod
+  does before installing it on a live-tier machine. (permissions, "Precedence among rules, hooks, and mods")
 - **Read and Edit denies cover Claude's file tools, not every process.** They apply to the built-in
   file tools and, in a Bash command Claude Code can analyse, to redirections and recognised file
   commands such as `cat`, `head`, `sed` and `tee`; a script or program a command runs can still read
@@ -94,7 +94,8 @@ commands, and every command that can change the live system.
 ```
 
 The live tier puts every command that can change the live system under **ask**, never allow, because
-an ask is never auto-approved in any mode (it prompts, or is denied where no prompt is possible); a destructive command the project never wants run goes under
+an ask is never auto-approved in any mode (it prompts, or is denied where no prompt is possible; an
+installed mod is the one exception, "Mods" above); a destructive command the project never wants run goes under
 **deny**. Principle 13's "ask before mutating" is then enforced by the harness, and principle 14
 applies to each prompt: a declined prompt means stop.
 
