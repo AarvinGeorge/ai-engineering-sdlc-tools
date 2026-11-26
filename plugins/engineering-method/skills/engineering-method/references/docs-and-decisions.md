@@ -93,7 +93,8 @@ Only code whose lines the diff touches is checked, so untouched code is never fo
 
 The same pattern answers any rule that has been missed more than once (a changelog entry, a version
 bump, an index line): a check that fails without it (CI, a pre-push hook or a test), not another line in
-the instructions file (SKILL.md principle 7).
+the instructions file (SKILL.md principle 7). With plan-layer, a "changed X, so Y must change"
+rule is a co-change rule in `meta.controller.rules`, fired on a stage event.
 
 ## Decision log
 

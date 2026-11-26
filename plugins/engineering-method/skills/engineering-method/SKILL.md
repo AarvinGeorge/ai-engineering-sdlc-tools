@@ -104,7 +104,7 @@ money or touches credentials; the lower one otherwise.
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
     indexed the same day. The plan's stage and a configured tracker move at each stage change, pause, handoff and
-    release, reconciled at every progress report (plan-layer: `/plan-layer sync --tracker`;
+    release, reconciled on events by plan-layer's controller (`move.py`, `sync --tracker`;
     `/plan-layer pause` before stopping; it owns how, this skill when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; the real technical name,
     defined once; words whose plain meaning matches ("tested on the bench", never "benched", which
