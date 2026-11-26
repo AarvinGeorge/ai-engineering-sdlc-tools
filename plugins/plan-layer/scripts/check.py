@@ -171,7 +171,10 @@ def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
             os.killpg(p.pid, signal.SIGKILL)
         except OSError:
             pass
-        p.communicate()
+        try:
+            p.communicate(timeout=5)  # a child that left the group may still hold the pipes
+        except sp.TimeoutExpired:
+            pass
         raise
     dec = lambda b: (b or b"").decode("utf-8", errors="replace").strip()  # noqa: E731
     return p.returncode, dec(out), dec(err)

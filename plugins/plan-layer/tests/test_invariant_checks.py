@@ -156,6 +156,17 @@ class InvariantChecks(Base):
         time.sleep(4)
         self.assertFalse(os.path.exists(mark), "a backgrounded child outlived the timeout")
 
+    def test_timeout_returns_even_if_a_child_left_the_group_holding_the_pipes(self):
+        import time
+        self.plan_with([{"rule": "escaper", "state": "holding",
+                         "check": "python3 -c 'import os,time; os.setsid(); time.sleep(14)' & sleep 30"}])
+        t0 = time.time()
+        out = self.verify_text(timeout=1)
+        took = time.time() - t0
+        self.assertIn("timed out after 1s", out)
+        self.assertLess(took, 8, "verify blocked on a child holding the pipes (%.1fs)" % took)
+        print("measured return time %.1fs" % took, file=sys.stderr)
+
     def test_check_does_not_inherit_stdin(self):
         self.plan_with([{"rule": "reads", "state": "holding",
                          "check": "read x && test -n \"$x\""}])
