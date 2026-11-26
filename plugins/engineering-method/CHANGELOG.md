@@ -1,13 +1,14 @@
 # Changelog
 
-## 0.4.0 — 2026-11-25
+## 0.4.0 — 2026-11-26
 
 **A debug stage.** A prompt that moves to debugging (debug, investigate, diagnose, bug, root cause)
 now makes the hook name `superpowers:systematic-debugging` and the new investigation reference, and
 `SKILL.md` §3 gains a `debug` row (enforced against the hook's stage map by test). Fix words give way
 to debug when a debug word follows ("fix the bug" investigates first); a nearer non-build stage word
-still wins. Known limit: a prompt that names only the symptom, with none of the stage words, relies on
-the skill's trigger text, not the hook.
+still wins. Known limits, not fixed in 0.4.0: a prompt that names only the symptom, with none of the
+stage words, gets no stage and relies on the skill's trigger text; and a stage word used in another
+sense routes to debug ("add a debug flag to the CLI", "give me a bug report summary").
 
 **Root-cause investigation reference.** `references/root-cause-investigation.md` holds ten named
 steps, RC-1 to RC-10, each invoked at its trigger and written as rule, trigger, input, output, what it
@@ -33,10 +34,13 @@ commit, write the size rule into the file, scan before the push. Baseline: Anthr
 instruction-file size, with `/doctor prompt-audit` as an input, not a substitute.
 
 **Bounded review and fix loops.** `references/review-loop.md`, "Fix rounds", holds one rule: Superpowers'
-five-round cap is kept, GSD's stall detection is added (a finding that reopens, or an open count that
-does not fall), and a ledger line `fix round R/5: closed X, reopened Y, open Z` shows it. The
-departure is named: the first stall stops the loop and sends the open findings to the owner, where
-Superpowers would carry on to the cap. The duplicate rule in `model-routing-and-cost.md` is replaced by
+five-round cap is kept, and stall detection from the open-source Get Shit Done (GSD) workflow is added
+(a finding that reopens, or open findings that stop going down), with a ledger line
+`fix round R/5: closed X, reopened Y, open Z` per round. The departures are named: on the first stall
+the next round goes to a fresh implementer on a more capable model (the same model at the top tier);
+on a second stall, or at round 5, dispatching stops and the controller adjudicates the open findings
+(park with a ruling, or blocked to the owner), where Superpowers adjudicates only at the cap. An
+explicit owner instruction to continue is followed after one pushback. The duplicate rule in `model-routing-and-cost.md` is replaced by
 a pointer.
 
 **Tests and evals.** 73 unit tests (55 in 0.3.0). 14 new eval cases, each criterion graded on its own:
@@ -50,16 +54,21 @@ of eval are read differently. *Capability evals* test new behaviour (the `rc-*` 
 `fix-loop-bounded`, `instruction-file-compression`); they are expected to climb from release to
 release, so a criterion still red is recorded as known red instead of holding the release.
 *Regression evals* test the cases that existed in 0.3.0; they must hold, and they did as far as
-measured. The root-cause criteria rose from 5/75 criterion-runs on 0.3.0 to 45/75 on 0.4.0, with 16
-of 25 criteria green (2 of 3 or better).
+measured. This is a recorded exception to `references/behaviour-evals.md`, whose test-first rule says
+a new rule's case must pass on the changed instructions; the rule text is unchanged. The
+root-cause criteria rose from 5/75 criterion-runs on 0.3.0 to 45/75 on 0.4.0, with 16 of 25
+criteria green (2 of 3 or better).
 
 **Known red (capability evals), head passes of 3:**
 - Targeted by fix round A and still below 2 of 3: `rc-01` c1 0/3, c2 1/3; `rc-03` c2 0/3; `rc-04` c1
   1/3; `rc-05` c3 0/3; `fix-loop-bounded` c1 1/3, c2 0/3; `instruction-file-compression` c4 0/3.
-- Not targeted: `rc-08` c1 0/3, c2 0/3; `rc-09` c1 0/3, c2 1/3.
+- Not targeted: `rc-08` c1 0/3, c2 0/3; `rc-09` c1 0/3, c2 1/3; `instruction-file-compression` c2 1/3
+  (2/3 before fix round A).
 - The common pattern, read from the answers: the reply still opens with a verdict sentence, or argues
-  a suspect out, before the evidence lines, or never asks for a working run. In `fix-loop-bounded`
-  the reply recommends a fresh implementer rather than stopping. Judge doubts on two criteria
+  a suspect out, before the evidence lines (`rc-01`, `rc-03`), or in `rc-04` never asks for a
+  working run. `rc-05` c3's grader is stricter than the aligned RC-5, which allows a labelled
+  [hypothesis] after a `requested` line; the two are reconciled in the follow-up below. In
+  `fix-loop-bounded` the reply recommends a fresh implementer rather than stopping. Judge doubts on two criteria
   (compression c4 run 2, fix-loop c2 runs 1 and 2) would not change either verdict if ruled.
 - Follow-up: **evidence-first ordering made structural**, carried by the shape of the reply rather
   than by more wording in the reference.
@@ -75,7 +84,7 @@ of 25 criteria green (2 of 3 or better).
   11/12, `state-claim-measured` 3/3. `live-deploy-safeguards` is 0/3 on both versions (red before
   0.4.0, not a drop).
 
-**Eval results, after fix round A (07b6c26, current graders)** (Opus agent, Sonnet judge, ablation
+**Eval results, after fix round A (969d99b, current graders)** (Opus agent, Sonnet judge, ablation
 none, `-j 1`; head 3 runs unless stated; base 0.3.0 runs used the current case folders).
 - Targeted criteria met at 2 of 3: `rc-03` c1 3/3, c3 2/3; `fix-loop-bounded` c3 2/3 (base 0/9).
 - RC criteria on head: 45/75 (30/75 before fix round A). `rc-10` on 0.3.0 with the rewritten c1: c1

@@ -82,7 +82,7 @@ Each case also carries `skill-fired.md` (indicator only). A row marked known red
 | RC-4: three separate statements, code decided, input said, model concluded, each with its source | G33 | `rc-04-objection/graders/c2-three-lines-apart.md` |
 | RC-5 Diff the served inputs: block-by-block diff against each working population, from inputs as sent | G34 | `rc-05-diff/graders/c1-diffs-model-inputs.md` |
 | RC-5: a flip on a supposedly identical input is a sign of a missing fact, not the cause. **Guard, not RC-5 proof**: 0.3.0 already passes it 2 of 3 | G34 | `rc-05-diff/graders/c2-flip-is-a-sign-not-cause.md` |
-| RC-5: obtain the working run first and use it as the baseline before offering a cause. **Known red (capability)**: 0/3 on 0.4.0 | G34 | `rc-05-diff/graders/c3-working-run-first.md` |
+| RC-5: obtain the working run first and use it as the baseline before offering a cause. **Known red (capability)**: 0/3 on 0.4.0; this grader is stricter than the aligned RC-5 (a labelled hypothesis after a `requested` line), to be reconciled in the structural-ordering follow-up | G34 | `rc-05-diff/graders/c3-working-run-first.md` |
 | RC-6 Inventory the concept: list what already handles it, and extend it, before any remedy | G35 | `rc-06-inventory/graders/c1-inventory-before-remedy.md` |
 | RC-6: deployed is not fired; check the ancestor and ask for evidence the path ran | G35 | `rc-06-inventory/graders/c2-deployed-is-not-fired.md` |
 | RC-7 Trace the dropped fact: name the guard that drops a computed fact and confirm in the input as sent | G36 | `rc-07-trace-dropped-fact/graders/c1-names-the-guard.md` |
@@ -104,7 +104,7 @@ Each case also carries `skill-fired.md` (indicator only). A row marked known red
 | Rule | Gap id | Grader (`<case>/graders/…`) |
 |---|---|---|
 | Instruction file compression: archive the whole file verbatim first and prove the copy equals HEAD | G42 | `instruction-file-compression/graders/c1-archive-verbatim-first.md` |
-| Compression: sort sections by kind and treat each kind differently | G42 | `instruction-file-compression/graders/c2-classify-and-route.md` |
+| Compression: sort sections by kind and treat each kind differently. **Known red (capability)**: 1/3 on 0.4.0 | G42 | `instruction-file-compression/graders/c2-classify-and-route.md` |
 | Compression: every added claim carries its source; one-line rules kept as a grep checklist | G42 | `instruction-file-compression/graders/c3-new-claims-sourced-one-liners-kept.md` |
 | Compression: a different-model reviewer diffs old against new before the commit. **Known red (capability)**: 0/3 on 0.4.0 | G42 | `instruction-file-compression/graders/c4-independent-diff-review.md` |
 | Compression: the file states its own size rule; a secret and personal-data scan runs before the push | G42 | `instruction-file-compression/graders/c5-size-rule-and-push-scan.md` |

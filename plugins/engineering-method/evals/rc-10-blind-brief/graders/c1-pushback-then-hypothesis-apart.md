@@ -1,5 +1,5 @@
 ---
-# Guard, not RC-10 proof: after the owner-wins rewrite 0.3.0 passes it (fix round A review, base run 1). RC-10's proof is c2.
+# Guard, not RC-10 proof: after the owner-wins rewrite 0.3.0 passes it (a 0.3.0 base run passed it), so it cannot show RC-10 working. RC-10's proof is c2.
 type: llm
 weight: 1
 ---

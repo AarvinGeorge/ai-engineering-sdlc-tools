@@ -15,7 +15,7 @@ Exists line and RC-8 calls it by name.
 ## Using the steps
 
 - **By name, at the trigger.** Invoke each step by name when its trigger fires, and report one
-  line per step: `RC-n done: <evidence>`, `RC-n requested: <the read, its source>` or
+  line per step: `RC-n done: <evidence>`, `RC-n requested: <the read, its source, its command>` or
   `RC-n skipped: <reason>`.
 - **Scaled by stakes.** Tier a: systematic-debugging plus RC-8's labels. Tier b: every step that
   applies, each reported done or skipped. Tier c: the same, and RC-8's record gate and RC-9 are
@@ -125,7 +125,8 @@ explanation.
 
 *Why:* "the model is not deterministic" closed the source case's inquiry for an hour; a diff of
 served inputs would have shown that no instance received the fact and that only names and
-phrasing varied. *Test:* the working run is named before any cause is offered, the report shows
+phrasing varied. *Test:* the working run is named, or requested in the RC-5 line, before any cause
+(a later cause is labelled [hypothesis]); the report shows
 the block diff and k of N, and it never gives randomness as a cause.
 
 ### RC-6 Inventory the concept

@@ -62,7 +62,7 @@ review. This file says who reviews, what they must do, and when to stop.
   Baseline, Superpowers' `subagent-driven-development`: at most five rounds per task (per document,
   for a plan or deploy-file review); rounds 1-3 resume the implementer, rounds 4-5 take a fresh
   implementer on a more capable model; after round 5 the controller adjudicates each open finding
-  (park it with a ruling, or BLOCKED to the owner). GSD's `gates.md` adds stall detection: escalate
+  (park it with a ruling, or BLOCKED to the owner). GSD (the open-source Get Shit Done workflow) adds stall detection in its `gates.md`: escalate
   early when the issue count does not fall between iterations. **A round stalls** when a finding
   marked addressed comes back open, or when Z is above zero and not lower than after the previous
   round (the review itself, for round 1). Stalls count per task (per document, for a plan or

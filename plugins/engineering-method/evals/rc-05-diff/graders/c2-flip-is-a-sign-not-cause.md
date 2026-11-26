@@ -1,5 +1,5 @@
 ---
-# Guard, not RC-5 proof: 0.3.0 already passes it 2 of 3 (Task 2 base run). RC-5's proof is c1 and c3.
+# Guard, not RC-5 proof: 0.3.0 already passes it 2 of 3 (measured on the 0.3.0 base run), so it cannot show RC-5 working. RC-5's proof is c1 and c3.
 type: llm
 weight: 1
 ---
