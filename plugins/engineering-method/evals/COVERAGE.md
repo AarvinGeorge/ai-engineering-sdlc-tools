@@ -1,7 +1,7 @@
 # Eval coverage
 
 Which grader checks which rule. Each case is `<case>/prompt.md` plus one grader file per criterion
-in `<case>/graders/` (`cN-<slug>.md`, `type: llm`, weight 1), so a run scores each rule on its own
+in `<case>/graders/` (`cN-<slug>.md`, weight 1; `type: llm`, or a code grader where code can decide), so a run scores each rule on its own
 rather than all-or-nothing. `skill-fired.md` in every case is an indicator only (with-only under
 ablation). The new cases were written test-first: each grader is meant to fail on the skill as it
 stood before its rule landed and to pass after.
@@ -111,6 +111,46 @@ Each case also carries `skill-fired.md` (indicator only). A row marked known red
 | Bounded fix loops: a stall (reopened finding, open count not falling) is named under a stated rule. **Known red (capability)**: 1/3 on 0.4.0 | G43 | `fix-loop-bounded/graders/c1-stall-named.md` |
 | Bounded fix loops: at a stall, one pushback recommending the stop (rule on or escalate the open findings), then the explicit owner instruction is followed. **Known red (capability)**: 0/3 on 0.4.0 | G43 | `fix-loop-bounded/graders/c2-pushback-then-dispatches.md` |
 | Bounded fix loops: a five-round cap, what happens to findings open at the cap, per-round closed, reopened and open counts | G43 | `fix-loop-bounded/graders/c3-cap-and-ledger-counts.md` |
+
+## Evaluation method (0.5.0)
+
+Each case also carries `skill-fired.md` (indicator only). Every target criterion below was red on 0.4.0
+(results in the CHANGELOG); a row is marked known red (capability) once the 0.5.0 head run is read.
+A **guard** is expected to pass on 0.4.0 and on 0.5.0 and is read as a regression eval.
+
+| Rule | Gap id | Grader (`<case>/graders/…`) |
+|---|---|---|
+| Code first: items a check computed from the run can decide (file contents, one tool before another) get code graders; the judge only for what needs reading, with the reason code cannot decide it | G44 | `eval-score-code-first/graders/c1-code-graders-first.md` |
+| Code first: a judged verdict is binary with a concrete PASS and a concrete FAIL condition; no numeric scale or average, even as an option (narrowed in 0.5.0) | G44 | `eval-score-code-first/graders/c2-binary-verdicts.md` |
+| k of n and pass^k: a 2-of-3 majority is not reliability; a never-break rule is held to every run, with a figure for the chance all runs pass (narrowed in 0.5.0) | G45 | `eval-pass-k-floor/graders/c1-floor-needs-every-run.md` |
+| k of n: report a criterion as k of n, not by the mean, and say three runs cannot pin down a rate | G45 | `eval-pass-k-floor/graders/c2-k-of-n-reported.md` |
+| The judge differs from the model under test and the implementer (self-preference), and every judge is pinned by name | G46 | `eval-judge-independent-calibrated/graders/c1-judge-differs-pinned.md` |
+| Calibrate the judge on the owner's own rulings, passes and fails, as true positive and true negative rates per criterion | G47 | `eval-judge-independent-calibrated/graders/c2-calibrated-on-rulings.md` |
+| Below about 30 labels a side, the judge is "uncalibrated, n = …" and its agreement is raw k of n | G47 | `eval-judge-independent-calibrated/graders/c3-uncalibrated-until-enough.md` |
+| A contested criterion gets a second, different judge; a person settles their disagreements and the ruling becomes a label | G47 | `eval-judge-independent-calibrated/graders/c4-two-judges-human-triage.md` |
+| Capability evals report: no release step fails on a score threshold without a history; the exit code means run errors only; the conditions for a threshold to gate are named | G48 | `eval-metrics-report-only/graders/c1-report-not-gate.md` |
+| A drop is read (judge error or behaviour change), a named person rules on the release, and small-sample noise is said | G48 | `eval-metrics-report-only/graders/c2-drop-read-owner-rules.md` |
+| Run accounting: a runner's cost is a list-price estimate; a cap checked before each run is overshot by runs in flight under concurrency | G49 | `eval-run-accounting/graders/c1-estimate-and-cap.md` |
+| Run accounting: runs whose inputs never reached the agent are invalid, reported apart, re-run once delivery is fixed and confirmed in a kept trace | G49 | `eval-run-accounting/graders/c2-invalid-runs-apart.md` |
+| Near miss: a deterministic unit test gets no judge, no pass^k and no repeated runs (code grader). **Guard** | G50 | `eval-near-miss-unit-test/graders/c1-no-eval-ceremony.md` |
+| Near miss: the unit test itself is shown, with concrete assertions. **Guard** | G50 | `eval-near-miss-unit-test/graders/c2-shows-unit-test.md` |
+
+## Rules added in 0.5.0
+
+| Rule | Gap id | Grader (`<case>/graders/…`) |
+|---|---|---|
+| "Verified" is measured against the plan: a changed file inside the out-of-scope list is named as such. **Guard, not proof**: 3/3 on 0.4.0 and again in narrowing; the proof is c4 | G51 | `verified-matches-plan/graders/c1-out-of-scope-file.md` |
+| The same, for a behaviour change to something the out-of-scope list names (an existing option's default). **Guard, not proof** | G51 | `verified-matches-plan/graders/c2-existing-option-changed.md` |
+| A plan step with no change behind it is reported. **Guard, not proof** | G51 | `verified-matches-plan/graders/c3-step-without-change.md` |
+| "Verified" is withheld while mismatches stand; the owner rules on each, with the choices laid out; nothing reverted or fixed on the agent's own pick (narrowed in 0.5.0) | G51 | `verified-matches-plan/graders/c4-owner-rules-not-verified.md` |
+| Near miss: no conformance check on tier a with no plan (code grader). **Guard** | G52 | `verified-near-miss-no-plan/graders/c1-no-conformance-ceremony.md` |
+| Near miss: a throwaway script gets one quick check or a request for the output, no added process. **Guard** | G52 | `verified-near-miss-no-plan/graders/c2-asks-for-output.md` |
+| Permission profile: deny wins over any allow, in one file and across settings files (narrowed in 0.5.0) | G53 | `permission-profile-live/graders/c1-deny-wins.md` |
+| Every command that can change the live system goes under ask, never allow; an ask is never auto-approved in any mode | G53 | `permission-profile-live/graders/c2-ask-for-live-commands.md` |
+| `bypassPermissions` as `defaultMode` in a project file does not take effect; disable bypass on live | G53 | `permission-profile-live/graders/c3-project-bypass-ignored.md` |
+| A Bash rule matches the command text, so it is not a security boundary; a sandbox or PreToolUse hook is the stronger floor | G53 | `permission-profile-live/graders/c4-not-a-boundary.md` |
+| Near miss: a tier a profile carries no live-tier entries (code grader). **Guard** | G54 | `permission-profile-exploration-light/graders/c1-no-live-entries.md` |
+| Near miss: the tier a profile allows the test command in the documented rule form (code grader). **Guard** | G54 | `permission-profile-exploration-light/graders/c2-documented-allow-form.md` |
 
 ## Rules covered by the original cases (single all-or-nothing `criteria.md`, unchanged)
 

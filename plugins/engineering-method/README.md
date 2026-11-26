@@ -37,6 +37,34 @@ skill.
   more capable model (the same model at the top tier); after a second stall, or at round 5,
   dispatching stops and the open findings are adjudicated: parked with a ruling, or brought to you.
   If you then say to continue anyway, the agent pushes back once and does as asked.
+- **You type "Which graders should this new eval case use?"** The hook sees the test stage and
+  injects: `engineering-method: stage test — re-read SKILL.md §3 row 'test', load superpowers:verification-before-completion, read references/measurement-and-state-claims.md, references/behaviour-evals.md before acting; keep the stakes tier you named.` The agent then puts a code check (a pattern over
+  the reply, a tool called, a file created) wherever one can decide, keeps an LLM judge for what
+  needs reading and says why code cannot decide it, and writes binary pass and fail conditions
+  instead of a score to average. It pins the judge by name, on a different model from the one under
+  test and the one that wrote the instructions, and calls the judge "uncalibrated, n = …" until
+  enough of your own rulings back it.
+- **You type "The eval says 2 of 3. Can we call it reliable?"** The hook injects the same test-stage
+  line, unless the test stage was already announced in this session. The agent reports k of n per
+  criterion, holds a rule that must never break to every run (pass^k), and says how little three runs can prove. A run whose inputs
+  never reached the agent is reported apart, as invalid. A new rule's case still red is recorded as
+  known red; a drop on an existing case gets more runs and a reading of the answers, then goes to
+  you.
+- **You type "All tests pass, mark it verified".** The hook injects the same test-stage line. On
+  tier b or c the agent first compares the diff with the plan's steps and its out-of-scope list. It
+  lists each mismatch with file and line: out of scope, a step with no change, or a change nobody
+  asked for. It withholds "verified" until you rule on each one, and fixes nothing on its own. With
+  no mismatch it says so with the counts and the command, for example
+  `diff matches the plan: 5 steps, 4 out-of-scope lines checked`. On a throwaway script with no plan
+  it does none of this.
+- **You type "Write the project settings file for our production service".** The hook sees the
+  deploy stage and injects: `engineering-method: stage deploy — re-read SKILL.md §3 row 'deploy', read references/live-system-changes.md before acting; keep the stakes tier you named.` That reference's
+  standing rules point to `references/permission-profiles.md`, and the agent gives you its live
+  profile to paste into the committed `.claude/settings.json`: what must never run under deny, every
+  command that can change the live system under ask, and bypass disabled. It explains that deny wins
+  over any allow in any settings file, and that a Bash rule matches the command text, not the
+  program, so a sandbox or a PreToolUse hook is the hard floor. It never edits your settings file
+  itself.
 - **You ask which model should review a change.** The answer is a different model from the one that
   wrote it, at least as strong, and the reviewer runs probes rather than reading the diff.
 
@@ -99,7 +127,7 @@ claude plugin eval plugins/engineering-method    # spends model calls; run delib
 
 The cases check behaviour, not wording: a prototype must not get live-system ceremony; a test
 report must show the command and its output; the reviewer must be a different model from the
-implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled; the root-cause cases (`rc-01` to `rc-10`, plus `rc-activation-loads-reference` and the near-miss guard `rc-near-miss-rename`) check each investigation step at its trigger; `instruction-file-compression` checks that an always-loaded file is shrunk without losing a rule; `fix-loop-bounded` checks the round cap and stall rule. Each case also carries a skill-fired indicator (not scored).
+implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled; the root-cause cases (`rc-01` to `rc-10`, plus `rc-activation-loads-reference` and the near-miss guard `rc-near-miss-rename`) check each investigation step at its trigger; `instruction-file-compression` checks that an always-loaded file is shrunk without losing a rule; `fix-loop-bounded` checks the round cap and stall rule; the `eval-*` cases check how evals are graded, repeated, judged, gated and accounted for (with the near-miss guard `eval-near-miss-unit-test`); `verified-matches-plan` checks "verified" against the plan (guard `verified-near-miss-no-plan`); `permission-profile-live` checks the live settings profile (guard `permission-profile-exploration-light`). Each case also carries a skill-fired indicator (not scored).
 
-Every new rule ships with its case, written first: it fails on the skill without the rule and
-passes with it (`references/behaviour-evals.md`). `evals/COVERAGE.md` maps each rule to its case.
+Every new rule ships with its case, written first: it fails on the skill without the rule, and its
+result with the rule is reported beside it (`references/behaviour-evals.md`). `evals/COVERAGE.md` maps each rule to its case.
