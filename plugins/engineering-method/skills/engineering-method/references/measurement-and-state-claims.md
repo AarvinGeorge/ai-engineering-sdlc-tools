@@ -83,7 +83,12 @@ parked, copied into the next session's notes unchecked, then cited as fact while
 moving a plan item to its `verified` stage, compare the diff with the plan's steps and its
 out-of-scope list:
 
-1. Read the plan's steps and out-of-scope list, then `git diff --stat <base>...HEAD` and the hunks.
+1. Read the plan's steps and out-of-scope list, then `git diff --stat=200 <base>...HEAD` and the hunks.
+   Save the plan text, that diff-stat and the hunks to one file, then
+   `python3 <the skill's base directory>/scripts/plan_conformance.py <that file>` does steps 1 and 2 (the base
+   directory is the one the Skill tool printed when the skill loaded); paste its block as printed.
+   Call it by its full path, not after cd. If it prints ERROR: cannot compare, do steps 1 and 2 by
+   hand and say the script could not read the plan.
 2. List every mismatch with file and line, in three kinds:
    - **out of scope:** a change the out-of-scope list rules out, including a change in behaviour to
      something it names, not only a file or folder it names;
@@ -92,7 +97,7 @@ out-of-scope list:
 3. Report them as findings and withhold "verified" while any stands. The owner rules on each (keep
    and add it to the plan, revert it, move it to a later item, or carry out the step). Do not revert or fix on your own.
 4. None found: say so with the counts and the command, e.g. "diff matches the plan: 5 steps, 4
-   out-of-scope lines checked (`git diff --stat <base>...HEAD`)".
+   out-of-scope lines checked (`git diff --stat=200 <base>...HEAD`)".
 
 Tier a has no plan; nothing here applies, and nothing about it is said.
 

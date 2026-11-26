@@ -465,5 +465,24 @@ class Wiring(unittest.TestCase):
         self.assertEqual(missing, [])
 
 
+def load_hook():
+    """Import scripts/method_hook.py by path (as test_skill_budget.load_hook does)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("method_hook", SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestStageNote(unittest.TestCase):
+    def test_test_stage_names_conformance_within_400(self):
+        hook = load_hook()
+        st = [s for s in hook.STAGES if s["stage"] == "test"][0]
+        msg = hook.stage_message(st)
+        self.assertIn("plan_conformance.py <plan+diff file>", msg)
+        self.assertLessEqual(len(msg), 400)
+        self.assertTrue(msg.endswith("named."), "the message was truncated at 400 characters")
+
+
 if __name__ == "__main__":
     unittest.main()
