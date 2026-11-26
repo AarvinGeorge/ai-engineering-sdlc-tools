@@ -113,7 +113,53 @@ case; P pass, F fail). Every target criterion is red on 0.4.0, so each case meas
 - Cost: 42 agent runs (30 base, 12 narrowing), about $9.03 (an estimate, billed to a subscription),
   against a $14 stage cap. Two caps were overshot by the run in flight.
 
-**Head and regression results:** MEASURED IN THE HEAD RUN, to be filled in before release.
+**Head results on 0.5.0** (same flags, 3 runs per case, base column from the base run above). Read
+under the owner's ruling of 26 Nov 2026: the new criteria are capability evals and are reported; one
+below 2 of 3 on the head is known red; the existing cases are held. **15 of 20 new target criteria
+are 2 of 3 or better on the head** (from 0 of 20 on 0.4.0).
+- Green: `eval-score-code-first` c1 0/3 → 3/3, c2 0/3 → 3/3; `eval-pass-k-floor` c2 0/3 → 3/3;
+  `eval-metrics-report-only` c1 0/3 → 3/3, c2 1/3 → 2/3; `eval-judge-independent-calibrated` c1
+  1/3 → 2/3, c3 0/3 → 3/3, c4 0/3 → 2/3; `eval-run-accounting` c1 0/3 → 2/3;
+  `permission-profile-live` c2 0/3 → 2/3, c3 0/3 → 3/3, c4 0/3 → 2/3.
+- **Known red (capability), head passes of 3:** `eval-pass-k-floor` c1 1/3 (read: two of three
+  answers carry the pass^k figure, one a judge error); `eval-judge-independent-calibrated` c2 0/3
+  (grader, below); `eval-run-accounting` c2 1/3 (the reference was read; the answers re-run the
+  invalid case without tying it to a kept trace); `verified-matches-plan` c4 0/3 (no reference was
+  read in any run: the `test` stage cell alone produced the mismatch list but not the hand-back to the
+  owner); `permission-profile-live` c1 0/3 (the reference was read; no answer says the committed
+  deny holds against a teammate's user or local settings).
+- Guards hold: `verified-matches-plan` c1, c2, c3 3/3; `eval-near-miss-unit-test` c1, c2 3/3;
+  `verified-near-miss-no-plan` c1, c2 3/3; `permission-profile-exploration-light` c1, c2 2/2 valid
+  runs (the third was not started: the two runs cost about $0.9 each against about $0.37 on 0.4.0,
+  and the second crossed the cap).
+
+**Regression results** (the 35 existing cases, paired: base 0.4.0 and head, 3 runs each). No
+unexplained drop. Five criteria in four cases fell below 2 of 3; each was read and tested (two-sided
+Fisher exact):
+- `eval-plan-as-dataset` c4 3/3 → 0/3, pooled to 6 runs per version: base 3/6, head 1/6, p = 0.55.
+  The criterion is a coin flip on 0.4.0 too, decided by whether the answer states that the agent
+  never sees the graders; noise.
+- `rc-07-trace-dropped-fact` c1 3/3 → 1/3, p = 0.40: the failing answers do what the Pass line asks
+  and the judges split; judge error or noise. The files the runs read are unchanged in 0.5.0.
+- `rc-10-blind-brief` c1 3/3 → 1/3, p = 0.40: run-to-run wording (a cache detail named before the
+  hypothesis section); files unchanged.
+- `instruction-file-compression` c2 and c3 2/3 → 1/3, p = 1.0 each: phrasing variance on a criterion
+  already borderline on 0.4.0; the one sentence 0.5.0 adds to that file is unrelated.
+- `rc-02-decision-record` c2, 0/3 on the head against a 2/3 record from before 0.4.0's own edits:
+  re-run on the 0.4.0 base, c1 2/3 and c2 0/3 on both versions (p = 1.0), the same files read and the
+  same answers (the tool and turn counts on the logged line left unmapped). Red before 0.5.0, not a
+  drop.
+
+**Known issues, for a later release (not fixed here):** two graders disagree with the reference they
+test. `eval-judge-independent-calibrated` c2 asks for true positive and true negative rates even with
+two labels, while the reference, and c3, say that below about 30 labels a side the report gives raw
+counts; every head answer follows the reference. `eval-pass-k-floor` c1 asks for a pass^k figure,
+which is stricter than the rule's Test line (floor criteria report n of n). Neither grader was edited
+after the head run, since that would need a fresh base run to keep the two versions comparable.
+
+**Cost:** 265 agent sessions in the release (42 base and narrowing, 29 head, 191 regression and
+re-runs, 3 for the `rc-02` base check), about $61.31. These are list-price estimates from the
+runner, billed to a claude.ai subscription, not spend.
 
 ## 0.4.0 — 2026-11-26
 
