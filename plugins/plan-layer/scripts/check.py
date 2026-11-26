@@ -22,7 +22,7 @@ Stdlib only, no arguments needed.
   check.py --json    # machine output for the session hooks
   check.py --strict  # exit 1 on DRIFT as well
   check.py --event <name>  # the controller's event rules fire for that event
-  check.py --verify  # run the plan's assertions against the real system
+  check.py --verify  # run the plan's assertions and invariant checks against the real system
                      # (explicit only — never run from a hook)
 """
 import hashlib
@@ -145,14 +145,49 @@ def parse_iso(s):
         return None
 
 
+CHECK_TIMEOUT = 60  # seconds; the assertion default
+
+
+def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
+    """Run one plan-declared command the way --verify always has.
+
+    What: `bash -lc <cmd>` in the project root with the --verify environment.
+    Use when: only from verify(), which runs only on an explicit `check.py --verify`.
+    Inputs: command string, working directory, environment dict, timeout seconds.
+    Output: (returncode, stripped stdout, stripped stderr); raises subprocess.TimeoutExpired
+    on timeout (the whole process group is killed first) or another error on spawn failure.
+    Side effects: executes a command read from plan.json, in its own session, with stdin
+    closed (/dev/null); on timeout its whole process group is killed.
+    Role: PLUMBING (one runner for assertions and invariant checks).
+    """
+    import signal
+    import subprocess as sp
+    p = sp.Popen(["bash", "-lc", cmd], cwd=cwd, stdin=sp.DEVNULL, stdout=sp.PIPE,
+                 stderr=sp.PIPE, env=env, start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except sp.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            p.communicate(timeout=5)  # a child that left the group may still hold the pipes
+        except sp.TimeoutExpired:
+            pass
+        raise
+    dec = lambda b: (b or b"").decode("utf-8", errors="replace").strip()  # noqa: E731
+    return p.returncode, dec(out), dec(err)
+
+
 def verify(root=None):
-    """Run the plan's own assertions against the real system.
+    """Run the plan's own assertions and invariant checks against the real system.
 
     This is the one thing a structural gate cannot do on its own: decide
     whether a claim is TRUE. The plan states how each claim is checked, and
     this runs those checks and compares.
 
-    SECURITY, and the reason this is never automatic: assertions are shell
+    SECURITY, and the reason this is never automatic: assertions and invariant checks are shell
     commands read out of a JSON file in the repository. Running them on session
     start would mean cloning a repository executes its author's commands. So
     they run only when a human types `check.py --verify`, never from a hook,
@@ -163,8 +198,11 @@ def verify(root=None):
     P = L.paths(root)
     d = json.load(open(P["src"], encoding="utf-8"))
     items = d.get("assertions") or []
-    if not items:
-        print("  no assertions declared — nothing to verify against the real system")
+    inv_declared = [i for i in d.get("invariants") or [] if "check" in i]
+    inv_checks = [i for i in inv_declared
+                  if isinstance(i.get("check"), str) and i["check"].strip()]
+    if not items and not inv_declared:
+        print("  no assertions or invariant checks declared — nothing to verify against the real system")
         return 0, 0
 
     # One gather, many checks.
@@ -208,15 +246,13 @@ def verify(root=None):
             print("  SKIP    %s — no `run` command" % claim)
             continue
         try:
-            r = sp.run(["bash", "-lc", cmd], cwd=P["root"], capture_output=True,
-                       text=True, timeout=a.get("timeout", 60), env=env)
-            got = r.stdout.strip()
+            rc, got, err = run_command(cmd, P["root"], env, a.get("timeout", 60))
             # An empty result from a non-zero exit is the command failing, not
             # the claim being false. Saying so is the difference between a
             # useful signal and a false alarm.
-            if not got and r.returncode != 0:
+            if not got and rc != 0:
                 print("  ERRORED %-46s command exited %d: %s"
-                      % (claim, r.returncode, (r.stderr or "").strip()[:60]))
+                      % (claim, rc, err[:60]))
                 bad += 1
                 continue
         except Exception as exc:
@@ -231,14 +267,49 @@ def verify(root=None):
         else:
             bad += 1
             print("  MISMATCH %-45s expected=%r actual=%r" % (claim, exp, got[:80]))
+    for inv in inv_declared:
+        rule, state = inv.get("rule", "?"), inv.get("state")
+        if inv not in inv_checks:
+            # Present but not runnable ("   ", a list, null): never a silent pass,
+            # and never a reason to move the verified stamp.
+            bad += 1
+            print("  FAIL    invariant %r: check is not a runnable command" % rule)
+            continue
+        try:
+            rc, out, err = run_command(inv["check"], P["root"], env, CHECK_TIMEOUT)
+        except sp.TimeoutExpired:
+            bad += 1
+            print("  ERRORED invariant %r (state %r): check timed out after %ds"
+                  % (rule, state, CHECK_TIMEOUT))
+            continue
+        except Exception as exc:
+            bad += 1
+            print("  ERRORED invariant %r (state %r): check could not run: %s"
+                  % (rule, state, str(exc).splitlines()[0][:80] if str(exc) else type(exc).__name__))
+            continue
+        if rc == 127:
+            bad += 1
+            print("  ERRORED invariant %r (state %r): check could not run: command not found (exit 127)"
+                  % (rule, state))
+        elif rc == 0:
+            ok += 1
+            print("  HOLDS   invariant %r (state %r)" % (rule, state))
+        else:
+            bad += 1
+            # First line only, on the FAIL line itself, so a check's own output
+            # can never print a forged HOLDS line of its own.
+            first = ((err or out).splitlines() or [""])[0][:80]
+            first = re.sub(r"[^\x20-\x7e]", "?", first)
+            print("  FAIL    invariant %r (state %r): check exited %d: %s"
+                  % (rule, state, rc, first))
     if facts_path:
         try:
             os.unlink(facts_path)
         except Exception:
             pass
-    print("\n  %d matched, %d mismatched, %d declared" % (ok, bad, len(items)))
+    print("\n  %d matched, %d mismatched, %d declared" % (ok, bad, len(items) + len(inv_declared)))
     if bad:
-        print("  note: an assertion that ERRORED is a broken check, not a broken claim.")
+        print("  note: ERRORED means the command could not run (a broken check, not a broken claim); MISMATCH or FAIL means it ran and disagreed.")
     return ok, bad
 
 
@@ -582,6 +653,9 @@ def run(root=None, event=None):
         if inv.get("state") not in VALID_INV:
             fails.append("invariant %r: state=%r is not one of %s"
                          % (inv.get("rule"), inv.get("state"), sorted(VALID_INV)))
+        if "check" in inv and not (isinstance(inv["check"], str) and inv["check"].strip()):
+            fails.append("invariant %r: check must be a non-empty shell command string"
+                         % inv.get("rule"))
 
     ids = [c.get("id") for c in caps]
     dupes = {i for i in ids if ids.count(i) > 1}
@@ -635,9 +709,12 @@ def run(root=None, event=None):
 
     # Assertions exist to be run. Declared and never run is worse than none,
     # because the page looks verified.
-    if d.get("assertions") and not d.get("meta", {}).get("assertions_verified"):
-        drifts.append("%d assertions declared but never recorded as run — "
-                      "`check.py --verify`" % len(d["assertions"]))
+    n_checks = len(d.get("assertions") or []) + sum(
+        1 for i in d.get("invariants") or []
+        if isinstance(i.get("check"), str) and i["check"].strip())
+    if n_checks and not d.get("meta", {}).get("assertions_verified"):
+        drifts.append("%d assertion(s) and invariant check(s) declared but never recorded as run — "
+                      "`check.py --verify`" % n_checks)
     av = parse_iso(d.get("meta", {}).get("assertions_verified"))
     if av and (datetime.now(timezone.utc) - av).days > 7:
         drifts.append("assertions last verified %d days ago"

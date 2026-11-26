@@ -445,6 +445,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" --verify
 **Never run these from a hook or without being asked.** They are shell commands from
 a repository file. Explicit human request only.
 
+An invariant may carry `check`, a command whose exit code is its truth; `--verify` runs it after the assertions and a failing one is a FAIL naming the invariant. Its `state` stays hand-set. A check runs as `bash -lc` with the user's full environment and write access, the same trust as the project's own scripts, which is why it runs only on `--verify`.
+
 **Write them as one gather, many checks.** Separate connections per assertion are
 slow and can trip a host's rate limiting. Keep the remote command trivial and match
 locally; a check that errors looks identical to a claim that is false.

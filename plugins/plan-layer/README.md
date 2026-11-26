@@ -48,6 +48,14 @@ drift.** **Session hooks brief the agent before the first word is typed.**
   ```
 
   Add the five to the script, or exempt each one with a written `why`.
+- **An invariant says "holding" and nobody has looked.** Give it a `check`, a command whose exit code
+  is the truth. `check.py --verify` runs it and prints:
+
+  ```
+  FAIL    invariant 'no debug prints left in src' (state 'holding'): check exited 1: src/app.py:1:print("DEBUG x")
+  ```
+
+  The hand-set state is not changed and the verified stamp does not move until the check passes.
 - **A one-week take-home or a spike.** `/plan-layer init --light` gives you the state file, the page
   and the gate, without figures, archive or rolling.
 
@@ -302,6 +310,23 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" --verify
 repository; running them on session start would mean cloning a repository executes
 its author's commands. Explicit `--verify` only, never from a hook, and there is a
 test that proves it.
+
+An invariant can prove itself the same way. Give it a `check`: a command whose exit code is the
+truth (0 holds). `--verify` runs it after the assertions, with the same `$PLAN_FACTS`; a non-zero
+exit is a FAIL naming the invariant, `--verify` exits 1, and the verified stamp does not move.
+The invariant's `state` stays yours to set; the run tells you when it is wrong.
+
+```json
+"invariants": [
+  { "rule": "the unit suite is green", "state": "holding",
+    "check": "python3 -m unittest discover -s tests 2>&1 | tail -1 | grep -Eq '^OK( \\(skipped=[0-9]+\\))?$'" }
+]
+```
+
+The same rule applies: never run automatically, never from a hook, `sync.py` or the gate. A check
+runs as `bash -lc` with your full environment and write access, the same trust as the project's own
+scripts, which is why it runs only on `--verify`. It gets no stdin, a 60-second timeout, and its
+whole process group is killed on timeout.
 
 **Use `assertions_setup`.** One command gathers everything into `$PLAN_FACTS`, and
 each assertion reads from that. Assertions that each open their own connection are
