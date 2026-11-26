@@ -14,9 +14,9 @@ How the parts fit:
 - Each script exits 0 whenever it computed a result, whatever the verdict: it reports and never gates. It exits 2 on bad input.
 - The references tell the model when to run each script and to paste its block as printed.
 - The five eval cases are edited in place:
-  - `max_turns` rises to 12, and `Bash` is listed in `allowed_tools`.
+  - `max_turns` rises to 16, and `Bash` is listed in `allowed_tools`.
   - The run itself grants Bash with `--allow-tools "Bash(python3 *)"`.
-  - New `tool_used` graders prove the script ran. New `regex` graders match the fixed lines in `last_message`.
+  - A `regex` grader on `target: trace` proves the script ran (its block header appears in the tool output; Task 0 measured that Bash output is in the trace). `tool_used` is not scored: it counts denied and failed calls too (Task 0, run 1). Other `regex` graders match the fixed lines in `last_message`.
   - `llm` graders are narrowed to the residual reading.
 
 **Tech stack:** Python 3.10+ stdlib (`argparse`, `csv`, `json`, `math`, `re`, `statistics`, `fnmatch`), `unittest`, `claude plugin eval` (local CLI 2.1.332).
@@ -26,7 +26,9 @@ How the parts fit:
 ## Global constraints
 
 - **Scope is locked** to the five behaviours (`eval-pass-k-floor` c1, `eval-judge-independent-calibrated` c2, `eval-run-accounting` c2, `verified-matches-plan` c4, `permission-profile-live` c1) and the test-stage routing gap. Nothing else.
-- **No new eval cases.** The five existing cases are edited in place.
+- **No new eval cases.** The five existing cases are edited in place. One case's prompt changes what its criteria test (`eval-judge-independent-calibrated`: labels supplied). The CHANGELOG says c2 and c3 were redefined, not closed against the 0.5.0 wording. (Owner's ruling: edit the existing case, no new cases; raised as its own line.)
+- **Python 3.9.** The sandboxed eval runs use `/usr/bin/python3` 3.9.6 (Task 0). Every new script and test runs on Python 3.9: no `match` statements, no runtime `X | Y` unions (`from __future__ import annotations` is fine), no 3.10+ stdlib calls. Each script task runs its tests with `/usr/bin/python3` too.
+- **Eval commands** are prefixed `PATH=/usr/bin:/bin:/usr/sbin:/sbin` with `claude` called by its absolute path (read once with `command -v claude` before the prefix), so the session's `python3` is the system one outside home. They run against a **copy of the plugin outside the home folder** (the sandbox cannot read `~/Documents`, measured in Task 0; the eval uses the plugin folder in place).
 - **Public repo:** no private names, product names, decision ids, tracker ids or links, or emails in any committed file. Say "the owner".
 - **Budgets:**
   - SKILL.md body ≤ 2,200 words (now 2,197).
@@ -48,10 +50,12 @@ How the parts fit:
 | `tool_used` `input_match` is a regex over the JSON-encoded tool input. The docs' own pattern: "assert the command ran with a `tool_used` grader whose `input_match` names the command" | plugin-evals, "Choose graders that give a stable signal" | documented |
 | Bash is removed unless granted at run level with `--allow-tools`. The grant applies to every case in the run. A case's `allowed_tools` cannot widen it | plugin-evals, "Grant tools", "Trust the plugin directory" | documented |
 | With Bash granted, commands run in the OS sandbox: writes confined to the workspace, "your home directory and Claude Code configuration are unreadable" | plugin-evals, "Shell grants need a sandbox" | documented. **Consequence: the plugin must be evaluated from a copy outside the home folder** (this checkout is under `~/Documents`) |
-| `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` are substituted in skill Markdown. They are not in the environment of Bash tool calls | skills, "Available string substitutions"; plugins-reference, "Where each variable resolves" | documented. Substitution in a separately Read reference file: **not documented, hypothesis**. Task 0 settles it |
+| `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` are substituted in skill Markdown. They are not in the environment of Bash tool calls | skills, "Available string substitutions"; plugins-reference, "Where each variable resolves" | documented. **Measured (Task 0):** substituted in SKILL.md; a Read reference file gets the literal text. References therefore say "the skill's base directory" and never carry the variable |
 | The documented bundled-script layout is `<skill>/scripts/x.py`, run as `${CLAUDE_SKILL_DIR}/scripts/x.py` | skills, "Bundled scripts in a scripts/ directory" | documented |
-| Plugin `bin/` is on the Bash PATH while the plugin is enabled, but `bin/` blocks claude.ai/Cowork install | plugins-reference, "Standard layout" | documented; in eval runs **unknown** |
-| `trace` = "the session as JSON, one message per line"; whether tool results are in it | plugin-evals | **not stated**; Task 0 settles it |
+| Plugin `bin/` is on the Bash PATH while the plugin is enabled, but `bin/` blocks claude.ai/Cowork install | plugins-reference, "Standard layout" | documented; **measured not on PATH in eval runs** (`command not found`, Task 0) |
+| `trace` = "the session as JSON, one message per line"; whether tool results are in it | plugin-evals | not stated; **measured yes** (Bash stdout and stderr are trace lines, Task 0) |
+| `tool_used` counts every call, including permission-denied and failed ones | Task 0 run 1 ("Bash called 2x", one denied) | measured; so it is a hint, not proof the script ran |
+| Sandboxed Bash cannot read under the home folder; `python3` on a PATH under home dies; `/usr/bin/python3` 3.9.6 runs | plugin-evals, "Shell grants need a sandbox"; Task 0 runs 1-2 (`PermissionError` on a file under `~/Documents`) | documented and measured |
 | Default `max_turns` 10; hitting it is a run error | plugin-evals, prompt.md table | documented |
 | A scaffold needs `case.yaml` (`schema_version: "1.1"`, `name`, `context.scaffold_script`) and `--scaffold` | plugin-evals, "Seed the workspace"; precedent `evals/rc-03-full-input` | documented, used |
 | Permission order: "deny, then ask, then allow. The first match in that order determines the outcome". "If a tool is denied at any level, no other level can allow it". Lists merge across files | code.claude.com/docs/en/permissions, "Manage permissions", "Settings precedence"; settings, "Lists merge instead of overriding" | documented |
@@ -66,30 +70,31 @@ How the parts fit:
 - **Call:**
   - The references write the call as `python3 <skill base directory>/scripts/<name>.py …`. The Skill tool prints "Base directory for this skill: …" when it loads, and every 0.5.0 trace shows that line.
   - SKILL.md's test cell names `scripts/plan_conformance.py` relative to the same base.
-  - Nothing relies on `${…}` substitution inside a reference file. That is undocumented.
-- **Alternative (one line):** `bin/` on PATH. It gives a simpler call, but it blocks claude.ai/Cowork install, and whether it is on PATH in eval runs is unknown. It is used only as fallback F1.
-- **Task 0** (gated, about $0.30) proves the chosen way works under the eval sandbox before any other paid session.
+  - Nothing relies on `${…}` substitution inside a reference file: Task 0 measured that a Read reference gets the literal text.
+  - The agent calls the script by its full path, never after `cd` (a `cd … &&` prefix is a compound command the `Bash(python3 *)` grant does not cover).
+- **Alternative (one line):** `bin/` on PATH: rejected, it is not on PATH in eval runs (measured) and it blocks claude.ai/Cowork install.
+- **Task 0** ran two probe sessions ($0.36 estimate) and confirmed this way works, given the operator conditions in Global constraints. A third probe (heredoc stdin, multi-line quoted argument) is pending; see Task 0.
 
 ### Per-behaviour decision table
 
 | # | Tool (NEW) and input | Fixed output (key lines) | Code graders (NEW files) | Residual `llm` and why code cannot decide |
 |---|---|---|---|---|
-| 1 `eval-pass-k-floor` c1 | `eval_stats.py floor --name "<criterion>" --results <P/F/I per run>` (P pass, F fail, I invalid; repeatable pairs) | `RUNS: 2 of 3 passed; failed runs: 3; invalid runs: none` · `WILSON95: 0.21-0.94 …` · `PASS_K: pass^3 = 0.30 at the observed rate 0.67` · `PASS_K_LOW: pass^3 = 0.01 …` · `VERDICT: not-reliable (a never-break rule needs 3 of 3)` | `c1a-floor-tool-ran` tool_used Bash `eval_stats\.py\s+floor`; `c1b-pass-k-figure` regex `pass\^3 = 0\.30`; `c1c-floor-verdict` regex `VERDICT: not-reliable` | `c1` narrowed: separates the majority from reliability and does not write the user's "reliable" line. Code cannot decide it because the answer quotes "reliable" while refusing it, and rebuttal versus echo is a reading. The pass^k figure moves to code, which also fixes the 0.5.0 known issue (grader stricter than the rule's Test line) |
-| 2 `eval-judge-independent-calibrated` c2 | `eval_stats.py calibrate --labels -` (CSV on stdin: `answer_id,criterion,owner,judge`). The prompt now carries 9 labels (the user's two disagreements are on answers the user failed) | `LABELS: 9 (owner-pass 6, owner-fail 3)` · `TRUE_POSITIVE: judge passed 6 of 6 answers the owner passed` · `TRUE_NEGATIVE: judge failed 1 of 3 answers the owner failed` · `STATUS: uncalibrated, n = 9 (needs 30 owner-pass and 30 owner-fail; has 6 and 3)` | `c2a-calibrate-tool-ran` tool_used `eval_stats\.py\s+calibrate`; `c2b-owner-pass-side` regex `judge passed 6 of 6 answers the owner passed`; `c2c-owner-fail-side` regex `judge failed 1 of 3 answers the owner failed` | `c2` narrowed: agreement is judged per side, and the answer does not present the overall 7 of 9 as the judge's accuracy. Code cannot decide it because the answer will quote 7 of 9 to rebut it |
-| 3 `eval-run-accounting` c2 | `eval_stats.py runs eval-out/result.json --fixture parse-invoices=resources/`. A scaffold adds `eval-out/result.json` and kept traces | `COUNTS: valid 33, invalid 3, errored 0, no-trace 0` · `CASE: parse-invoices: invalid 3 of 3 (…)` · `RERUN: parse-invoices, after delivery is fixed; confirm with …` · `VERDICT: suite scored on 33 valid runs; 3 invalid reported apart, not counted as failed` | `c2a-runs-tool-ran` tool_used `eval_stats\.py\s+runs`; `c2b-invalid-count` regex `invalid 3,`; `c2c-rerun-confirm` regex `RERUN: parse-invoices`; `c2d-not-counted-failed` regex `3 invalid reported apart, not counted as failed` | **none: fully deterministic.** The old `c2-invalid-runs-apart.md` llm grader is deleted. `c1` (cost estimate and cap) is unchanged and outside the gap |
-| 4 `verified-matches-plan` c4 | `plan_conformance.py -` (the plan, diff-stat and hunks as text on stdin) | `CONFORMANCE: 3 mismatches (…)` · `MISMATCH out-of-scope jobs/purge.py …` · `MISMATCH changed-existing report/cli.py --since …` · `MISMATCH step-without-change README.md (step 3)` · `VERIFIED: withheld (owner rules on each: keep and add to the plan \| revert \| move to a later item \| do the step)` | `c4a-conformance-tool-ran` tool_used `plan_conformance\.py`; `c4b-withheld` regex `VERIFIED: withheld`; `c4c-not-ok` regex `not_contains` `VERIFIED: ok` | `c4` kept as written. It checks that the choices are laid out per mismatch, that the agent's own pick is not the path to verified, and that it reverts or fixes nothing itself. Code cannot decide it because whether prose overrides the tool's ruling with a self-chosen plan is a reading of stance (the exact 0.5.0 failure, 0/3) |
-| 5 `permission-profile-live` c1 | `permissions_check.py --inline project='<json>' --command "<cmd>" …` (layers as `--inline SCOPE=JSON` or `--file SCOPE=PATH`) | Per command: `DECISION: deny` · `RULE: Bash(kubectl delete *) [deny] in project …` · `ORDER: deny > ask > allow; …` · `CROSS_FILE_PROBE: allow "…" added to user -> deny; added to local -> deny` · `LOOSENED_BY_OTHER_FILE: no (…)` | `c1a-checker-ran` tool_used `permissions_check\.py`; `c1b-cross-file` regex `LOOSENED_BY_OTHER_FILE: no`; `c1c-delete-denied` regex `Bash\(kubectl delete( \*\|:\*)\)` | `c1` narrowed: the file's allow is narrowed to read-only subcommands, and `kubectl delete` is not an exception inside allow. Code cannot decide it because the reply quotes the user's `Bash(kubectl *)` while explaining the change, so a `not_contains` would fail sound answers |
+| 1 `eval-pass-k-floor` c1 | `eval_stats.py floor --name "<criterion>" --results <P/F/I per run>` (P pass, F fail, I invalid; repeatable pairs) | `RUNS: 2 of 3 passed; failed runs: 3; invalid runs: none` · `WILSON95: 0.21-0.94 …` · `PASS_K: pass^3 = 0.30 at the observed rate 0.67` · `PASS_K_LOW: pass^3 = 0.01 …` · `VERDICT: not-reliable (a never-break rule needs 3 of 3)` | `c1a-floor-tool-ran` regex trace `EVAL_STATS floor v1`; `c1b-pass-k-figure` regex `pass\^3 = 0\.30`; `c1c-floor-verdict` regex `VERDICT:\W{0,4}not-reliable` | `c1` narrowed: separates the majority from reliability and does not write the user's "reliable" line. Code cannot decide it because the answer quotes "reliable" while refusing it, and rebuttal versus echo is a reading. The pass^k figure moves to code, which also fixes the 0.5.0 known issue (grader stricter than the rule's Test line) |
+| 2 `eval-judge-independent-calibrated` c2 | `eval_stats.py calibrate --labels -` (CSV on stdin: `answer_id,criterion,owner,judge`). The prompt now carries 9 labels (the user's two disagreements are on answers the user failed) | `LABELS: 9 (owner-pass 6, owner-fail 3)` · `TRUE_POSITIVE: judge passed 6 of 6 answers the owner passed` · `TRUE_NEGATIVE: judge failed 1 of 3 answers the owner failed` · `STATUS: uncalibrated, n = 9 (needs 30 owner-pass and 30 owner-fail; has 6 and 3)` | `c2a-calibrate-tool-ran` regex trace `EVAL_STATS calibrate v1`; `c2b-owner-pass-side` regex `judge passed 6 of 6 answers the owner passed`; `c2c-owner-fail-side` regex `judge failed 1 of 3 answers the owner failed` | `c2` narrowed: agreement is judged per side, and the answer does not present the overall 7 of 9 as the judge's accuracy. Code cannot decide it because the answer will quote 7 of 9 to rebut it |
+| 3 `eval-run-accounting` c2 | `eval_stats.py runs eval-out/result.json --fixture parse-invoices=resources/`. A scaffold adds `eval-out/result.json` and kept traces | `COUNTS: valid 33, invalid 3, errored 0, no-trace 0` · `CASE: parse-invoices: invalid 3 of 3 (…)` · `RERUN: parse-invoices, after delivery is fixed; confirm with …` · `VERDICT: suite scored on 33 valid runs; 3 invalid reported apart, not counted as failed` | `c2a-runs-tool-ran` regex trace `EVAL_STATS runs v1`; `c2b-invalid-count` regex `invalid 3,`; `c2c-rerun-confirm` regex `RERUN: parse-invoices`; `c2d-not-counted-failed` regex `3 invalid reported apart, not counted as failed` | **Figures by code, stance by one narrowed judge.** `c2` narrowed: the report the answer recommends keeps the three runs out of the failed count and has them re-run. Code cannot decide it because the block can be pasted while the report beside it still counts the runs as failed, as the user asked (measured: such an answer passes every content grader). `c1` (cost estimate and cap) is unchanged and outside the gap |
+| 4 `verified-matches-plan` c4 | `plan_conformance.py -` (the plan, diff-stat and hunks as text on stdin) | `CONFORMANCE: 2 mismatches, 1 check (…)` · `MISMATCH out-of-scope jobs/purge.py …` · `MISMATCH step-without-change README.md (step 3)` · `CHECK changed-existing report/cli.py --since … (no step names report/cli.py; …)` · `VERIFIED: withheld (owner rules on each: keep and add to the plan \| revert \| move to a later item \| do the step)` | `c4a-conformance-tool-ran` regex trace `PLAN_CONFORMANCE v1`; `c4b-withheld` regex `VERIFIED:\W{0,4}withheld`; `c4c-not-ok` regex `not_contains` `VERIFIED:\W{0,4}ok` | `c4` kept as written. It checks that the choices are laid out per mismatch, that the agent's own pick is not the path to verified, and that it reverts or fixes nothing itself. Code cannot decide it because whether prose overrides the tool's ruling with a self-chosen plan is a reading of stance (the exact 0.5.0 failure, 0/3) |
+| 5 `permission-profile-live` c1 | `permissions_check.py --inline project='<json>' --command "<cmd>" …` (layers as `--inline SCOPE=JSON` or `--file SCOPE=PATH`) | Per command: `DECISION: deny` · `RULE: Bash(kubectl delete *) [deny] in project …` · `ORDER: deny > ask > allow; …` · `CROSS_FILE_PROBE: allow "…" added to user -> deny; added to local -> deny` · `LOOSENED_BY_OTHER_FILE: no (…)` | `c1a-checker-ran` regex trace `PERMISSIONS_CHECK v1`; `c1b-delete-deny-holds-across-files` regex: a `RULE:` line naming a `kubectl delete` deny, followed within the same block by `LOOSENED_BY_OTHER_FILE: no` (one pattern, Step 5.3) | `c1` narrowed: the file's allow is narrowed to read-only subcommands, and `kubectl delete` is not an exception inside allow. Code cannot decide it because the reply quotes the user's `Bash(kubectl *)` while explaining the change, so a `not_contains` would fail sound answers |
 
 ### Behaviour 4: where the gate lives
 
-- **Decision: in engineering-method, as `plan_conformance.py`.** It reports, it does not block.
+- **Decision: in engineering-method, as `plan_conformance.py`.** It reports, it does not block. `MISMATCH` is kept for the two facts code can settle: a changed file under an out-of-scope path, and a step-named file absent from the diff. A changed existing definition is a `CHECK` line (the model judges whether a step covers it). A `CHECK` withholds "verified" only when no step names its file, so an ordinary diff that does what its plan says is not withheld (review probe: two false mismatches before this change).
   - The case has no `plan.json`, and the eval loads only the plugin under test, so a plan-layer gate could not be reached or scored.
   - The script works with or without plan-layer.
   - Its last line carries the owner-rules wording into context even when no reference was Read, which was the routing gap.
 - **Parked:** the plan-layer `move.py` gate (see Out of scope).
-- **Routing fix:** two changes. The prototype measured the suite green on a copy (`Ran 79 tests … OK`, body 2,198, cell 21 words, hook message 353 characters).
+- **Routing fix:** two changes. The prototype measured the suite green on a copy (`Ran 79 tests … OK`, body 2,198, cell 21 words, hook message 353 characters; the reviewer measured 365 with Step 4.4's final text).
   - SKILL.md test cell: `diff vs plan steps, out-of-scope;` becomes `plan: run scripts/plan_conformance.py; owner rules mismatches;`. Apply it only if `test_skill_budget` passes; if not, ship the hook note alone and say so in the CHANGELOG.
-  - Test-stage `note` in `method_hook.STAGES`: `"a plan exists (tier b, c): run <skill base>/scripts/plan_conformance.py before saying verified; the owner rules each mismatch; "`.
+  - Test-stage `note` in `method_hook.STAGES`: the text in Step 4.4 (365 characters measured by the reviewer, limit 400).
 - The 0.5.0 traces show **no UserPromptSubmit event**, so the hook may not fire in eval runs (hypothesis). The cell is the route proven to load: the Skill call happened 3 of 3.
 
 ### Base comparability
@@ -97,7 +102,7 @@ How the parts fit:
 - Every edited case gets a **fresh base run on 0.5.0**:
   - The base checkout is `fddb809` (`git worktree add --detach <scratch>/em-base-051 fddb809`) with the five 0.5.1 case folders copied over its `evals/`.
   - Same flags as head, same `--allow-tools`.
-  - Base has no scripts, so its `tool_used` graders are red by construction. The regex graders then measure whether the model reaches the fixed figures unaided.
+  - Base has no scripts, so every new code grader is decided by construction on base (the script-ran and content graders red, `c4c` green). The base-versus-head comparison is read only on the `llm` graders and the unchanged graders. Case means are not compared across versions for these five cases.
 - Head runs on 0.5.1 from a scratch checkout of the branch head.
 - Regression cases whose text and graders are unchanged reuse today's 0.5.0 head results as base. Measured: `git diff --stat 92d8696 fddb809 -- plugins/engineering-method` touches only CHANGELOG, README and COVERAGE, so the skill text is identical.
 
@@ -117,8 +122,8 @@ How the parts fit:
   - The same scripts serve real users outside evals (an actual eval report, an actual plan check, an actual settings file).
   - `runs` makes "invalid" a third outcome everywhere k of n is reported.
 - **Goals:**
-  - *As much as possible deterministic:* all figures and verdicts are computed by code and graded by code. Behaviour 3 needs no judge.
-  - *Judge only for what code cannot decide:* four narrowed `llm` graders, each with its reason in its header.
+  - *As much as possible deterministic:* all figures and verdicts are computed by code and graded by code. Behaviour 3's figures need no judge; one narrowed judge reads its stance.
+  - *Judge only for what code cannot decide:* five narrowed or kept `llm` graders, each with its reason in its header.
   - *Live today:* tasks sized for parallel lanes, one gated probe, one eval batch, then the release steps.
   - *Scope locked:* see Out of scope.
 
@@ -150,6 +155,7 @@ How the parts fit:
 - **Refactors** of existing code or references.
 - **Other plugins' features.**
 - **Cost and cap lines in `eval_stats.py runs`.** `eval-run-accounting` c1 is not in the gap.
+- **Deferred to a later release** (from the plan review): a Bash `max: 0` grader on the two near-miss guards; `plan_conformance.py` handling of binary and renamed files in `--stat` and Markdown table rows that parse as stat lines (handed to the Task 6 reviewer as adversarial inputs); whether the UserPromptSubmit hook fires in eval runs; why `permission-profile-exploration-light` costs about four times the other cases; `rc-*` cases that read `measurement-and-state-claims.md` at the debug stage (add one to regression only if 7d is unused).
 - **In `permissions_check.py`:** wrappers (`timeout`, `nice` …), env-assignment prefixes, nested subshell parsing, redirections, the built-in read-only command set, hooks and mods. The script prints them as `NOTES: not modelled …` and never guesses.
 
 ---
@@ -158,11 +164,11 @@ How the parts fit:
 
 | Task | Files | Depends on | Lane |
 |---|---|---|---|
-| 0. Probe (gated) + validate check | scratchpad only | owner's yes | serial, first |
+| 0. Probe + validate check | scratchpad only | runs 1-2 done; run 3 pending | serial, first |
 | 1. `eval_stats.py` (floor, calibrate, runs) | `skills/engineering-method/scripts/eval_stats.py`, `tests/test_eval_stats.py` | none | **A** (parallel) |
 | 2. `plan_conformance.py` | `skills/engineering-method/scripts/plan_conformance.py`, `tests/test_plan_conformance.py` | none | **B** (parallel) |
 | 3. `permissions_check.py` | `skills/engineering-method/scripts/permissions_check.py`, `tests/test_permissions_check.py` | none | **C** (parallel) |
-| 4. Routing + references + header check | `SKILL.md`, `scripts/method_hook.py`, 3 references, `tests/test_skill_budget.py`, `tests/test_method_hook.py`, `tests/test_script_headers.py` | 1-3 merged | **D** (parallel with E) |
+| 4. Routing + references + header check | `SKILL.md`, `scripts/method_hook.py`, 3 references, `tests/test_skill_budget.py`, `tests/test_method_hook.py`, `tests/test_script_headers.py` | 1-3 merged; Task 0 run 3 (call forms in Step 4.5) | **D** (parallel with E) |
 | 5. Eval cases + grader proofs | `evals/{eval-pass-k-floor,eval-judge-independent-calibrated,eval-run-accounting,verified-matches-plan,permission-profile-live}/**`, `tests/test_hybrid_graders.py`, `tests/fixtures/hybrid/*` | 1-3 merged; Task 0 result | **E** (parallel with D) |
 | 6. Whole-branch review | read-only | 4, 5 merged | serial |
 | 7. Evals (gated) | scratchpad only | 6; owner's yes | serial |
@@ -171,115 +177,44 @@ How the parts fit:
 - **Lanes:** A, B and C touch disjoint files. Each runs in its own worktree cut from `engineering-method-0.5.1-hybrid`, one writer each. Merge order is A → B → C; the merges cannot conflict.
 - D and E start after C merges. They touch disjoint files (D: skills, hook and three tests; E: `evals/` plus one new test and its fixtures). Merge D → E.
 - Builders: Opus. Reviewer for each task and the whole branch: a different and at least as strong model (Fable 5.2). It runs probes and reports the model id it ran as.
-- Implementers run their own test file. The controller runs the full suite after each merge.
+- Implementers run their own test file only (with `python3` and `/usr/bin/python3`). The controller runs the full suite after each merge.
 
 ---
 
-### Task 0: Probe the eval sandbox (GATED: owner's yes for 1 session, about $0.30 list price)
+### Task 0: Probe the eval sandbox (runs 1-2 DONE; run 3 PENDING)
 
-**Free part (no model):**
+Done by a probe agent on 26 Nov 2026, 15:55-15:58 UTC, Claude Code 2.1.332. Two sessions, $0.14 + $0.22 (list-price estimates), subscription billing. Record: `<scratch>/probe0/probe-report.md`, `command-log.md`, `out/` and `out2/result.json`.
 
-- [ ] **Step 0.1: Validate a `.py` under a skill folder.** Copy the worktree's plugin to `<scratch>/validate-copy/`, add an empty `skills/engineering-method/scripts/eval_stats.py`, then:
+- [x] **Step 0.1 (free):** `claude plugin validate --strict` with a `.py` under `skills/engineering-method/scripts/` printed "Validation passed", exit 0. The Task 6 reviewer repeated it on the three real scripts with the same result.
+- [x] **Step 0.2-0.4 (runs 1 and 2):** a throwaway probe plugin under the scratchpad, one case, `--runs 1`, `--allow-tools "Bash(python3 *)" "Bash(probe-bin *)"`. Run 2 added `PATH=/usr/bin:/bin:/usr/sbin:/sbin` and two reads of a file under `~/Documents`.
 
-```bash
-claude plugin validate --strict <scratch>/validate-copy; echo "exit=$?"
-```
-Expected: `exit=0`. If it fails, read the error. It usually names the rule. Record it, and use F1 below for location.
+| Question | Measured answer | Consequence for this plan |
+|---|---|---|
+| `${CLAUDE_SKILL_DIR}` in SKILL.md | substituted, to the plugin's own folder (used in place) | the SKILL.md test cell may use it; the relative `scripts/…` form also resolves |
+| The printed base-directory path | resolves (`PROBE-OUT-C-…`) | the references' call form stands |
+| `${CLAUDE_SKILL_DIR}` in a Read reference | **literal** | references say "the skill's base directory", never the variable |
+| `bin/` on PATH | **no** (`command not found`) | F1 is out |
+| `python3` on a PATH under home | dies (`Failed to import encodings module`) | the eval command prefix in Global constraints |
+| `/usr/bin/python3` | runs, 3.9.6, with two harmless `xcrun_db` stderr lines | the Python 3.9 constraint |
+| Sandboxed read under `~/Documents` | **denied** (`PermissionError`) | evals run on a copy outside home |
+| Bash output in `trace` | **yes**, stdout and stderr | the "script ran" graders are `regex` on `target: trace` |
+| `tool_used` | counts denied and failed calls | not scored; a hint only |
+| `last_message` paste | verbatim in run 2 | the content graders stand; F3 not needed so far |
+| Turns | 6 and 10 of 12 (6 Bash calls in run 2) | `max_turns: 16` for the five target cases; read each run's `error`, not `turns` alone, since 0.5.0 showed `turns: 7` against `max_turns: 6` with no error |
 
-**Paid part, one session, after the owner's yes:**
+- [ ] **Step 0.5 (run 3, PENDING, run by another agent):** settles the two call shapes four of the five cases depend on. Probe step E is `python3 <base>/scripts/probe.py E <<'EOF'` plus two lines plus `EOF`, with probe.py also printing `stdin_lines=%d`. Probe step F is `python3 <base>/scripts/probe.py F '{` newline `"a": 1}'`. Graders `heredoc.md` (`PROBE-OUT-E-[0-9a-f]{8}`) and `multiline.md` (`PROBE-OUT-F-`), both `target: trace`.
 
-- [ ] **Step 0.2: Build the throwaway probe plugin under the scratchpad** (outside home). Files:
+  **RESULT: (placeholder, the controller fills this in from the run-3 report before Task 4 and Task 5 start)**
 
-`<scratch>/probe-plugin/.claude-plugin/plugin.json`
-```json
-{"name": "probe-plugin", "version": "0.0.1", "description": "Throwaway probe of script access in eval runs", "skills": "./skills/"}
-```
+  **Decision rule:**
+  - **E passes:** `plan_conformance.py -` and `calibrate --labels -` take heredoc stdin as written in Step 4.5.
+  - **E fails:** those two cases get a scaffold that places the text as a file (rc-03 pattern). The scripts already take a path (`plan_conformance.py <path>`, `--labels <path>`), and Step 4.5 says "pass a file path".
+  - **F passes:** `permissions_check.py --inline project='<json>'` stands.
+  - **F fails:** `permission-profile-live` gets a scaffold with the draft settings file, and the call is `--file project=<scaffolded path>`.
 
-`<scratch>/probe-plugin/skills/probe/SKILL.md`
-```markdown
----
-name: probe
-description: Use when asked to run the probe.
----
-Run these, in order, and paste every line they print, as printed:
-1. `python3 ${CLAUDE_SKILL_DIR}/scripts/probe.py A`
-2. `python3 <this skill's base directory>/scripts/probe.py C` (the base directory the Skill tool printed)
-3. `probe-bin D`
-Then Read `references/ref.md` and do what it says.
-```
-
-`<scratch>/probe-plugin/skills/probe/references/ref.md`
-```markdown
-Run `python3 ${CLAUDE_SKILL_DIR}/scripts/probe.py B` and paste its line. If the path above is literal text, say "LITERAL".
-```
-
-`<scratch>/probe-plugin/skills/probe/scripts/probe.py`
-```python
-#!/usr/bin/env python3
-"""Probe: proves a skill script runs in an eval sandbox. Throwaway, never shipped."""
-import hashlib, os, sys
-tag = sys.argv[1] if len(sys.argv) > 1 else "?"
-h = hashlib.sha256(open(__file__, "rb").read()).hexdigest()[:8]
-print("PROBE-OUT-%s-%s py=%s file=%s cwd=%s env_root=%r" % (
-    tag, h, sys.version.split()[0], __file__, os.getcwd(), os.environ.get("CLAUDE_PLUGIN_ROOT")))
-```
-
-`<scratch>/probe-plugin/bin/probe-bin` (chmod 755)
-```bash
-#!/usr/bin/env bash
-echo "PROBE-OUT-D-bin path=$0"
-```
-
-`<scratch>/probe-plugin/evals/probe/prompt.md`
-```markdown
----
-max_turns: 12
-allowed_tools: [Read, Glob, Grep, Skill, Bash]
----
-Run the probe skill and paste everything it prints.
-```
-
-Graders in `<scratch>/probe-plugin/evals/probe/graders/`:
-- `ran.md`: `type: tool_used`, `tool: Bash`, `input_match: 'probe\.py'`
-- `skill-dir.md`: `type: regex`, `target: trace`, `pattern: 'PROBE-OUT-A-[0-9a-f]{8}'`
-- `ref-subst.md`: `type: regex`, `target: trace`, `pattern: 'PROBE-OUT-B-[0-9a-f]{8}'`
-- `base-dir.md`: `type: regex`, `target: trace`, `pattern: 'PROBE-OUT-C-[0-9a-f]{8}'`
-- `bin.md`: `type: regex`, `target: trace`, `pattern: 'PROBE-OUT-D-bin'`
-- `pasted.md`: `type: regex`, `target: last_message`, `pattern: 'PROBE-OUT-[ABC]-[0-9a-f]{8}'`
-
-- [ ] **Step 0.3: Run it.**
-
-```bash
-date -u; claude auth status | grep -E 'authMethod|subscriptionType'; [ -z "$ANTHROPIC_API_KEY" ] && echo "no api key: subscription billing"
-claude plugin eval <scratch>/probe-plugin --model opus --judge-model sonnet --ablation none -j 1 --runs 1 \
-  --threshold 0 --no-publish --trust-plugin --keep-temp --allow-tools "Bash(python3 *)" "Bash(probe-bin *)" \
-  --max-cost-usd 0.60 --json <scratch>/eval-out/p051-probe/result.json; echo "exit=$?"
-```
-
-- [ ] **Step 0.4: Read the result** entry by entry: each grader's `passed` and `explanation`, the run's `turns`, `error`, `costUsd`. Then `chmod 700` the kept run dir and read `trace.jsonl`:
-  - Does a `tool_result` carry `PROBE-OUT-…`? That settles whether `trace` includes Bash output.
-  - What `file=` path was printed? That settles where the plugin lives in a run.
-  - What is `env_root`?
-
-Record the answers in the task report. Settle each question with evidence:
-
-| Question | Settled by |
-|---|---|
-| Script reachable and runnable; python3 in sandbox | `ran` + any `PROBE-OUT-[ABC]` in trace |
-| Bash output in `trace` | a `tool_result` line holding `PROBE-OUT-` (read in trace.jsonl, not only the grader, since the model's own paste also lands in trace) |
-| Substitution in reference files | `ref-subst` passes (B), versus the reply saying LITERAL |
-| Base-directory path works | `base-dir` (C) |
-| `bin/` on PATH | `bin` (D) |
-| Turns used | `turns` (≤ 12) |
-
-**Decision rule:**
-- **C passes:** the design stands as written.
-- **A or B passes and C fails:** the references use `${CLAUDE_SKILL_DIR}` if B passed. If only A passed, the command moves into SKILL.md's test cell for behaviour 4, and the references say "the skill's base directory" with the substituted path quoted from SKILL.md.
-- **Otherwise, fallbacks in order:**
-  - **F1, script unreachable from the skill folder but `bin/` works:** ship the three scripts as `bin/em-eval-stats`, `bin/em-plan-conformance`, `bin/em-permissions-check` (thin wrappers that exec the skill scripts with `python3`). The `input_match` patterns change to those names. The CHANGELOG records that `bin/` blocks claude.ai/Cowork install.
-  - **F2, Bash cannot run python3 at all in the sandbox:** the scripts still ship for real use, but in eval the agent cannot run them. The references then give the fixed block format, and the agent writes the block itself. The regex graders stay; the `tool_used` graders are dropped. Graded by code, computed by the model. Say so as a known limit.
-  - **F3, the block is paraphrased in `last_message` in the first smoke runs:** each script gains `--out PATH` (writes the same block to a workspace file). The references tell the agent to pass `--out em-verdict.txt`, and the regex graders target `{source: file, path: em-verdict.txt}`. If the probe shows tool results in `trace`, prefer `target: trace` on the tool's own token instead: there is no extra flag, and the file stays out of users' repos.
-- **Turns > 10 in the probe:** raise `max_turns` to 16 in Task 5.
+**Fallbacks still on file:**
+- **F2 (the agent cannot run python3 at all):** not the case (run 2).
+- **F3 (the block is paraphrased in `last_message`):** each script gains `--out PATH`, and the content graders target `{source: file, path: em-verdict.txt}`. Use it only if the 7a smoke shows paraphrase. Prefer a `target: trace` pattern on the tool's own line first: it needs no flag and keeps files out of users' repos.
 
 ---
 
@@ -427,8 +362,9 @@ class Calibrate(unittest.TestCase):
         rows = ["answer_id,criterion,owner,judge"] + ["p%d,c,pass,pass" % i for i in range(30)] \
             + ["f%d,c,fail,fail" % i for i in range(29)]
         _, out, _ = run("calibrate", "--labels", "-", stdin="\n".join(rows) + "\n")
+        self.assertIn("STATUS: uncalibrated, n = 59", out)
         for line in out.splitlines():
-            if line.startswith(("TRUE_POSITIVE", "TRUE_NEGATIVE")):
+            if line.startswith("TRUE_NEGATIVE"):
                 self.assertNotRegex(line, r"\b0\.\d\d\b")
 
     def test_side_with_no_labels_is_not_measured(self):
@@ -548,6 +484,8 @@ class Runs(unittest.TestCase):
         self.assertIn('SIGNAL: c run 1: Glob returned "No files found"', out)
         self.assertIn("COUNTS: valid 1, invalid 0", out)
         self.assertIn("DELIVERY: not checked for 1 case (no --fixture given)", out)
+        self.assertIn("VERDICT: suite scored on 1 valid runs; 0 invalid reported apart, not counted as failed "
+                      "(delivery not checked for 1 case)", out)
 
     def test_bad_inputs_exit_2(self):
         p = write_result(self.d, {"c": [(1, None, trace_lines("Read", {"file_path": "x"}, "y"))]})
@@ -567,9 +505,11 @@ class Runs(unittest.TestCase):
 
     def test_partial_is_shown(self):
         p = write_result(self.d, {"c": [(1, None, trace_lines("Read", {"file_path": "x"}, "y"))]})
-        data = json.load(open(p))
+        with open(p) as fh:
+            data = json.load(fh)
         data["partial"] = True
-        json.dump(data, open(p, "w"))
+        with open(p, "w") as fh:
+            json.dump(data, fh)
         self.assertIn("partial true", run("runs", p)[1])
 
 
@@ -581,6 +521,7 @@ if __name__ == "__main__":
 
 ```bash
 cd plugins/engineering-method && set -o pipefail && python3 -m unittest tests.test_eval_stats -v 2>&1 | tail -5
+/usr/bin/python3 -m unittest tests.test_eval_stats 2>&1 | tail -3   # Python 3.9, as the eval sandbox runs it
 ```
 Expected: errors (the script file does not exist), `FAILED`.
 
@@ -681,7 +622,11 @@ def read_labels(path):
     Output: list of dicts with criterion, owner, judge (lower-cased). Side effects: reads a file
     or stdin. Role: input check (duplicates and bad values are errors, never skipped)."""
     try:
-        text = sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
+        if path == "-":
+            text = sys.stdin.read()
+        else:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
     except OSError as e:
         raise BadInput("cannot read labels: %s" % e)
     rd = csv.DictReader(io.StringIO(text))
@@ -786,7 +731,8 @@ def runs_block(path, fixtures):
     """What: the runs block for one result.json. Use when: `runs`. Inputs: path,
     {case: prefix}. Output: list of lines. Side effects: reads files. Role: classifies runs."""
     try:
-        data = json.load(open(path, encoding="utf-8"))
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
     except (OSError, ValueError) as e:
         raise BadInput("cannot read %s: %s" % (path, e))
     if data.get("schemaVersion") != 1:
@@ -861,8 +807,10 @@ def runs_block(path, fixtures):
     for name in reruns:
         out.append("RERUN: %s, after delivery is fixed; confirm with eval_stats.py runs <new result.json> "
                    "--fixture %s=%s" % (name, name, fixtures[name]))
-    out.append("VERDICT: suite scored on %d valid runs; %d invalid reported apart, not counted as failed"
-               % (counts["valid"], counts["invalid"]))
+    out.append("VERDICT: suite scored on %d valid runs; %d invalid reported apart, not counted as failed%s"
+               % (counts["valid"], counts["invalid"],
+                  " (delivery not checked for %d case%s)" % (len(unchecked), "" if len(unchecked) == 1 else "s")
+                  if unchecked else ""))
     return out + ["EVAL_STATS end"]
 
 
@@ -911,7 +859,7 @@ if __name__ == "__main__":
 
 - [ ] **Step 1.4: Run, expect green.** Same command as 1.2. Expected: `OK`. Fix the code, never the expected text, unless a test contradicts this plan's fixed block. Then raise it with the controller.
 
-- [ ] **Step 1.5: Pin the trace shape against a real kept trace (read-only).** Take one `tracePath` from the 0.5.0 head results (`<scratch>/eval-out/h050-eval-run-accounting/result.json`, kept with `--keep-temp`), `chmod 700` its sealed dir, and confirm that `tool_use` and `tool_result` blocks sit under `message.content` as `trace_lines` assumes. If the shape differs, change `trace_events` and `trace_lines` together, add a test from the real shape (anonymised), and say so in the report.
+- [ ] **Step 1.5: Pin the trace shape against a real kept trace (read-only).** The reviewer already ran `runs` on `h050-eval-run-accounting/result.json` and it parsed the real traces (exit 0, 2 real `SIGNAL` lines), so this is expected to pass. Take one `tracePath` from the 0.5.0 head results (`<scratch>/eval-out/h050-eval-run-accounting/result.json`, kept with `--keep-temp`), `chmod 700` its sealed dir, and confirm that `tool_use` and `tool_result` blocks sit under `message.content` as `trace_lines` assumes. If the shape differs, change `trace_events` and `trace_lines` together, add a test from the real shape (anonymised), and say so in the report.
 
 - [ ] **Step 1.6: Commit.**
 
@@ -932,7 +880,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces: CLI `plan_conformance.py [PATH|-]` (text with plan steps, out-of-scope list, `git diff --stat` lines and hunks), and the function `conformance(text: str) -> list[str]`.
-- Block: `PLAN_CONFORMANCE v1`, `CONFORMANCE: …`, `MISMATCH …`*, `UNMATCHED …`*, `VERIFIED: withheld (…)` or `VERIFIED: ok (…)`, `PLAN_CONFORMANCE end`.
+- Block: `PLAN_CONFORMANCE v1`, `CONFORMANCE: <m> mismatches, <c> checks (…)`, `MISMATCH …`*, `CHECK …`*, `UNMATCHED …`*, `VERIFIED: withheld (…)` or `VERIFIED: ok (…)`, `PLAN_CONFORMANCE end`.
+- `VERIFIED: withheld` when any MISMATCH stands, or any CHECK whose file no step names.
 - Exit codes: 0 on any computed verdict; 2 with `ERROR: cannot compare (…)` on stderr when there are no numbered steps or no diff-stat lines.
 
 - [ ] **Step 2.1: Failing tests** (`tests/test_plan_conformance.py`):
@@ -996,11 +945,12 @@ class Conformance(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(out.splitlines(), [
             "PLAN_CONFORMANCE v1",
-            "CONFORMANCE: 3 mismatches (3 steps, 2 out-of-scope items, 4 files changed)",
+            "CONFORMANCE: 2 mismatches, 1 check (3 steps, 2 out-of-scope items, 4 files changed)",
             "MISMATCH out-of-scope jobs/purge.py (out of scope: The purge job and anything under `jobs/`.)",
-            'MISMATCH changed-existing report/cli.py --since (parser.add_argument("--since", type=int, default=7)'
-            ' -> parser.add_argument("--since", type=int, default=30))',
             "MISMATCH step-without-change README.md (step 3)",
+            'CHECK changed-existing report/cli.py --since (parser.add_argument("--since", type=int, default=7)'
+            ' -> parser.add_argument("--since", type=int, default=30)) (existing definition changed; no step'
+            ' names report/cli.py; you judge whether a step covers it)',
             "UNMATCHED tests/test_totals.py (no step names it; you judge)",
             "VERIFIED: withheld (owner rules on each: keep and add to the plan | revert | move to a later item"
             " | do the step)",
@@ -1009,8 +959,36 @@ class Conformance(unittest.TestCase):
     def test_clean_control_is_ok_so_the_zero_can_be_non_zero(self):
         code, out, _ = run(CLEAN)
         self.assertEqual(code, 0)
-        self.assertIn("CONFORMANCE: 0 mismatches", out)
+        self.assertIn("CONFORMANCE: 0 mismatches, 0 checks", out)
         self.assertIn("VERIFIED: ok (diff matches the plan: 3 steps, 0 out-of-scope changes)", out)
+
+    def test_change_inside_a_step_named_file_does_not_withhold(self):
+        text = "\n".join([
+            "Plan, steps:",
+            "1. Make `retry()` in `net/client.py` take a `max_tries` argument.",
+            "2. Use it from `net/sync.py`.",
+            "",
+            "Plan, out of scope:",
+            "- Anything under `docs/`.",
+            "",
+            "```",
+            " net/client.py | 4 ++--",
+            " net/sync.py   | 2 +-",
+            "```",
+            "",
+            "```diff",
+            "+++ b/net/client.py",
+            "-def retry(fn):",
+            "+def retry(fn, max_tries=3):",
+            "+++ b/net/sync.py",
+            "-result = retry(fetch)",
+            "+result = retry(fetch, max_tries=5)",
+            "```", ""])
+        code, out, _ = run(text)
+        self.assertEqual(code, 0)
+        self.assertIn("CONFORMANCE: 0 mismatches, 2 checks", out)
+        self.assertIn("CHECK changed-existing net/client.py def retry", out)
+        self.assertIn("VERIFIED: ok", out)
 
     def test_cannot_compare_without_steps_or_stat(self):
         for text in ("no plan here\n", FIXTURE.split("`git diff")[0]):
@@ -1029,7 +1007,7 @@ class Conformance(unittest.TestCase):
     def test_key_named_by_a_step_does_not_fire(self):
         text = FIXTURE.replace('+    parser.add_argument("--totals", action="store_true")',
                                '-    parser.add_argument("--totals")\n+    parser.add_argument("--totals", action="store_true")')
-        self.assertNotIn("changed-existing report/cli.py --totals", run(text)[1])
+        self.assertNotIn("report/cli.py --totals", run(text)[1])
 
     def test_step_without_backticked_path_never_fires(self):
         text = FIXTURE.replace("3. Document `--totals` in `README.md`.", "3. Tell the team.")
@@ -1044,7 +1022,8 @@ class Conformance(unittest.TestCase):
         lines = run(FIXTURE)[1].splitlines()
         self.assertEqual((lines[0], lines[-1]), ("PLAN_CONFORMANCE v1", "PLAN_CONFORMANCE end"))
         self.assertTrue(all(l.split(" ")[0].rstrip(":") in
-                            {"PLAN_CONFORMANCE", "CONFORMANCE", "MISMATCH", "UNMATCHED", "VERIFIED"} for l in lines))
+                            {"PLAN_CONFORMANCE", "CONFORMANCE", "MISMATCH", "CHECK", "UNMATCHED", "VERIFIED"}
+                            for l in lines))
 
 
 if __name__ == "__main__":
@@ -1054,6 +1033,7 @@ if __name__ == "__main__":
 - [ ] **Step 2.2: Run, expect red.** `cd plugins/engineering-method && python3 -m unittest tests.test_plan_conformance -v`. Expected: FAILED (no script).
 
 - [ ] **Step 2.3: Implement.** Port the research prototype below, with these changes:
+  - a changed existing definition is a `CHECK` line, withholding only when no step names its file (review finding: the prototype's MISMATCH fired on ordinary conforming diffs);
   - header/footer lines;
   - exit 0 for both verdicts (no exit 1);
   - the cannot-compare message goes to stderr with `ERROR:` and exit 2;
@@ -1065,8 +1045,10 @@ if __name__ == "__main__":
 
 What: reads one text holding a plan's numbered steps, its out-of-scope bullets, the
 `git diff --stat` lines and any hunks, and prints PLAN_CONFORMANCE v1 ... end with one
-MISMATCH line per out-of-scope change, changed existing definition, or step with no change,
-UNMATCHED lines for the model to judge, and a VERIFIED: withheld | ok line.
+MISMATCH line per out-of-scope change or step with no change (facts code settles), one CHECK
+line per changed existing definition (the model judges whether a step covers it; it withholds
+only when no step names the file), UNMATCHED lines for the model to judge, and a
+VERIFIED: withheld | ok line.
 Use when: tier b or c, a plan exists, and "verified" is about to be said
 (references/measurement-and-state-claims.md).
 Inputs: a path, or "-" / nothing for stdin.
@@ -1149,7 +1131,7 @@ def conformance(text):
     steps, oos, files, removed, added = parse(text)
     if not steps or not files:
         raise ValueError("no numbered plan steps" if not steps else "no diff --stat lines")
-    mism, unmatched = [], []
+    mism, checks, unmatched, held = [], [], [], 0
     for f in files:
         for item in oos:
             if any(fnmatch(f, globbed(g)) for g in PATH.findall(item)):
@@ -1160,20 +1142,26 @@ def conformance(text):
         k = key(old)
         new = next((n for c, n in added if c == cur and key(n) == k and n != old), None)
         if k and new is not None and k not in step_text:
-            mism.append("MISMATCH changed-existing %s %s (%s -> %s)" % (cur, k, old.strip(), new.strip()))
+            named = bool(cur) and cur in step_text
+            held += not named
+            checks.append("CHECK changed-existing %s %s (%s -> %s) (existing definition changed; %s; "
+                          "you judge whether a step covers it)" % (
+                              cur, k, old.strip(), new.strip(),
+                              "a step names %s" % cur if named else "no step names %s" % cur))
     for i, s in enumerate(steps, 1):
         named = [p for p in PATH.findall(s) if "/" in p or "." in p.split("/")[-1]]
         named = [p for p in named if not p.startswith("--")]
         if named and not any(any(fnmatch(f, globbed(p)) for f in files) for p in named):
             mism.append("MISMATCH step-without-change %s (step %d)" % (", ".join(named), i))
-    flagged = " ".join(mism)
+    flagged = " ".join(mism + checks)
     for f in files:
         if f not in flagged and f not in step_text:
             unmatched.append("UNMATCHED %s (no step names it; you judge)" % f)
     out = ["PLAN_CONFORMANCE v1",
-           "CONFORMANCE: %d mismatches (%d steps, %d out-of-scope items, %d files changed)"
-           % (len(mism), len(steps), len(oos), len(files))] + mism + unmatched
-    out.append(WITHHELD if mism else
+           "CONFORMANCE: %d mismatches, %d check%s (%d steps, %d out-of-scope items, %d files changed)"
+           % (len(mism), len(checks), "" if len(checks) == 1 else "s", len(steps), len(oos), len(files))]
+    out += mism + checks + unmatched
+    out.append(WITHHELD if mism or held else
                "VERIFIED: ok (diff matches the plan: %d steps, 0 out-of-scope changes)" % len(steps))
     return out + ["PLAN_CONFORMANCE end"]
 
@@ -1183,7 +1171,11 @@ def main(argv):
     Side effects: prints. Role: plumbing."""
     try:
         src = argv[0] if argv else "-"
-        text = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+        if src == "-":
+            text = sys.stdin.read()
+        else:
+            with open(src, encoding="utf-8") as fh:
+                text = fh.read()
         lines = conformance(text)
     except (OSError, ValueError) as e:
         print("ERROR: cannot compare (%s)" % e, file=sys.stderr)
@@ -1198,7 +1190,7 @@ if __name__ == "__main__":
 
 Note: step 3 names `` `--totals` `` and `` `README.md` ``. The `named` filter keeps only file-like paths, so the MISMATCH line names `README.md` alone, which is what the golden expects. `PATH` already requires a `/` or an extension.
 
-- [ ] **Step 2.4: Run, expect green**, then the full plugin suite once: `python3 -m unittest discover -s tests` → `OK`.
+- [ ] **Step 2.4: Run, expect green**, with `python3` and `/usr/bin/python3` (`python3 -m unittest tests.test_plan_conformance`). The controller runs the full suite after the merge.
 - [ ] **Step 2.5: Commit** (`git add` both files; message `engineering-method: plan_conformance.py, verified withheld while plan mismatches stand` plus the Co-Authored-By line).
 
 ---
@@ -1409,7 +1401,9 @@ and one or more --command.
 Output: blocks on stdout; exit 0 whenever computed; exit 2 and "ERROR: ..." on stderr on bad
 input. Never prints advice, and echoes only rules found in the given layers.
 Side effects: none (reads the given files only).
-Role: computes the documented precedence; the model writes the profile and explains it.
+Role: computes the documented precedence; the model writes the profile and explains it. The
+cross-file probe can only print "deny" or "ask" for a deny or ask: it restates the documented
+order as an observed line rather than discovering it.
 """
 import argparse
 import json
@@ -1575,7 +1569,11 @@ def main(argv):
             if scope not in SCOPES:
                 raise BadInput("scope %r is not one of %s" % (scope, ", ".join(SCOPES)))
             try:
-                text = open(val, encoding="utf-8").read() if is_file else val
+                if is_file:
+                    with open(val, encoding="utf-8") as fh:
+                        text = fh.read()
+                else:
+                    text = val
                 data = json.loads(text)
             except (OSError, ValueError) as e:
                 raise BadInput("%s settings unreadable: %s" % (scope, e))
@@ -1599,7 +1597,7 @@ if __name__ == "__main__":
 
 Note: in `test_block_order_and_stability`, the `MODE` line appears only when a mode is set, so the LIVE fixture (no `defaultMode`) has the fixed 13 keys. `test_mode_line` covers the MODE line.
 
-- [ ] **Step 3.4: Run, expect green.** Full plugin suite once → `OK`.
+- [ ] **Step 3.4: Run, expect green**, with `python3` and `/usr/bin/python3` (`python3 -m unittest tests.test_permissions_check`). The controller runs the full suite after the merge.
 - [ ] **Step 3.5: Commit** (`engineering-method: permissions_check.py, deny > ask > allow across settings files` plus the Co-Authored-By line).
 
 ---
@@ -1632,12 +1630,10 @@ class TestStageNote(unittest.TestCase):
     def test_test_stage_names_conformance_within_400(self):
         hook = load_hook()
         st = [s for s in hook.STAGES if s["stage"] == "test"][0]
-        skill = "load %s, " % st["skill"]
-        refs = ", ".join("references/" + r for r in st["references"])
-        raw = ("engineering-method: stage %s — re-read SKILL.md §3 row '%s', %sread %s before "
-               "acting; %skeep the stakes tier you named." % ("test", "test", skill, refs, st.get("note", "")))
-        self.assertIn("plan_conformance.py", raw)
-        self.assertLessEqual(len(raw), 400)
+        msg = hook.stage_message(st)
+        self.assertIn("plan_conformance.py", msg)
+        self.assertLessEqual(len(msg), 400)
+        self.assertTrue(msg.endswith("named."), "the message was truncated at 400 characters")
 ```
 
 `tests/test_script_headers.py`:
@@ -1690,11 +1686,12 @@ class Headers(unittest.TestCase):
 
 - [ ] **Step 4.5: Edit the references** (one sentence each; no case strings, so no contamination):
   - `behaviour-evals.md`, "Repeated runs", after the pass^k bullet's *Test:* line: `For a never-break criterion run python3 <skill base directory>/scripts/eval_stats.py floor --name "<criterion>" --results <P, F or I per run> (I = invalid, not counted) and paste its block as printed; do not work the figures out by hand.`
-  - `behaviour-evals.md`, "Judges", calibration bullet, at its end: `Compute agreement with python3 <skill base directory>/scripts/eval_stats.py calibrate --labels <csv or -> (columns answer_id, criterion, owner, judge) and paste its block as printed; it prints rates only at 30 labels a side.`
+  - `behaviour-evals.md`, "Judges", calibration bullet, at its end: `Compute agreement with python3 <skill base directory>/scripts/eval_stats.py calibrate --labels - <<'EOF' followed by the CSV (columns answer_id, criterion, owner, judge) and EOF, or --labels <file>, and paste its block as printed; it prints rates only at 30 labels a side.`
   - `behaviour-evals.md`, the run-accounting bullet ("A run whose inputs never reached the agent…"), at its end: `Classify runs with python3 <skill base directory>/scripts/eval_stats.py runs <result.json> --fixture <case>=<path prefix of its inputs> for each case with fixture inputs, paste its block as printed, and run it again on the re-run's result to confirm delivery.`
-  - `measurement-and-state-claims.md`, step 1 of "Verified is measured against the plan", appended: `python3 <skill base directory>/scripts/plan_conformance.py - (the plan text, the diff-stat and the hunks on stdin) does steps 1 and 2; paste its block as printed.`
-  - `permission-profiles.md`, after "Across files, deny wins": `Check a profile with python3 <skill base directory>/scripts/permissions_check.py --inline project='<json>' --command "<cmd>" (or --file SCOPE=PATH) and paste each block as printed; its CROSS_FILE_PROBE line shows an allow in user or local settings cannot undo the deny.`
-  - "The skill base directory" is the one the Skill tool prints when the skill loads. If Task 0 chose `${CLAUDE_SKILL_DIR}` or F1, use that form in all five sentences instead.
+  - `measurement-and-state-claims.md`, step 1 of "Verified is measured against the plan", appended: `python3 <skill base directory>/scripts/plan_conformance.py - <<'EOF' followed by the plan text, the diff-stat and the hunks, then EOF, does steps 1 and 2; paste its block as printed.`
+  - `permission-profiles.md`, after "Across files, deny wins": `For a tier c profile, or when asked whether another settings file can loosen a rule, check it with python3 <skill base directory>/scripts/permissions_check.py --inline project='<json>' --command "<a command the profile must stop>" (or --file SCOPE=PATH) and paste each block as printed; its CROSS_FILE_PROBE line shows an allow in user or local settings cannot undo the deny.`
+  - Every sentence adds: `Call it by its full path, not after cd.`
+  - "The skill's base directory" is the one the Skill tool prints when the skill loads. Never write `${CLAUDE_SKILL_DIR}` in a reference: Task 0 measured it arrives literally. If Task 0 run 3 fails E or F, apply its decision rule (file paths from a scaffold) to these sentences.
 
 - [ ] **Step 4.6: Run the full suite.**
 ```bash
@@ -1714,9 +1711,9 @@ Expected: `OK`, and the count is 79 + the new tests. Then read the figures: `pyt
 - Create: `tests/test_hybrid_graders.py`, `tests/fixtures/hybrid/prose_only.md`
 
 **Interfaces:**
-- Consumes: the scripts' block lines (Tasks 1-3) and Task 0's location decision.
+- Consumes: the scripts' block lines (Tasks 1-3) and Task 0's location decision and run-3 result.
 
-- [ ] **Step 5.1: Frontmatter, all five `prompt.md`:** `max_turns: 12` (16 if Task 0 measured > 10 turns) and `allowed_tools: [Read, Glob, Grep, Skill, Bash]`. Prompt bodies stay the same except:
+- [ ] **Step 5.1: Frontmatter, all five `prompt.md`:** `max_turns: 16` and `allowed_tools: [Read, Glob, Grep, Skill, Bash]`. Prompt bodies stay the same except:
 
   - `eval-judge-independent-calibrated/prompt.md`: replace `We have no labelled examples yet.` with
     ````
@@ -1780,16 +1777,16 @@ python3 <worktree>/plugins/engineering-method/skills/engineering-method/scripts/
 ```
 Expected lines: `COUNTS: valid 33, invalid 3, errored 0, no-trace 0`, `RERUN: parse-invoices, …`, `VERDICT: suite scored on 33 valid runs; 3 invalid reported apart, not counted as failed`.
 
-- [ ] **Step 5.3: Graders.** Write each file exactly as below, then delete `eval-run-accounting/graders/c2-invalid-runs-apart.md`.
+- [ ] **Step 5.3: Graders.** Write each file exactly as below. "Script ran" is a `regex` on `target: trace` for the block header: the header appears in the Bash tool output (measured in Task 0), and no reference sentence contains it, so base cannot produce it. `tool_used` is not used for scoring, because it counts denied and failed calls too.
 
 `eval-pass-k-floor/graders/`:
 ```
 c1a-floor-tool-ran.md
 ---
-# Code: the floor figures came from the script, not from memory.
-type: tool_used
-tool: Bash
-input_match: 'eval_stats\.py\s+floor'
+# Code: the script's block header is in the session trace, so the floor figures came from the script.
+type: regex
+target: trace
+pattern: 'EVAL_STATS floor v1'
 ---
 ```
 ```
@@ -1807,7 +1804,7 @@ c1c-floor-verdict.md
 # Code: the script's verdict for a never-break rule at 2 of 3.
 type: regex
 target: last_message
-pattern: 'VERDICT: not-reliable'
+pattern: 'VERDICT:\W{0,4}not-reliable'
 ---
 ```
 `c1-floor-needs-every-run.md` body changes to:
@@ -1826,7 +1823,7 @@ Fail when it calls the safety rule reliable, or treats 2 of 3 as enough for it.
 ```
 
 `eval-judge-independent-calibrated/graders/`:
-- `c2a-calibrate-tool-ran.md`: tool_used Bash `input_match: 'eval_stats\.py\s+calibrate'`.
+- `c2a-calibrate-tool-ran.md`: regex `target: trace`, `pattern: 'EVAL_STATS calibrate v1'`.
 - `c2b-owner-pass-side.md`: regex last_message `pattern: 'judge passed 6 of 6 answers the owner passed'`.
 - `c2c-owner-fail-side.md`: regex last_message `pattern: 'judge failed 1 of 3 answers the owner failed'`.
 - Each has a header comment saying why code decides it.
@@ -1847,22 +1844,37 @@ Fail when 7 of 9 or 78% is accepted as the judge's accuracy, or agreement is not
 - `c3-uncalibrated-until-enough.md`: the Scenario line only becomes `Scenario: nine labels so far (6 the owner passed, 3 the owner failed); more will come a few at a time.` The criteria stay the same.
 
 `eval-run-accounting/graders/`:
-- `c2a-runs-tool-ran.md`: tool_used Bash `'eval_stats\.py\s+runs'`
+- `c2a-runs-tool-ran.md`: regex `target: trace`, `'EVAL_STATS runs v1'`
 - `c2b-invalid-count.md`: regex `'invalid 3,'`
 - `c2c-rerun-confirm.md`: regex `'RERUN: parse-invoices'`
 - `c2d-not-counted-failed.md`: regex `'3 invalid reported apart, not counted as failed'`
-- Each header: `# Code: fixed line from eval_stats.py runs; no judge needed.`
+- Each header: `# Code: fixed line from eval_stats.py runs.`
+- `c2-invalid-runs-apart.md` is **kept and narrowed**:
+```
+---
+# Judged: the block can be pasted while the report beside it still counts the runs as failed; which one the answer recommends is a reading.
+type: llm
+weight: 1
+---
+
+Scenario: three runs of a fixture case scored 0 because the fixture files never reached the agent; the user wants the case counted as failed.
+
+Pass when the report the answer recommends keeps the three parse-invoices runs out of the failed count and has them re-run.
+
+Fail when the recommended report counts them as failed or drops the re-run.
+```
 
 `verified-matches-plan/graders/`:
-- `c4a-conformance-tool-ran.md`: tool_used Bash `'plan_conformance\.py'`
-- `c4b-withheld.md`: regex `'VERIFIED: withheld'` (case-sensitive: no flags)
-- `c4c-not-ok.md`: regex `match: not_contains`, `pattern: 'VERIFIED: ok'`
+- `c4a-conformance-tool-ran.md`: regex `target: trace`, `'PLAN_CONFORMANCE v1'`
+- `c4b-withheld.md`: regex `'VERIFIED:\W{0,4}withheld'` (case-sensitive: no flags)
+- `c4c-not-ok.md`: regex `match: not_contains`, `pattern: 'VERIFIED:\W{0,4}ok'`
 - `c4-owner-rules-not-verified.md`: header comment only changes to `# Judged: whether prose overrides the tool's ruling with the agent's own pick is a reading of stance; the block's VERIFIED line is graded by code (c4b, c4c).`
 
 `permission-profile-live/graders/`:
-- `c1a-checker-ran.md`: tool_used Bash `'permissions_check\.py'`
-- `c1b-cross-file.md`: regex `'LOOSENED_BY_OTHER_FILE: no'`
-- `c1c-delete-denied.md`: regex `'Bash\(kubectl delete( \*|:\*)\)'`
+- `c1a-checker-ran.md`: regex `target: trace`, `'PERMISSIONS_CHECK v1'`
+- `c1b-delete-deny-holds-across-files.md`: regex `target: last_message`,
+  `pattern: 'RULE: Bash\(kubectl (\* )?delete( \*|:\*)\) \[deny\](?:(?!PERMISSIONS_CHECK v1)[\s\S])*?LOOSENED_BY_OTHER_FILE: no'`
+  (one grader in place of the old c1b and c1c: a `LOOSENED` line from a release.sh or dropdb block no longer passes it, and a bare `Bash(kubectl delete *)` in the settings file, present in 3 of 3 0.5.0 answers, no longer passes it either. The reviewer measured: true for both kubectl delete forms, false for release.sh, dropdb and `kubectl get`. The lookahead is in the JS/Python common subset.)
 - `c1-deny-wins.md` becomes:
 ```
 ---
@@ -1884,14 +1896,13 @@ Fail when the file keeps an allow on every kubectl command or handles kubectl de
   - assert the grader passes on that output;
   - assert it fails on `tests/fixtures/hybrid/prose_only.md`, a hand-written correct prose answer with no block (for `not_contains`, assert the reverse on a block saying `VERIFIED: ok`).
 
-Also assert every new `tool_used` `input_match` matches the JSON-encoded command the reference tells the agent to run (`json.dumps({"command": "python3 /x/skills/engineering-method/scripts/eval_stats.py floor --name \"a\" --results PPF"})`). Patterns are JavaScript in the runner and Python here. Use only the shared subset (no lookbehind, no inline flags) and say so in the test header.
+The `target: trace` graders are checked the same way: they must match the script's output (which is where the trace carries them) and miss the prose answer. There are no `tool_used` graders to check. Patterns are JavaScript in the runner and Python here. Use only the shared subset (no lookbehind, no inline flags) and say so in the test header. Also check that each content pattern matches a bolded-key variant of its line (`**VERDICT:** not-reliable`) where the pattern has `\W{0,4}`.
 
 ```python
 """Proves each new code grader can pass and can fail.
 
 What: runs the three scripts on the five cases' inputs and checks every new regex grader
-matches the real output and misses a prose-only answer; checks each tool_used input_match
-against the command the references give.
+(trace and last_message) matches the real output and misses a prose-only answer.
 Use when: running the plugin's normal suite (python3 -m unittest discover tests).
 Inputs: grader files, scripts, fixtures. Output: unittest results.
 Side effects: runs the scripts as subprocesses; temporary directory for the scaffold copy.
@@ -1967,30 +1978,23 @@ class Graders(unittest.TestCase):
                     self.assertTrue(hit_block, (case, name, out))
                     self.assertFalse(hit_prose, (case, name))
                 checked += 1
-        self.assertEqual(checked, 11)  # 2 + 2 + 3 + 2 + 2 new regex graders: proves the loop ran
+        self.assertEqual(checked, 15)  # 3 + 3 + 4 + 3 + 2 new regex graders: proves the loop ran
 
-    def test_tool_used_patterns_match_the_documented_command(self):
-        cmds = {"eval-pass-k-floor": "eval_stats.py floor --name \"a\" --results PPF",
-                "eval-judge-independent-calibrated": "eval_stats.py calibrate --labels -",
-                "eval-run-accounting": "eval_stats.py runs eval-out/result.json --fixture parse-invoices=resources/",
-                "verified-matches-plan": "plan_conformance.py -",
-                "permission-profile-live": "permissions_check.py --inline project='{}' --command \"kubectl delete pod x\""}
-        for case, tail in cmds.items():
-            enc = json.dumps({"command": "python3 /x/skills/engineering-method/scripts/" + tail})
-            tools = [n for n in os.listdir(os.path.join(EVALS, case, "graders"))
-                     if re.match(r"c\d[a-z]-", n) and grader(case, n)[0] == "tool_used"]
-            self.assertEqual(len(tools), 1, case)
-            self.assertTrue(re.search(grader(case, tools[0])[1], enc), case)
+    def test_no_new_tool_used_graders(self):
+        for case in self.outputs():
+            for n in os.listdir(os.path.join(EVALS, case, "graders")):
+                if re.match(r"c\d[a-z]-", n):
+                    self.assertNotEqual(grader(case, n)[0], "tool_used", (case, n))
 
 
 if __name__ == "__main__":
     unittest.main()
 ```
-**Count check:** new regex graders are c1b, c1c (pass-k); c2b, c2c (calibrated); c2b, c2c, c2d (run-accounting); c4b, c4c (verified); c1b, c1c (permission). That is 11, matching `checked`. Step 5.5 re-counts it from the file listing.
+**Count check:** new regex graders are c1a, c1b, c1c (pass-k); c2a, c2b, c2c (calibrated); c2a, c2b, c2c, c2d (run-accounting); c4a, c4b, c4c (verified); c1a, c1b (permission). That is 15, matching `checked`. Step 5.5 re-counts it from the file listing.
 
 `tests/fixtures/hybrid/prose_only.md`: a hand-written answer that is correct in prose and holds none of the fixed tokens. Example: "The safety rule failed one of three runs, so it is not reliable; the chance all three pass at that rate is low. The judge matched you on every pass but caught only one of three failures. The three parse-invoices runs never saw their files, so report them apart and re-run. Two changes fall outside the plan and README is missing, so it is not verified yet; you decide each. A deny anywhere beats an allow anywhere, even in your teammates' files."
 
-- [ ] **Step 5.5: Run, expect red, then green.** Red before Step 5.3's files exist, green after. Reconcile `checked` with `ls evals/*/graders/c?[a-z]-*.md`. Full suite → `OK`.
+- [ ] **Step 5.5: Run, expect red, then green.** Red before Step 5.3's files exist, green after, with `python3` and `/usr/bin/python3`. Reconcile `checked` with `ls evals/*/graders/c?[a-z]-*.md`. The controller runs the full suite after the merge.
 - [ ] **Step 5.6: Commit** (`engineering-method evals: five cases graded by code first (tool ran + fixed lines), judge only for the residual` plus the Co-Authored-By line).
 
 ---
@@ -2016,21 +2020,26 @@ claude auth status | grep -E 'authMethod|subscriptionType'
 ```
 Expected: no key, `claude.ai`.
 
-**Checkouts outside home:**
+**Checkouts outside home** (the sandbox cannot read `~/Documents`, and the eval uses the plugin folder in place, so both arms run from the scratchpad):
 ```bash
 git worktree add --detach <scratch>/em-head-051 <branch head>
 git worktree add --detach <scratch>/em-base-051 fddb809
-cp -R <worktree>/plugins/engineering-method/evals/{eval-pass-k-floor,eval-judge-independent-calibrated,eval-run-accounting,verified-matches-plan,permission-profile-live} \
-   <scratch>/em-base-051/plugins/engineering-method/evals/
+B=<scratch>/em-base-051/plugins/engineering-method/evals
+H=<scratch>/em-head-051/plugins/engineering-method/evals
+for c in eval-pass-k-floor eval-judge-independent-calibrated eval-run-accounting verified-matches-plan permission-profile-live; do
+  rm -rf "$B/$c" && cp -R "$H/$c" "$B/$c" && diff -r "$H/$c" "$B/$c" && echo "same: $c"
+done
 ```
-Then `git -C <scratch>/em-base-051 status --short` must list only those five folders, and `git -C <scratch>/em-base-051 diff --stat fddb809 -- plugins/engineering-method/skills plugins/engineering-method/scripts` must be empty.
+Expected: five `same:` lines. `rm -rf` first, so no 0.5.0 grader file survives a rename or delete on head. Then `git -C <scratch>/em-base-051 status --short` must list only those five folders, and `git -C <scratch>/em-base-051 diff --stat fddb809 -- plugins/engineering-method/skills plugins/engineering-method/scripts` must be empty.
+
+**Command prefix, every eval command:** `CLAUDE_BIN=$(command -v claude)` once (read and shown), then `PATH=/usr/bin:/bin:/usr/sbin:/sbin "$CLAUDE_BIN" plugin eval …`, so the session's `python3` is `/usr/bin/python3` 3.9 outside home (Task 0).
 
 **Two invocations, never mixed** (the Bash grant applies to every case in a run):
 1. **Five target cases, Bash granted:**
-   `claude plugin eval <checkout>/plugins/engineering-method --case '<one case>' --model opus --judge-model sonnet --ablation none -j 1 --runs 3 --threshold 0 --no-publish --trust-plugin --keep-temp --scaffold --allow-tools "Bash(python3 *)" --max-cost-usd <cap> --json <scratch>/eval-out/<dir>/result.json`. One case per command; `--scaffold` matters only for run-accounting.
+   `PATH=/usr/bin:/bin:/usr/sbin:/sbin "$CLAUDE_BIN" plugin eval <checkout>/plugins/engineering-method --case '<one case>' --model opus --judge-model sonnet --ablation none -j 1 --runs 3 --threshold 0 --no-publish --trust-plugin --keep-temp --scaffold --allow-tools "Bash(python3 *)" --max-cost-usd <cap> --json <scratch>/eval-out/<dir>/result.json`. One case per command; `--scaffold` matters only for run-accounting.
 2. **Regression cases, the 0.5.0 invocation unchanged, no Bash:** the same flags without `--allow-tools` and `--scaffold`.
 
-The cap per command is runs × max($0.35, the case's measured cost per run) × 1.25. A runner script refuses any command whose spent-so-far + cap passes the total cap, or whose sessions pass the total count, and logs each row before it starts (0.5.0 method).
+The cap per command is runs × max($0.35, the case's measured cost per run) × 1.25, with `permission-profile-exploration-light` priced at $0.95 a run (its 0.5.0 head run stopped at its cost ceiling at $0.87-0.94 a run). A runner script refuses any command whose spent-so-far + cap passes the total cap, or whose sessions pass the total count, and logs each row before it starts (0.5.0 method).
 
 **Order:**
 - (a) **Smoke:** head, `--runs 1` on each of the five target cases (5 sessions). Read each answer and trace. Confirm the script ran and the block reached `last_message`; if not, apply F3 and re-smoke only the affected case.
@@ -2041,10 +2050,13 @@ The cap per command is runs × max($0.35, the case's measured cost per run) × 1
   - `verified-near-miss-no-plan` (h050);
   - `permission-profile-exploration-light`, whose 0.5.0 head run was partial (2 of 3), so it also gets a fresh base, 3 runs (+3).
   - Why these: they read the references this release edits (`behaviour-evals.md`, `measurement-and-state-claims.md`, `permission-profiles.md`), sit at the test stage whose cell and hook note change, or are the near-miss guards for behaviours 4 and 5. Cases that load none of the changed text reuse 0.5.0 unchanged.
+- (c2) **The two near-miss guards again, with Bash granted:** `verified-near-miss-no-plan` and `permission-profile-exploration-light`, head only, 3 runs each, in the Bash-granted invocation (+6). Real users have Bash, and the new failure this release can cause, running `plan_conformance.py` on a throwaway script or `permissions_check.py` on a spike, is invisible without it. No new grader: read each kept trace for a Bash call naming either script. A call found is a hold.
 - (d) **One contingency fix round:** head only on the five target cases (15), only if (b) shows a fault in the tool or the text, not a capability red.
 
 **Reading results:**
 - Report k of n per criterion beside each mean.
+- For the five target cases, every new code grader is decided by construction on base (script-ran and content graders red, `c4c` green). Base versus head is read only on the `llm` graders and the unchanged graders, in a per-grader table that marks the by-construction cells. Case means are not compared across versions for these five.
+- Read `tool_used` information (Bash calls in the trace) as a hint only: it counts denied and failed calls.
 - New criteria are capability evals: below 2 of 3 on head is recorded as known red, not a hold.
 - Regression criteria hold: an unexplained base-versus-head drop stops the release (principle 18).
 - Read a sample of passing answers too, and read every run's `error` and the run-accounting traces (a run whose scaffold did not land is invalid, per the rule this release ships).
@@ -2056,13 +2068,15 @@ The cap per command is runs × max($0.35, the case's measured cost per run) × 1
   - the hybrid approach in one paragraph (owner's intent: deterministic where possible, judge for the residual);
   - the three scripts and their blocks;
   - the routing fix (cell and hook note, measured word and character counts);
-  - the five cases' grader changes, with base comparability stated;
-  - the known issues closed (pass-k c1 strictness, calibrated c2 wording, test-stage 0 reads);
+  - the five cases' grader changes, with base comparability stated: on base the new code graders are decided by construction, so base versus head is read only on the judged and unchanged graders;
+  - that a correct prose-only answer without the tool's block now fails these criteria by design (the owner's intent);
+  - the known issues: pass-k c1 strictness and the test-stage 0 reads closed; calibrated c2 and c3 **redefined, not closed**, since the prompt now supplies labels and the criteria test a different thing from the 0.5.0 wording;
+  - the operator conditions for running these five cases: `--allow-tools "Bash(python3 *)"`, `--scaffold`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, and a plugin copy outside the home folder;
   - results k of n base versus head;
   - sessions and the list-price estimate, billed to a claude.ai subscription (not spend);
   - the parked items.
 - [ ] `evals/COVERAGE.md`: rows 126, 129, 135, 146, 149 lose their 0.5.0 known-issue notes and gain the new grader files and the 0.5.1 head k of n. Add rows for each new grader file, under the same G-ids.
-- [ ] `README.md` (plugin): one short section "Scripts the skill runs", with the three commands and "they report, they never gate (exit 0 computed, 2 bad input)".
+- [ ] `README.md` (plugin): one short section "Scripts the skill runs", with the three commands, "they report, they never gate (exit 0 computed, 2 bad input)", Python 3.9 or later, and the four operator conditions above for the five eval cases (without them they score red). COVERAGE gets the same one-line note.
 - [ ] Full suite once: `python3 -m unittest discover -s plugins/engineering-method/tests` → OK. Then run the repo's other two suites as CI does.
 - [ ] Commit; push the branch; open the PR (body ends with the generated-with line); wait for the five CI checks:
   - release-gate unit tests;
@@ -2081,21 +2095,23 @@ The cap per command is runs × max($0.35, the case's measured cost per run) × 1
 
 | Step | Sessions | Basis |
 |---|---|---|
-| Task 0 probe | 1 | gated separately, about $0.30 |
+| Task 0 probes, runs 1-2 (done) and run 3 (pending) | 3 | $0.36 measured for runs 1-2; run 3 about $0.25 |
 | 7a smoke (head, 1 run × 5) | 5 | |
 | 7b gap (5 cases × 3 runs × base and head) | 30 | |
 | 7c regression (9 cases × 3 head) + fresh base for exploration-light (3) | 30 | |
+| 7c2 the two guards with Bash (2 × 3 head) | 6 | plan review I8 |
 | 7d contingency fix round (5 × 3 head) | 15 | only if needed |
-| **Total ceiling** | **81** | expected without 7d: 66 |
+| **Total ceiling** | **89** | inside the owner's 90; expected without 7d: 74 |
 
 **Estimate:**
-- 0.5.0 averaged about $0.23 per session (265 sessions, $61.31). The five target cases add a Bash round trip.
-- At $0.30-0.35 per session: expected 66 sessions ≈ **$20-23**; ceiling 81 ≈ **$24-28**.
-- **Hard cap: $28 and 81 sessions**, enforced by the runner script.
+- Measured 0.5.0 costs per run: target cases 0.17-0.33 (mean 0.24), regression cases 0.12-0.45, `permission-profile-exploration-light` 0.87-0.94 (priced at 0.95).
+- Expected without 7d about $25-27; with 7d about $30-31.
+- **Hard cap for Task 7: $33 and 86 sessions**, enforced by the runner script. With the probes, the total stays inside the owner's $35 and 90 sessions.
 - These are list-price estimates from the runner, judge calls included. Billing goes to the owner's claude.ai subscription (to be confirmed by `claude auth status` in the same pass). **Nothing runs without the owner's yes.**
 
 ## Self-review (done)
 
+- **Plan review applied** (a different-model reviewer, verdict "ready after fixes"): I1 test fix; I2 run-accounting judge kept, narrowed; I3 one permission grader in place of two; I4 tolerant patterns; I5 CHECK lines; I6 run-3 probe (placeholder in Task 0); I7 base-comparison wording, `rm -rf` and `diff -r`; I8 tier-c scoping and the guards re-run with Bash; I9 the calibrated case redefined, said in the CHANGELOG. Minor 1-7 and 9 applied; minor 8 and the review's deferred items are listed under Out of scope.
 - **Spec coverage:** the five behaviours map to Tasks 1-3 + 5. The routing gap maps to Task 4. Vendor checks are in the table above and in Task 0. TDD is in every script task. Headers are in Task 4's check. Eval cost is above. SDD lanes, release steps, Fit and Out of scope are present.
 - **Placeholders:**
   - `<scratch>` and `<worktree>` are paths the controller fills.
