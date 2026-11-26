@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": ["Bash(kubectl *)", "Bash(./ops/release.sh *)"],
+    "deny": ["Bash(dropdb *)"]
+  }
+}

@@ -1,0 +1,5 @@
+# Runs need --scaffold: fixture.sh copies review-input.md (the plan, diff-stat and diff the prompt shows) into the workspace.
+schema_version: "1.1"
+name: verified-matches-plan
+context:
+  scaffold_script: fixture.sh

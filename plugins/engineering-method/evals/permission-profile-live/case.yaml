@@ -1,0 +1,5 @@
+# Runs need --scaffold: fixture.sh copies settings.json (the user's draft for the live repo) into the workspace.
+schema_version: "1.1"
+name: permission-profile-live
+context:
+  scaffold_script: fixture.sh
