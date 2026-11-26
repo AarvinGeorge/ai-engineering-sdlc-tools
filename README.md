@@ -8,6 +8,19 @@ The through-line: **a coding agent's memory ends with its context window, and a 
 memory of what the agent did ends sooner than that.** These tools put the shared state
 somewhere both sides can read, and make the reading automatic.
 
+## Use cases
+
+- **plan-layer** answers "where are we?" from a file, in every new session. [Use cases](plugins/plan-layer/README.md#use-cases).
+- **engineering-method** makes the agent show evidence and scale its process to the stakes. [Use cases](plugins/engineering-method/README.md#use-cases).
+- **work-log** turns your sessions into a timesheet you can hand to someone. [Use cases](plugins/work-log/README.md#use-cases).
+
+**The three together.** You spend two weeks on a small internal tool. Each morning the session
+opens with the plan's active item and what is next, so you never re-explain. The agent names the
+work "internal", so changes get tests and a review by a different model, and "is it merged?" is
+answered with a command and its output. When tasks finish, `/plan-layer sync` re-renders the page
+and the gate flags anything left behind. On Monday you ask "work log for last week" and get a
+sheet of what was done, with estimated hours per day.
+
 ## Plugins
 
 | Plugin | What it does |

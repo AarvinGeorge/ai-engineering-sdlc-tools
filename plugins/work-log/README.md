@@ -3,6 +3,24 @@
 Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any
 period, saved as a new Google Sheet in a `Work Logs` folder in Drive, or as a local `.xlsx` file.
 
+## Use cases
+
+- **Your manager asks what you did last week.** Ask "work log for last week". It covers the
+  previous Monday to Sunday for the current folder and returns a link to a new sheet in
+  `Work Logs`, plus the total for each day.
+- **HR needs hours for a month, across every project.** Ask "hours for HR for October, all
+  projects". Each entry gets a summary of 30 words or fewer that a non-engineer can read, with no
+  file paths or branch names. Hours are estimates from activity and are labelled as such.
+- **You spent an hour on a call outside Claude.** Say "log 1 hour yesterday, call with the design
+  team". It is saved as a manual entry in `Work Logs/Manual` and included in later logs for that
+  period.
+- **A name must never appear in a log.** Put it in `~/.config/work-log/never.txt`. If any summary
+  contains it, the upload stops and the message names the entry, never the value.
+- **You have not connected Google Drive.** The same request writes a local `.xlsx` in the current
+  folder with the same three tabs.
+- **You forget to ask for weeks.** A weekly Desktop task makes last week's sheet every Monday and
+  fills missed weeks while their transcripts still exist.
+
 ## The problem
 
 You need a record of what you did and roughly how long it took: for HR, a client, a manager or a

@@ -5,6 +5,28 @@ A shared planning surface between a human developer and a coding agent.
 **One JSON file is the state.** **A self-contained HTML page is the view.** **A gate catches
 drift.** **Session hooks brief the agent before the first word is typed.**
 
+## Use cases
+
+- **You come back after a week and ask the agent where things stand.** A session hook has already
+  given it the active item, its stage and the queue, read from `plan/plan.json`. Ask for
+  `/plan-layer status` and you get the same three things, not a guess from memory.
+- **The plan says one thing and the work says another.** The gate reads the plan against itself.
+  Mark a dependency finished and forget the item that waited on it, and `/plan-layer check` prints:
+
+  ```
+  DRIFT  item 'Login page' still says it waits on 'Mail provider', which is finished
+  ```
+
+  A contradiction (two active items, a missing plan file for work being built) is a `FAIL` instead.
+- **You want to read the plan without a terminal.** `/plan-layer sync` re-renders `plan/index.html`,
+  a single page with no scripts or network calls. Open it locally or publish it. If the JSON changes
+  and the page does not, the page says it is stale.
+- **You stop for the day, or hand the work to someone else.** `/plan-layer pause` writes
+  `plan/HANDOFF.md` and marks the plan paused. The next session's brief tells the agent to read the
+  handoff before anything else. `/plan-layer pause --resume` clears it.
+- **A one-week take-home or a spike.** `/plan-layer init --light` gives you the state file, the page
+  and the gate, without figures, archive or rolling.
+
 ## The problem
 
 An agent's memory ends with its context window. A human's memory of what the agent did ends

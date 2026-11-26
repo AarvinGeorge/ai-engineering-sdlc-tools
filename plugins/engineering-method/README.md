@@ -3,6 +3,25 @@
 An engineering method for working with coding agents, carried to every project as one on-demand
 skill.
 
+## Use cases
+
+- **You ask "is it deployed?"** The agent measures instead of recalling. It shows the command that
+  proves the running version contains the change (for example
+  `git merge-base --is-ancestor <sha> <running>`), and says "unverified" when it cannot read the
+  running version.
+- **You want a quick throwaway script.** The agent names it exploration (tier a) and keeps it light:
+  the script, plus one check you can run. No plan, no review pipeline. Ceremony the stakes do not
+  need counts as a defect.
+- **A search comes back with 0 results.** Before reporting "none", the agent shows the same search
+  can find something, so a broken pattern is not mistaken for a real zero.
+- **You decline a permission prompt.** The agent stops. It does not retry a narrower form or move
+  the action somewhere that does not prompt; it marks the step unverified and tells you.
+- **You type "ok, now deploy it to production".** A hook sees the stage change and injects one line
+  telling the agent to read `references/live-system-changes.md` before acting: in-flight check,
+  verified backup, rollback ready, read-backs after. It stays quiet until the stage changes again.
+- **You ask which model should review a change.** The answer is a different model from the one that
+  wrote it, at least as strong, and the reviewer runs probes rather than reading the diff.
+
 ## The problem
 
 A method learnt on one project lives in that project's instructions file. Open a different
