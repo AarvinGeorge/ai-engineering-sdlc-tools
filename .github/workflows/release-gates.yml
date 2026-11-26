@@ -80,12 +80,15 @@ jobs:
         run: |
           set -uo pipefail
           printf 'AK%s%s\n' 'IA' 'CCCCCCCCCCCCCCCC' > "$RUNNER_TEMP/ctl-generic.txt"
-          python .github/release-gates/scan_payload.py --paths "$RUNNER_TEMP/ctl-generic.txt"; rc=$?
+          # the runner uses bash -e: an expected non-zero exit must be captured with || , not with $? afterwards
+          rc=0
+          python .github/release-gates/scan_payload.py --paths "$RUNNER_TEMP/ctl-generic.txt" || rc=$?
           [ "$rc" -eq 1 ] || { echo "generic control did not fire (exit $rc)"; exit 1; }
           if [ "$REQUIRE" = "true" ]; then
             grep -v '^[[:space:]]*\(#\|$\)' "$RUNNER_TEMP/private-list.txt" | head -n1 > "$RUNNER_TEMP/ctl-private.txt"
+            rc=0
             python .github/release-gates/scan_payload.py --paths "$RUNNER_TEMP/ctl-private.txt" \
-              --tokens-file "$RUNNER_TEMP/private-list.txt" --require-private-list > /dev/null; rc=$?
+              --tokens-file "$RUNNER_TEMP/private-list.txt" --require-private-list > /dev/null || rc=$?
             [ "$rc" -eq 1 ] || { echo "private control did not fire (exit $rc)"; exit 1; }
           fi
           rm -f "$RUNNER_TEMP"/ctl-*.txt
