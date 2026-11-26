@@ -199,6 +199,67 @@ class Conformance(unittest.TestCase):
         self.assertIn("CONFORMANCE: 1 mismatch, 0 checks (1 step, 1 out-of-scope item, 1 file changed)",
                       run(text)[1])
 
+    RENAME = "\n".join([
+        "Plan, steps:", "1. Add `report_totals(rows)` in `report/totals.py`.", "",
+        "Plan, out of scope:", "- Anything under `jobs/`.", "",
+        " jobs/{purge.py => purge_all.py} | 4 ++--",
+        " jobs/logo.png                   | Bin 0 -> 2048 bytes",
+        " jobs/my notes.txt               | 3 +++",
+        " report/totals.py                | 31 +++++++++++++++++++++++++++++++",
+        " 4 files changed, 36 insertions(+), 2 deletions(-)", ""])
+
+    def test_rename_binary_and_spaced_names_withhold(self):
+        out = run(self.RENAME)[1]
+        for f in ("jobs/purge.py", "jobs/purge_all.py", "jobs/logo.png"):
+            self.assertIn("MISMATCH out-of-scope %s " % f, out)
+        self.assertIn("UNREAD diff-stat (its summary says 4 files changed, 3 stat lines read;", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_spaced_name_alone_is_unread_and_withholds(self):
+        text = self.RENAME.replace(" jobs/{purge.py => purge_all.py} | 4 ++--\n", "").replace(
+            " jobs/logo.png                   | Bin 0 -> 2048 bytes\n", "").replace(
+            " 4 files changed", " 2 files changed").replace("`jobs/`", "`old/`")
+        out = run(text)[1]
+        self.assertIn("0 mismatches", out)
+        self.assertIn("UNREAD diff-stat (its summary says 2 files changed, 1 stat lines read;", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_summary_that_matches_the_stat_prints_no_unread(self):
+        text = "\n".join(self.RENAME.splitlines()[:6] + [
+            " report/totals.py | 31 +++++", " 1 file changed, 31 insertions(+)", ""])
+        out = run(text)[1]
+        self.assertNotIn("UNREAD", out)
+        self.assertIn("VERIFIED: ok", out)
+
+    CONTEXT = "\n".join([
+        "Plan, steps:", "1. Document `--totals` in `README.md`.", "",
+        "Plan, out of scope:", "- Anything under `jobs/`.", "",
+        " README.md | 3 ++-", " 1 file changed, 2 insertions(+), 1 deletion(-)", "",
+        "diff --git a/README.md b/README.md", "--- a/README.md", "+++ b/README.md",
+        "@@ -10,6 +10,7 @@ Usage",
+        " 1. Install it; see `docs/setup.md`.",
+        " - Reports live in `README.md` and `report/`.",
+        "-Old line", "+Run `report --totals`.",
+        " * 2 | 3 pipes in a context line", ""])
+
+    def test_hunk_context_lines_are_not_plan_text(self):
+        out = run(self.CONTEXT)[1]
+        self.assertIn("CONFORMANCE: 0 mismatches, 0 checks (1 step, 1 out-of-scope item, 1 file changed)", out)
+        self.assertIn("VERIFIED: ok", out)
+
+    def test_context_control_a_real_out_of_scope_change_still_withholds(self):
+        text = self.CONTEXT.replace(" README.md | 3 ++-", " README.md | 3 ++-\n jobs/x.py | 1 +").replace(
+            " 1 file changed", " 2 files changed")
+        out = run(text)[1]
+        self.assertIn("MISMATCH out-of-scope jobs/x.py", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_no_argument_is_an_error_not_a_wait(self):
+        # a valid plan on stdin: before this rule it was read and exit 0; now no argument is exit 2
+        p = subprocess.run([sys.executable, SCRIPT], input=FIXTURE, capture_output=True, text=True, timeout=10)
+        self.assertEqual((p.returncode, p.stdout), (2, ""))
+        self.assertIn("ERROR: cannot compare", p.stderr)
+
     def test_block_shape(self):
         lines = run(FIXTURE)[1].splitlines()
         self.assertEqual((lines[0], lines[-1]), ("PLAN_CONFORMANCE v1", "PLAN_CONFORMANCE end"))

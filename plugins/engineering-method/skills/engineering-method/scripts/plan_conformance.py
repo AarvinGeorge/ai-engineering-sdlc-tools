@@ -9,7 +9,7 @@ only when no step names the file), UNMATCHED lines for the model to judge, and a
 VERIFIED: withheld | ok line.
 Use when: tier b or c, a plan exists, and "verified" is about to be said
 (references/measurement-and-state-claims.md).
-Inputs: a path, or "-" / nothing for stdin.
+Inputs: a path, or "-" for stdin (no argument is an error, never a wait).
 Output: the block on stdout; exit 0 for either verdict (it reports, never gates); exit 2 and
 "ERROR: cannot compare (...)" on stderr when there are no steps or no diff-stat lines.
 Side effects: none (reads text only, runs no git).
@@ -20,7 +20,8 @@ import sys
 from fnmatch import fnmatch
 
 PATH = re.compile(r"`([\w./-]+(?:/|\.\w+))`")
-STAT = re.compile(r"^\s*(\S+)\s+\|\s+\d+")
+STAT = re.compile(r"^\s*(\S+|\S*\{\S* => \S*\}\S*|\S+ => \S+)\s+\|\s+(?:\d+|Bin\b)")
+SUMMARY = re.compile(r"^\s*(\d+) files? changed\b")
 KEY = re.compile(r"""(--[\w-]+|def\s+\w+|class\s+\w+|^\s*[A-Za-z_]\w*\s*=)""")
 HEAD = re.compile(r"^(?:\+\+\+ b/|diff --git a/)(\S+)")
 WITHHELD = ("VERIFIED: withheld (owner rules on each: keep and add to the plan | revert | "
@@ -40,7 +41,7 @@ def parse(text):
             continue
         m = STAT.match(line)
         if m:
-            files.append(m.group(1))
+            files.extend(stat_paths(m.group(1)))
             continue
         h = HEAD.match(line)
         if h or line.startswith("@@"):
@@ -51,6 +52,8 @@ def parse(text):
             continue
         if in_diff and line.startswith("+") and not line.startswith("+++"):
             added.append((cur, line[1:]))
+            continue
+        if in_diff and line[:1] in (" ", "\\"):
             continue
         item = re.match(r"\s*(\d+\.|[-*] )", line)
         if re.search(r"out[- ]of[- ]scope", low) and len(line) < 60 and not item:
@@ -67,6 +70,16 @@ def parse(text):
         elif section == "oos" and re.match(r"\s*[-*] ", line):
             oos.append(line.strip()[2:])
     return steps, oos, files, removed, added
+
+
+def stat_paths(p):
+    """What: the path or paths one diff-stat name stands for (a rename gives old and new).
+    Use when: parse(). Inputs: the name column of a stat line. Output: list of paths.
+    Side effects: none. Role: parsing."""
+    m = re.match(r"(.*)\{(.*) => (.*)\}(.*)$", p)
+    if m:
+        return [re.sub(r"/+", "/", m.group(1) + x + m.group(4)) for x in m.group(2, 3)]
+    return p.split(" => ")
 
 
 def key(line):
@@ -135,8 +148,15 @@ def conformance(text):
            "CONFORMANCE: %s, %s (%s, %s, %s changed)"
            % (count(len(mism), "mismatch"), count(len(checks), "check"), count(len(steps), "step"),
               count(len(oos), "out-of-scope item"), count(len(files), "file"))]
-    out += mism + checks + unmatched
-    out.append(WITHHELD if mism or held else
+    said = [int(m.group(1)) for m in map(SUMMARY.match, text.splitlines()) if m]
+    read = sum(1 for ln in text.splitlines() if STAT.match(ln))
+    unread = []
+    if said and sum(said) != read:
+        unread.append("UNREAD diff-stat (its summary says %d files changed, %d stat lines read; a name "
+                      "this script cannot parse, such as one with spaces; compare those by hand)"
+                      % (sum(said), read))
+    out += mism + checks + unmatched + unread
+    out.append(WITHHELD if mism or held or unread else
                "VERIFIED: ok (diff matches the plan: %d steps, 0 out-of-scope changes)" % len(steps))
     return out + ["PLAN_CONFORMANCE end"]
 
@@ -145,7 +165,9 @@ def main(argv):
     """What: CLI entry. Use when: run as a script. Inputs: argv. Output: exit code.
     Side effects: prints. Role: plumbing."""
     try:
-        src = argv[0] if argv else "-"
+        if not argv:
+            raise ValueError("give the plan+diff file path, or - for stdin")
+        src = argv[0]
         if src == "-":
             text = sys.stdin.read()
         else:
