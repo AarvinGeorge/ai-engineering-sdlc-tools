@@ -107,6 +107,9 @@ near 100%, and a capability case that holds graduates into the regression set.
   release to release.
 - **Criteria that existed before the change are regression evals: they hold.** A drop is read and
   ruled on as the next bullet says; an unexplained one stops the release (principle 18).
+- **A difference from the base is read, explained and ruled on.** Read the answers behind it, label
+  each a judge error or a behaviour change, and bring it to the owner, who decides the release. Unit
+  tests, deterministic checks and live checks still gate (principle 18).
 - **A score threshold on a new metric gates a release only after it has a history**: stored results
   across several versions, a code grader or a calibrated judge, and the owner's decision that it now
   gates. Until then, run so the exit code means run errors only (for example a threshold of 0) and
@@ -115,9 +118,6 @@ near 100%, and a capability case that holds graduates into the regression set.
   holds releases on chance; a criterion that already held is what a release must not lose. *Test:*
   the release notes list known-red capability criteria apart from the regression results, and no
   release step fails on a score threshold that has no history.
-- **A difference from the base is read, explained and ruled on.** Read the answers behind it, label
-  each a judge error or a behaviour change, and bring it to the owner, who decides the release. Unit
-  tests, deterministic checks and live checks still gate (principle 18).
 - **A new rule's case still has to be red on the old version** (below), because that shows the case
   measures the rule; its result on the new version is reported (first bullet).
 
