@@ -19,9 +19,9 @@ from pathlib import Path
 
 EXEMPT_FILES = {"README.md", "ROADMAP.md", "CHANGELOG.md"}
 EXEMPT_DIRS = ("tests/", "evals/")
-SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
-HEADING = re.compile(r"^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}\s*$")
-CURRENT = re.compile(r"Current: (\d+\.\d+\.\d+)\.")
+SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+HEADING = re.compile(r"^## ((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)) — [0-9]{4}-[0-9]{2}-[0-9]{2}\s*$")
+CURRENT = re.compile(r"Current: ((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))\.")
 
 
 def git(root, *args):
@@ -44,7 +44,7 @@ def is_release_relevant(rel):
 def changed_plugins(root, base):
     """Plugin directory names with a release-relevant change in base...HEAD."""
     names = set()
-    for p in git(root, "diff", "--name-only", f"{base}...HEAD", "--", "plugins").splitlines():
+    for p in git(root, "diff", "--name-only", "--no-renames", f"{base}...HEAD", "--", "plugins").splitlines():
         parts = p.split("/", 2)
         if len(parts) == 3 and is_release_relevant(parts[2]):
             names.add(parts[1])
@@ -97,6 +97,8 @@ def bump_problems(root, base, versions):
     problems = []
     for name in changed_plugins(root, base):
         head = versions.get(name)
+        if head is None and not (root / "plugins" / name).exists():
+            continue  # plugin removed cleanly: nothing left to bump
         if head is None:
             problems.append(f"{name}: files changed under plugins/{name} but no marketplace entry")
             continue
@@ -122,7 +124,7 @@ def main(argv=None):
         if a.base:
             problems += bump_problems(root, a.base, versions)
             changed = changed_plugins(root, a.base)
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as e:
+    except (OSError, ValueError, KeyError, AttributeError, TypeError, subprocess.CalledProcessError) as e:
         print(f"version_gate: unusable input: {e}", file=sys.stderr)
         return 2
     for p in problems:

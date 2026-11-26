@@ -1,5 +1,8 @@
 """Tests for version_gate.py: consistency (rule 1) and bump (rule 2)."""
+import contextlib
+import io
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -68,7 +71,8 @@ class Repo:
 
     def run(self, base=True):
         argv = ["--root", str(self.root)] + (["--base", self.base] if base else [])
-        return vg.main(argv)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return vg.main(argv)
 
     def __exit__(self, *a):
         self.tmp.cleanup()
@@ -177,6 +181,51 @@ class Bump(unittest.TestCase):
         with Repo() as r:
             r.base = "0" * 40
             self.assertEqual(r.run(), 2)
+
+    def test_move_out_of_shipped_into_tests_needs_bump(self):
+        with Repo() as r:
+            (r.root / "plugins/alpha/tests").mkdir()
+            (r.root / "plugins/alpha/scripts/run.py").rename(r.root / "plugins/alpha/tests/run.py")
+            r.commit()
+            self.assertEqual(r.run(), 1)
+
+    def test_move_into_another_plugin_needs_bump_of_the_source(self):
+        with Repo() as r:
+            (r.root / "plugins/alpha/scripts/run.py").rename(r.root / "plugins/beta/scripts/moved.py")
+            set_version(r.root, "beta", "1.1.0")
+            r.commit()
+            self.assertEqual(r.run(), 1)
+
+    def test_cleanly_deleted_plugin_passes(self):
+        with Repo() as r:
+            shutil.rmtree(r.root / "plugins/alpha")
+            m = json.loads((r.root / ".claude-plugin/marketplace.json").read_text())
+            m["plugins"] = [e for e in m["plugins"] if e["name"] != "alpha"]
+            write(r.root, ".claude-plugin/marketplace.json", json.dumps(m))
+            lines = [l for l in (r.root / "README.md").read_text().splitlines() if "[`alpha`]" not in l]
+            write(r.root, "README.md", "\n".join(lines) + "\n")
+            r.commit()
+            self.assertEqual(r.run(), 0)
+
+    def test_leading_zero_version_is_unusable(self):
+        with Repo() as r:
+            set_version(r.root, "alpha", "0.019.0")
+            self.assertEqual(r.run(base=False), 2)
+
+    def test_fullwidth_digit_version_is_unusable(self):
+        with Repo() as r:
+            set_version(r.root, "alpha", "\uff11.0.0")
+            self.assertEqual(r.run(base=False), 2)
+
+    def test_leading_zero_in_changelog_heading_fails(self):
+        with Repo() as r:
+            write(r.root, "plugins/alpha/CHANGELOG.md", "# Changelog\n\n## 0.01.0 \u2014 2026-11-01\n")
+            self.assertEqual(r.run(base=False), 1)
+
+    def test_plugin_json_not_an_object_is_unusable(self):
+        with Repo() as r:
+            write(r.root, "plugins/alpha/.claude-plugin/plugin.json", "[]")
+            self.assertEqual(r.run(base=False), 2)
 
 
 if __name__ == "__main__":
