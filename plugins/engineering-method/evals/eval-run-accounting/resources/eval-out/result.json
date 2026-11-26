@@ -1,0 +1,743 @@
+{
+ "schemaVersion": 1,
+ "partial": false,
+ "costUsd": 5.62,
+ "suite": {
+  "concurrency": 4,
+  "threshold": 1
+ },
+ "cases": [
+  {
+   "name": "parse-invoices",
+   "arms": {
+    "with": [
+     {
+      "score": 0,
+      "passed": false,
+      "turns": 4,
+      "costUsd": 0.26,
+      "error": null,
+      "tracePath": "traces/parse-invoices-1.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": false
+       },
+       {
+        "name": "c2",
+        "passed": false
+       }
+      ]
+     },
+     {
+      "score": 0,
+      "passed": false,
+      "turns": 4,
+      "costUsd": 0.26,
+      "error": null,
+      "tracePath": "traces/parse-invoices-2.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": false
+       },
+       {
+        "name": "c2",
+        "passed": false
+       }
+      ]
+     },
+     {
+      "score": 0,
+      "passed": false,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/parse-invoices-3.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": false
+       },
+       {
+        "name": "c2",
+        "passed": false
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "summarise-thread",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "draft-reply",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "extract-dates",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "rank-tickets",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 0.5,
+      "passed": false,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": false
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "tag-expenses",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "merge-contacts",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "route-request",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "translate-note",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "classify-intent",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "check-links",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "format-table",
+   "arms": {
+    "with": [
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     },
+     {
+      "score": 1,
+      "passed": true,
+      "turns": 4,
+      "costUsd": 0.15,
+      "error": null,
+      "tracePath": "traces/ok.jsonl",
+      "graders": [
+       {
+        "name": "c1",
+        "passed": true
+       },
+       {
+        "name": "c2",
+        "passed": true
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

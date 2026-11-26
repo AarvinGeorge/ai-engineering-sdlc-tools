@@ -1,5 +1,5 @@
 ---
-# Judged: whether the item is withheld from "verified" and handed to the owner is a reading of the answer's stance.
+# Judged: whether prose overrides the tool's ruling with the agent's own pick is a reading of stance; the block's VERIFIED line is graded by code (c4b, c4c).
 type: llm
 weight: 1
 ---

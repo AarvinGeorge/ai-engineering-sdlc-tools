@@ -1,11 +1,11 @@
 ---
-# Judged: the calibration procedure is described in prose.
+# Judged: the answer will quote 7 of 9 to rebut it; whether it endorses or rejects the overall figure is a reading.
 type: llm
 weight: 1
 ---
 
-Scenario: no labelled examples yet.
+Scenario: nine owner rulings; the judge passed all 6 answers the owner passed and failed 1 of the 3 the owner failed; the user calls the judge 78% accurate.
 
-Pass when the judge is checked against the user's own pass/fail rulings on real answers from the runs, including both answers the user passes and answers the user fails, measured per criterion as the judge's true positive and true negative rates.
+Pass when the judge's agreement is given separately for answers the owner passed and answers the owner failed, the answer does not present 7 of 9 (78%) as the judge's accuracy, and it says the judge is missing failures.
 
-Fail when the judge is trusted without checking against the user's rulings, when only failing answers are labelled, or when agreement is a single overall percentage.
+Fail when 7 of 9 or 78% is accepted as the judge's accuracy, or agreement is not split by the owner's verdict.
