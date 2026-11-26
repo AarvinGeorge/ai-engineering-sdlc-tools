@@ -13,12 +13,12 @@ Paste it; never let an agent rewrite a settings file to loosen it.
 - **Across files, deny wins:** lists merge across user, project, local and managed settings; a deny
   at any level beats an allow at any other. (permissions, "Settings precedence"; settings, "Lists
   merge instead of overriding"). For a tier c profile, or when asked whether another settings file
-  can loosen a rule, check it with `python3 <the skill's base directory>/scripts/permissions_check.py --file
-  <scope>=<settings file> --command "<a command the profile must stop>"` (save a draft to a file
-  first; `--inline <scope>='<json>'` suits only a one-line JSON; the base directory is the one the
-  Skill tool printed when the skill loaded) and paste each block as printed; its CROSS_FILE_PROBE
-  line shows an allow in user or local settings cannot undo the deny. Call it by its full path, not
-  after cd.
+  can loosen a rule, check the profile you are handing back, not only a draft you were given, with
+  `python3 <the skill's base directory>/scripts/permissions_check.py --inline project='<your profile
+  as one-line JSON>' --command "<a command the profile must stop>"` (or `--file <scope>=<settings
+  file>` when that profile is already saved in a file; the base directory is the one the Skill tool
+  printed when the skill loaded) and paste each block as printed; its CROSS_FILE_PROBE line shows an
+  allow in user or local settings cannot undo the deny. Call it by its full path, not after cd.
 - **Every mode:** deny blocks in every mode, `bypassPermissions` included. A call matching an ask
   rule is never auto-approved in any mode: it prompts, or is denied where no prompt is possible
   (`dontAsk`); an installed mod is the one exception ("Mods" below). Command-content ask rules fall back to a prompt in auto mode; allow rules do nothing

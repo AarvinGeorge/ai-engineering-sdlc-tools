@@ -78,7 +78,7 @@ near 100%, and a capability case that holds graduates into the regression set.
   floor criteria report n of n, and a floor criterion with any failing run is not called reliable.
   A new floor criterion is still a capability eval for the release; n of n is what lets it be called
   reliable. For a never-break criterion run
-  `python3 <the skill's base directory>/scripts/eval_stats.py floor --name "<criterion>" --results <P, F or I per run>`
+  `python3 <the skill's base directory>/scripts/eval_stats.py floor --name "<criterion>" --results <one letter per run, no spaces or commas: P, F or I>`
   (I = invalid, not counted; the base directory is the one the Skill tool printed when the skill
   loaded) and paste its block as printed; do not work the figures out by hand. Call it by its full
   path, not after cd.

@@ -479,7 +479,7 @@ class TestStageNote(unittest.TestCase):
         hook = load_hook()
         st = [s for s in hook.STAGES if s["stage"] == "test"][0]
         msg = hook.stage_message(st)
-        self.assertIn("plan_conformance.py", msg)
+        self.assertIn("plan_conformance.py <plan+diff file>", msg)
         self.assertLessEqual(len(msg), 400)
         self.assertTrue(msg.endswith("named."), "the message was truncated at 400 characters")
 

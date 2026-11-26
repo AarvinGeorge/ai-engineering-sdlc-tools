@@ -87,7 +87,8 @@ out-of-scope list:
    Save the plan text, that diff-stat and the hunks to one file, then
    `python3 <the skill's base directory>/scripts/plan_conformance.py <that file>` does steps 1 and 2 (the base
    directory is the one the Skill tool printed when the skill loaded); paste its block as printed.
-   Call it by its full path, not after cd.
+   Call it by its full path, not after cd. If it prints ERROR: cannot compare, do steps 1 and 2 by
+   hand and say the script could not read the plan.
 2. List every mismatch with file and line, in three kinds:
    - **out of scope:** a change the out-of-scope list rules out, including a change in behaviour to
      something it names, not only a file or folder it names;
