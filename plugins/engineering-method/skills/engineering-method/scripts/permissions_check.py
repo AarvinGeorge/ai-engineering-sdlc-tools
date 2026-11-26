@@ -370,8 +370,9 @@ def block(cmd, layers, ssh_supplied=False):
     else:
         out += ["CROSS_FILE_PROBE: n/a", "LOOSENED_BY_OTHER_FILE: n/a"]
     out += ["TRUST: project allow rules apply only after workspace trust; deny and ask apply at once",
-            "LIMIT: matches command text as written; /full/path, sh -c and other forms are not covered "
-            "(not a security boundary)",
+            "LIMIT: matches command text as written; /full/path, sh -c and other forms are not covered; "
+            "permission rules are not a security boundary; the hard floor is the OS sandbox or a "
+            "PreToolUse hook that blocks the command",
             "NOTES: deny and ask are also checked past wrappers (their own arguments skipped by a "
             "heuristic), env assignments, control-flow keywords and nested bodies; this checker does not "
             "compute allow past wrappers or env assignments and prints no-rule there, which is not a "

@@ -150,6 +150,12 @@ class Contract(unittest.TestCase):
                                 "ALSO_MATCHED", "CROSS_FILE_PROBE", "LOOSENED_BY_OTHER_FILE", "TRUST", "LIMIT",
                                 "NOTES", "END"])
 
+    def test_limit_line_names_the_hard_floor(self):
+        _, out, _ = run({"project": self.LIVE}, "kubectl delete pod x")
+        self.assertIn("LIMIT: matches command text as written; /full/path, sh -c and other forms are not "
+                      "covered; permission rules are not a security boundary; the hard floor is the OS sandbox "
+                      "or a PreToolUse hook that blocks the command", out)
+
     def test_mode_line(self):
         _, out, _ = run({"project": {"permissions": {"defaultMode": "bypassPermissions", "deny": ["Bash(rm *)"]}}},
                         "rm x")
