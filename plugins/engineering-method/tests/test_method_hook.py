@@ -141,7 +141,7 @@ class Prompt(Base):
         text = context(self.prompt("/plan-layer status"))
         self.assertIn("stage report", text)
         self.assertIsNone(context(self.prompt("/review", session="x")))
-        self.assertIn("stage build", context(self.prompt("/plan fix the bug", session="y")))
+        self.assertIn("stage build", context(self.prompt("/plan fix the heading", session="y")))
 
     def test_whole_word_only(self):
         for i, text in enumerate(("the planet is big", "contest", "prereview", "update it and check it")):
@@ -162,7 +162,7 @@ class Prompt(Base):
         self.assertNotIn("load ", text)
 
     def test_message_within_limit(self):
-        for i, w in enumerate(("plan", "build", "review", "test", "deploy", "merge", "release", "report")):
+        for i, w in enumerate(("plan", "build", "review", "test", "deploy", "merge", "release", "report", "debug")):
             text = context(self.prompt(w, session="m%d" % i))
             self.assertLessEqual(len(text), 400)
 
@@ -253,7 +253,7 @@ class FixRound(Base):
                  "go-live": "deploy", "roll back": "deploy", "rolling back": "deploy",
                  "rolled back": "deploy", "re-deploy": "deploy", "unit-tests": "test",
                  "test-suite": "test", "pr": "merge", "open a pull request": "merge",
-                 "commit": "merge", "pytest": "test", "debug": "build"}
+                 "commit": "merge", "pytest": "test", "debug": "debug"}
         for text, stage in cases.items():
             self.assertEqual(self.stage_of(text), stage, text)
 
@@ -355,6 +355,82 @@ class TagTokens(Base):
 
     def test_stray_closing_tag_removed_contents_kept(self):
         self.assertIn("stage review", context(self.prompt("</div> review it")))
+
+
+class DebugStage(Base):
+    """0.4.0: a debugging prompt routes to systematic-debugging and the investigation reference."""
+    n = 0
+
+    def stage_of(self, text):
+        DebugStage.n += 1
+        c = context(self.prompt(text, session="dbg%d" % DebugStage.n))
+        return None if c is None else re.search(r"stage (\w+)", c).group(1)
+
+    def test_debug_words_and_phrase(self):
+        for text in ("debug the agent", "debugging this", "investigate the refusal",
+                     "diagnose it", "there is a bug in the parser",
+                     "what was the root cause"):
+            self.assertEqual(self.stage_of(text), "debug", text)
+
+    def test_debug_message_names_skill_and_reference(self):
+        text = context(self.prompt("investigate this", session="dm"))
+        self.assertIn("load superpowers:systematic-debugging", text)
+        self.assertIn("references/root-cause-investigation.md", text)
+        self.assertLessEqual(len(text), 400)
+
+    def test_debug_message_puts_evidence_before_any_cause(self):
+        text = context(self.prompt("investigate this", session="dm2"))
+        self.assertIn("no cause, suspect list or fix until RC-1 to RC-4", text)
+        self.assertIn("(tier b, c)", text)
+        self.assertIn("are done, requested or skipped", text)
+        self.assertLessEqual(len(text), 400)
+        other = context(self.prompt("review this", session="dm3"))
+        self.assertNotIn("RC-1", other)
+
+    def test_a_debug_word_outranks_an_earlier_fix_word(self):
+        for text in ("fix the bug in the parser", "fix the bug in login",
+                     "fix it, then investigate why it broke"):
+            self.assertEqual(self.stage_of(text), "debug", text)
+
+    def test_other_build_words_keep_build(self):
+        for text in ("implement a debug flag", "build with debug symbols",
+                     "refactor the debug logging", "build a bug tracker",
+                     "build the investigation dashboard"):
+            self.assertEqual(self.stage_of(text), "build", text)
+
+    def test_fix_without_a_debug_word_stays_build(self):
+        for text in ("fix it", "fix the typo in the heading", "implement the fix"):
+            self.assertEqual(self.stage_of(text), "build", text)
+
+    def test_an_earlier_non_build_stage_still_wins(self):
+        self.assertEqual(self.stage_of("plan the fix for the bug"), "plan")
+        self.assertEqual(self.stage_of("review the bug fix"), "review")
+
+    def test_a_nearer_non_build_stage_blocks_the_debug_override(self):
+        self.assertEqual(self.stage_of("fix the typo, then deploy to production; "
+                                       "the bug report can wait"), "deploy")
+        self.assertEqual(self.stage_of("fix it then merge, the bug is known"), "merge")
+
+    def test_inflected_fix_and_bug_words_route_to_debug(self):
+        for text in ("fixed the bug", "fixing bugs in the parser", "fixes the bugs here",
+                     "fixed it, bugs remain"):
+            self.assertEqual(self.stage_of(text), "debug", text)
+
+    def test_why_questions_do_not_claim_the_debug_stage(self):
+        self.assertIsNone(context(self.prompt("why did we decide on Postgres?", session="why")))
+        text = context(self.prompt("debug the login failure", session="why"))
+        self.assertIn("stage debug", text)
+
+    def test_debug_words_are_whole_words(self):
+        for text in ("debugger", "bugle", "investigator", "humbug"):
+            self.assertIsNone(self.stage_of(text), text)
+
+    def test_brief_lists_the_debug_stage(self):
+        text = context(self.start("startup"))
+        self.assertIn("debug -> superpowers:systematic-debugging -> "
+                      "references/root-cause-investigation.md", text)
+        for source in ("startup", "clear", "compact"):
+            self.assertLessEqual(len(context(self.start(source))), 1500)
 
 
 class Wiring(unittest.TestCase):

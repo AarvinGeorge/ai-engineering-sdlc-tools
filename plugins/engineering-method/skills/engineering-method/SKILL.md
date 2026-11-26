@@ -1,7 +1,7 @@
 ---
 name: engineering-method
 description: Engineering judgement for work with a coding agent, scaled by stakes (prototype, internal tool, live system). Use it BEFORE answering even when it looks simple, whenever the user asks whether something works, passed, is deployed, live or merged, or found zero results; asks for a status update or a report of a test run; asks for steps to deploy, pull, restart or migrate a system real people use; asks which model should implement or review, or how to brief a subagent; has just declined a permission; or asks to add, change, plan, build, review or ship code of any size, even a terse one-line request or a quick script where it says to keep process light. It carries the checks a quick answer skips - evidence shown, state measured now, proven zeros, piped exit codes, in-flight work, verified backup, rollback and read-backs before a live change, a cross-model reviewer that runs probes.
-when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "promote", "release", "show progress", "which step is next" on a step list, "eval plan", "setup notes", "the owner update", "personal data in a commit", "pre-push guard", "we decided this before", "just add X".
+when_to_use: Phrases like "is it live / deployed?", "can I tell the team", "write the status", "the tests printed", "it returned 0", "give me the steps to deploy / restart", "production", "which model should review", "review brief", "subagent", "I declined", "quick / throwaway script", "plan", "build", "ship", "merge", "is this over-engineered", "record this decision", "is this a regression", "why did it fail / refuse?", "root cause", "promote", "release", "show progress", "which step is next" on a step list, "eval plan", "setup notes", "the owner update", "personal data in a commit", "pre-push guard", "we decided this before", "just add X".
 ---
 
 # engineering-method
@@ -16,7 +16,7 @@ full version for the person to choose from. *Why:* literal readings and question
 delivered less than the intent. *Test:* the thing as asked, its assumptions, one pushback, one pick.
 
 **Superpowers does the procedure** (section 3, plus `brainstorming`, `subagent-driven-development`,
-`using-git-worktrees`, `systematic-debugging`); this skill adds what it does not say, and names any
+`using-git-worktrees`); this skill adds what it does not say, and names any
 disagreement.
 
 ## 1. Decide the stakes first
@@ -116,8 +116,8 @@ money or touches credentials; the lower one otherwise.
     notes to the asker last. *Test:* progress-ladder.md.
 
 **Delivery (tier c; tier b where it applies)**
-17. **Root cause, not symptom; the fix fits what exists.** Replay the case through the system first;
-    the cause is a hypothesis until it has run. A fix plan then has a "Fit with what exists" section
+17. **Root cause, not symptom; the fix fits what exists.** Replay the case first (root-cause-investigation.md);
+    the cause is a hypothesis until measured. A fix plan then has a "Fit with what exists" section
     with four REQUIRED lines: **Exists:** every mechanism already on the concept, absent ones named
     absent. **Extends:** the smallest one, where the property must hold (no mechanism beside it).
     **Unlocks:** what it makes possible beyond this case (a change that covers only this case, proposed or yours, is named a patch). **Goals:**
@@ -150,6 +150,7 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 | Stage | Skill | References | What this method adds |
 |---|---|---|---|
 | plan | `superpowers:writing-plans` | docs-and-decisions.md, parallel-and-worktrees.md | out-of-scope list; EXTENDS/NEW per capability; a fix plan follows principle 17; tier c: a fresh reviewer reads it against the running code |
+| debug | `superpowers:systematic-debugging` | root-cause-investigation.md, measurement-and-state-claims.md | steps RC-1 to RC-10 by name; decided, told and judged kept apart |
 | build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; tier b/c: headers on touched code, with their check (docs-and-decisions.md); the full suite once before reporting; a held release first |
 | review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; usage read before launching; re-reviews cover the delta; nothing competes with a held release |
 | test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts read entry by entry; behaviour evals: a cost cap first, layered, isolated, sends fail closed |
@@ -166,4 +167,5 @@ codes, skips, counts, negatives, state words), `progress-ladder.md` (ladder, rel
 updates, checklists), `parallel-and-worktrees.md` (fan-out, who writes where, lanes),
 `live-system-changes.md` (deploy standard and file, proving a release, pre-launch, pushing),
 `docs-and-decisions.md` (docs, headers and their check, decision log, the record, names),
-`behaviour-evals.md` (evals as a dataset, cost cap, contamination, baselines).
+`behaviour-evals.md` (evals as a dataset, cost cap, contamination, baselines),
+`root-cause-investigation.md` (RC-1 to RC-10).

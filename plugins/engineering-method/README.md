@@ -19,6 +19,24 @@ skill.
 - **You type "ok, now deploy it to production".** A hook sees the stage change and injects one line
   telling the agent to read `references/live-system-changes.md` before acting: in-flight check,
   verified backup, rollback ready, read-backs after. It stays quiet until the stage changes again.
+- **You type "investigate why the assistant refuses on the North site but works on South".** The
+  hook sees the debug stage and injects: `engineering-method: stage debug — re-read SKILL.md §3 row 'debug', load superpowers:systematic-debugging, read references/root-cause-investigation.md, references/measurement-and-state-claims.md before acting; evidence first (tier b, c): no cause, suspect list or fix until RC-1 to RC-4 are done, requested or skipped; keep the stakes tier you named.` The
+  agent then pins what each instance actually runs before comparing them, reads the model input as
+  sent on a failing turn, and calls a cause a hypothesis until that input has been read. A prompt
+  that names only the symptom, with none of the stage words, relies on the skill's trigger text
+  instead of the hook.
+- **Your always-loaded instruction file has grown past what is read.** Ask to compress it and the
+  agent follows the ten-step procedure in `references/docs-and-decisions.md`: archive the whole file
+  verbatim and prove the copy matches, sort sections by kind, keep binding rules as rule plus reason,
+  grep a checklist of one-line rules afterwards, and have a different model diff old against new
+  before anything is committed. Nothing is deleted; what leaves the file lives in the archive.
+- **You ask for "one more fix round, until the reviewer says clean".** The agent pushes back once and
+  applies the fix-round rule in `references/review-loop.md`: a five-round cap and a ledger line per
+  round (`fix round R/5: closed X, reopened Y, open Z`). A round stalls when a finding reopens or the
+  open count does not fall. After the first stall the next round goes to a fresh implementer on a
+  more capable model (the same model at the top tier); after a second stall, or at round 5,
+  dispatching stops and the open findings are adjudicated: parked with a ruling, or brought to you.
+  If you then say to continue anyway, the agent pushes back once and does as asked.
 - **You ask which model should review a change.** The answer is a different model from the one that
   wrote it, at least as strong, and the reviewer runs probes rather than reading the diff.
 
@@ -38,6 +56,8 @@ procedure makes an agent worse on the small task and no better on the large one.
 - **A thin layer over [Superpowers](https://github.com/obra/superpowers).** Brainstorming, plans,
   TDD, code review, debugging, worktrees and verification are Superpowers' job; this skill points to
   them by name and adds only what they do not say.
+- **Debugging.** A debug stage loads Superpowers' systematic-debugging and a reference of ten named
+  investigation steps, most of them for systems where a model makes the decision.
 - **Short body, detail on demand.** `SKILL.md` stays within 2,200 words, and a test enforces it; the detail lives in
   `references/` and loads only when a task needs it.
 
@@ -56,7 +76,7 @@ marketplace). Without it the skill still reads correctly; the pointers name skil
 The plugin ships two hooks (`hooks/hooks.json`, script `scripts/method_hook.py`) so the method is re-applied without a reminder:
 
 - **SessionStart** (`startup`, `clear`, `compact`): injects a short brief with the stakes tiers and the stage map. After compaction it adds a line telling the agent to re-read the skill.
-- **UserPromptSubmit**: when your prompt moves to a new stage of work (plan, build, review, test, deploy, merge, release, report), injects one line naming the skill and references to load. It stays silent while the stage is unchanged; the memory resets on session start.
+- **UserPromptSubmit**: when your prompt moves to a new stage of work (plan, debug, build, review, test, deploy, merge, release, report), injects one line naming the skill and references to load. It stays silent while the stage is unchanged; the memory resets on session start.
 
 Both never fail loudly: on any error they print nothing (or a one-line brief) and exit 0. To turn them off, disable the plugin; there is no separate switch.
 
@@ -79,7 +99,7 @@ claude plugin eval plugins/engineering-method    # spends model calls; run delib
 
 The cases check behaviour, not wording: a prototype must not get live-system ceremony; a test
 report must show the command and its output; the reviewer must be a different model from the
-implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled. Each case also carries a skill-fired indicator (not scored).
+implementer; a zero must be proven able to be non-zero; a declined permission must stop the action; a live deploy gets in-flight, backup, rollback-first and read-backs; a "deployed" note is measured, not recalled; the root-cause cases (`rc-01` to `rc-10`, plus `rc-activation-loads-reference` and the near-miss guard `rc-near-miss-rename`) check each investigation step at its trigger; `instruction-file-compression` checks that an always-loaded file is shrunk without losing a rule; `fix-loop-bounded` checks the round cap and stall rule. Each case also carries a skill-fired indicator (not scored).
 
 Every new rule ships with its case, written first: it fails on the skill without the rule and
 passes with it (`references/behaviour-evals.md`). `evals/COVERAGE.md` maps each rule to its case.

@@ -56,8 +56,35 @@ review. This file says who reviews, what they must do, and when to stop.
   diff has its own review row naming a reviewer other than its author.
 - **A fix that adds a check in one branch is usually the wrong shape.** Ask where the property must
   hold and put it there, once.
-- **Escalate by Superpowers' fix rounds** (`subagent-driven-development`): early rounds resume the
-  implementer; later rounds take a fresh implementer at least one tier up.
+- **Escalate, cap, and stop on a stall** (one rule; model-routing-and-cost.md points here). A fix
+  round is one fix dispatch plus its scoped re-review (or the controller's read of a test-only or
+  docs-only fix, above); Z is the number of open Critical and Important findings after it.
+  Baseline, Superpowers' `subagent-driven-development`: at most five rounds per task (per document,
+  for a plan or deploy-file review); rounds 1-3 resume the implementer, rounds 4-5 take a fresh
+  implementer on a more capable model; after round 5 the controller adjudicates each open finding
+  (park it with a ruling, or BLOCKED to the owner). GSD (the open-source Get Shit Done workflow) adds stall detection in its `gates.md`: escalate
+  early when the issue count does not fall between iterations. **A round stalls** when a finding
+  marked addressed comes back open, or when Z is above zero and not lower than after the previous
+  round (the review itself, for round 1). Stalls count per task (per document, for a plan or
+  deploy-file review), across rounds. Two departures from Superpowers, which adjudicates only at
+  the cap, both triggered by stall detection, GSD's idea: on the first stall on the task, the next
+  round goes to a fresh implementer on a more capable model (at the top tier, a fresh implementer
+  on the same model), whatever the round number; on a second stall on the task, dispatching stops
+  before the cap and the controller adjudicates as at the cap (park with a ruling, or BLOCKED to
+  the owner). The cap is five for every review loop, plan and deploy-file reviews included, not
+  GSD's three for plans: the stall rule already ends a loop that is not converging, and one number
+  for every loop is one rule to check. **These stops bind the agent's own autonomy, not the
+  owner.** The agent never starts a round past the cap, or after a second stall, on its own. When
+  the owner explicitly asks for more rounds, it pushes back once: it names the stall and the rounds
+  that meet it, states the cap and what happens to findings open at it, and recommends stopping.
+  The instruction already stands, so in the same reply it dispatches as asked, with no second
+  pushback, and keeps the ledger counts. *Why:* the escalation line said who takes
+  each round but never when the rounds end, and a round that reopens what it closed spends review
+  capacity without converging. *Test:* the review's ledger line states the starting Z; each round's
+  line is Superpowers' (`Task N: fix round R/5 (...; commits a..b)`) carrying
+  `closed X, reopened Y, open Z` (Critical and Important only), ending `stall` when the round
+  stalls; a round after a second stall on a task or after round 5 appears only beside the owner's
+  explicit instruction and the one pushback that preceded it.
 - **Record a residual rather than hiding it.** A known limit, stated, is a decision; a hidden one is
   a defect waiting.
 

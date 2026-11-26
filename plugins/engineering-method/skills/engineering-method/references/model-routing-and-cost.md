@@ -20,8 +20,8 @@ exactly where the stronger model pays for itself.
 
 1. **Turn count beats token price.** A cheap model that takes three times the turns costs more and
    pollutes context. Mid tier is the floor for any worker working from prose rather than code.
-2. **Escalate on failure** by Superpowers' fix rounds (`subagent-driven-development`): early rounds
-   resume the implementer; later rounds go to a fresh implementer at least one tier up.
+2. **Escalate on failure** by the one fix-round rule in `review-loop.md` ("Fix rounds": who takes
+   each round, the five-round cap, the stall rule).
 3. **The model does not fix independence.** See `review-loop.md`.
 4. **Name the model on every dispatch, and have every agent report the model
    identifier its runtime gave it.** An omitted model inherits the session's and silently defeats the routing. The report's

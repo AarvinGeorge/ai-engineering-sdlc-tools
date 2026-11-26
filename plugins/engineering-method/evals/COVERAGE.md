@@ -65,6 +65,53 @@ the plan file with all its tracks) are not covered here. They are covered by
 | Push back once, then do as asked | G29 | `intent-over-literal/c3-pushback-once-then-forever.md` |
 | Recommend, don't survey | G29 | `intent-over-literal/c4-recommend-not-survey.md` |
 
+## Root-cause investigation (0.4.0)
+
+Each case also carries `skill-fired.md` (indicator only). A row marked known red (capability) was below 2 of 3 when 0.4.0 shipped; the release ruling and the follow-up are in the CHANGELOG. `rc-03-full-input` copies its fixture into the workspace, so run it with `--scaffold`.
+
+| Rule | Gap id | Grader (`<case>/graders/…`) |
+|---|---|---|
+| RC-1 Pin what ran: read revision, model id and model-shaping values for every instance, each with its command. **Known red (capability)**: 0/3 on 0.4.0 | G30 | `rc-01-pin-what-ran/graders/c1-pins-every-instance.md` |
+| RC-1: do not rule a suspect in or out until its per-instance value is read; flag differing values as confounders. **Known red (capability)**: 1/3 on 0.4.0 | G30 | `rc-01-pin-what-ran/graders/c2-flags-differing-values.md` |
+| RC-2 Read the decision record: the whole record for the event, the code's outcome kept apart from the model's | G31 | `rc-02-decision-record/graders/c1-code-outcome-apart-from-model.md` |
+| RC-2: account for every number on the logged line by the part of the input it stands for | G31 | `rc-02-decision-record/graders/c2-maps-each-logged-size.md` |
+| RC-3 Read the full input: name the cause from the complete model input, not a truncated local copy (runs need `--scaffold`) | G32 | `rc-03-full-input/graders/c1-names-empty-requester-role.md` |
+| RC-3: check the truncation flag and match the copy's size to the original before naming a cause (`--scaffold`). **Known red (capability)**: 0/3 on 0.4.0 | G32 | `rc-03-full-input/graders/c2-notices-truncation.md` |
+| RC-3: a cause stated before the full input is read is a hypothesis; the final cause cites its store (`--scaffold`) | G32 | `rc-03-full-input/graders/c3-hypothesis-until-read.md` |
+| RC-4 Quote the objection: the model's own stated reason, and a working run's reasoning to compare. **Known red (capability)**: 1/3 on 0.4.0 | G33 | `rc-04-objection/graders/c1-quotes-stated-reason.md` |
+| RC-4: three separate statements, code decided, input said, model concluded, each with its source | G33 | `rc-04-objection/graders/c2-three-lines-apart.md` |
+| RC-5 Diff the served inputs: block-by-block diff against each working population, from inputs as sent | G34 | `rc-05-diff/graders/c1-diffs-model-inputs.md` |
+| RC-5: a flip on a supposedly identical input is a sign of a missing fact, not the cause. **Guard, not RC-5 proof**: 0.3.0 already passes it 2 of 3 | G34 | `rc-05-diff/graders/c2-flip-is-a-sign-not-cause.md` |
+| RC-5: obtain the working run first and use it as the baseline before offering a cause. **Known red (capability)**: 0/3 on 0.4.0; this grader is stricter than the aligned RC-5 (a labelled hypothesis after a `requested` line), to be reconciled in the structural-ordering follow-up | G34 | `rc-05-diff/graders/c3-working-run-first.md` |
+| RC-6 Inventory the concept: list what already handles it, and extend it, before any remedy | G35 | `rc-06-inventory/graders/c1-inventory-before-remedy.md` |
+| RC-6: deployed is not fired; check the ancestor and ask for evidence the path ran | G35 | `rc-06-inventory/graders/c2-deployed-is-not-fired.md` |
+| RC-7 Trace the dropped fact: name the guard that drops a computed fact and confirm in the input as sent | G36 | `rc-07-trace-dropped-fact/graders/c1-names-the-guard.md` |
+| RC-7: find the guard's history and pinning test; remedy changes that mechanism and its test | G36 | `rc-07-trace-dropped-fact/graders/c2-history-test-and-extend.md` |
+| RC-8 Label the root, then fit the fix: every claim labelled measured, documented or hypothesis. **Known red (capability)**: 0/3 on 0.4.0 | G37 | `rc-08-label-and-fit/graders/c1-labels-and-records-hypothesis.md` |
+| RC-8: a stopgap offered once, labelled, apart from the diagnosis. **Known red (capability)**: 0/3 on 0.4.0 | G37 | `rc-08-label-and-fit/graders/c2-stopgap-once-apart.md` |
+| RC-8: ledger of rejected hypotheses with their refuting evidence; a count measures frequency, not cause | G37 | `rc-08-label-and-fit/graders/c3-ledger-and-variance.md` |
+| RC-9 Close the loop: a per-stage table of conclusion, evidence, what was wrong and what unlocked the next stage. **Known red (capability)**: 0/3 on 0.4.0 | G38 | `rc-09-close-the-loop/graders/c1-stage-table.md` |
+| RC-9: map each lesson to the step that would have caught it; record an uncovered one as a general entry in the method. **Known red (capability)**: 1/3 on 0.4.0 | G38 | `rc-09-close-the-loop/graders/c2-lessons-mapped-and-uncovered-recorded.md` |
+| RC-10 Brief the investigator blind: one pushback on an owner-requested hypothesis, then it sits in its own section, the rest of the brief carries no cause. **Guard, not RC-10 proof**: 0.3.0 passes it after the owner-wins rewrite; the proof is c2 | G39 | `rc-10-blind-brief/graders/c1-pushback-then-hypothesis-apart.md` |
+| RC-10: the brief requires the full-input statement with its store, the model id and labelled claims | G39 | `rc-10-blind-brief/graders/c2-requires-input-line-and-model-id.md` |
+| A debugging prompt loads the investigation reference (`tool_used: Read` on `root-cause-investigation.md`) | G40 | `rc-activation-loads-reference/graders/c1-reference-read.md` |
+| A debugging prompt gathers the decision record and the model input as sent before any cause or fix | G40 | `rc-activation-loads-reference/graders/c2-evidence-before-fix.md` |
+| Near miss: a plain rename does not load the reference. **Regression guard**, expected to pass on 0.3.0 and 0.4.0 | G41 | `rc-near-miss-rename/graders/c1-reference-not-read.md` |
+| Near miss: the rename itself is done and shown. **Regression guard** | G41 | `rc-near-miss-rename/graders/c2-shows-renamed-function.md` |
+
+## Rules added in 0.4.0
+
+| Rule | Gap id | Grader (`<case>/graders/…`) |
+|---|---|---|
+| Instruction file compression: archive the whole file verbatim first and prove the copy equals HEAD | G42 | `instruction-file-compression/graders/c1-archive-verbatim-first.md` |
+| Compression: sort sections by kind and treat each kind differently. **Known red (capability)**: 1/3 on 0.4.0 | G42 | `instruction-file-compression/graders/c2-classify-and-route.md` |
+| Compression: every added claim carries its source; one-line rules kept as a grep checklist | G42 | `instruction-file-compression/graders/c3-new-claims-sourced-one-liners-kept.md` |
+| Compression: a different-model reviewer diffs old against new before the commit. **Known red (capability)**: 0/3 on 0.4.0 | G42 | `instruction-file-compression/graders/c4-independent-diff-review.md` |
+| Compression: the file states its own size rule; a secret and personal-data scan runs before the push | G42 | `instruction-file-compression/graders/c5-size-rule-and-push-scan.md` |
+| Bounded fix loops: a stall (reopened finding, open count not falling) is named under a stated rule. **Known red (capability)**: 1/3 on 0.4.0 | G43 | `fix-loop-bounded/graders/c1-stall-named.md` |
+| Bounded fix loops: at a stall, one pushback recommending the stop (rule on or escalate the open findings), then the explicit owner instruction is followed. **Known red (capability)**: 0/3 on 0.4.0 | G43 | `fix-loop-bounded/graders/c2-pushback-then-dispatches.md` |
+| Bounded fix loops: a five-round cap, what happens to findings open at the cap, per-round closed, reopened and open counts | G43 | `fix-loop-bounded/graders/c3-cap-and-ledger-counts.md` |
+
 ## Rules covered by the original cases (single all-or-nothing `criteria.md`, unchanged)
 
 | Rule | Case |
