@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.20.0 — 2026-11-26
+
+**Runnable invariants.** An invariant may carry an optional `check`: a shell command whose exit
+code is its truth (0 holds). `check.py --verify` runs it after the assertions, with the same
+`$PLAN_FACTS`, through one shared runner; a non-zero exit is a FAIL naming the invariant (first
+line of output only), a check that cannot run is ERRORED, and neither moves the verified stamp.
+The invariant's `state` stays hand-set.
+
+No new flag: `--verify` already is the explicit runner, so nothing else (gate, `sync.py`, `brief.py`,
+`gate_hook.py`, any hook) ever runs a check; a test proves it across those entry points.
+
+Gate: a `check` that is not a non-empty string is a structural FAIL, and under `--verify` it FAILs
+with "check is not a runnable command". The never-run drift now counts assertions and invariant
+checks together. Schema gains `check`. 11 new tests (plan-layer suite 412 to 423).
+
 ## 0.19.0 — 2026-11-25
 
 **The controller (opt-in).** The plan is the declared state; git, the tracker and named files are

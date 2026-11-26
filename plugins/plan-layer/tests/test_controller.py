@@ -1078,12 +1078,14 @@ class TestDocs(unittest.TestCase):
                 if ln.startswith("|") and not re.match(r"^\|\s*(Field|-)", ln)]
         self.assertEqual(rows, [[w["field"], w["writer"], w["enforced"]] for w in L.WRITERS])
 
-    def test_version_is_0_19_0_with_a_changelog_entry(self):
+    def test_version_is_at_least_0_19_0_and_its_changelog_entry_stays(self):
         with open(os.path.join(PLUGIN, ".claude-plugin", "plugin.json")) as fh:
             pl = json.load(fh)
-        self.assertEqual(pl["version"], "0.19.0")
+        self.assertGreaterEqual(tuple(int(x) for x in pl["version"].split(".")), (0, 19, 0))
         with open(os.path.join(PLUGIN, "CHANGELOG.md"), encoding="utf-8") as fh:
-            self.assertTrue(fh.read().startswith("# Changelog\n\n## 0.19.0"))
+            text = fh.read()
+        self.assertTrue(text.startswith("# Changelog\n\n## "))
+        self.assertIn("\n## 0.19.0", text)
 
     def test_no_private_names_in_the_new_files(self):
         """Generic examples only; the scan list itself is kept outside the repo."""
