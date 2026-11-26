@@ -25,7 +25,7 @@ PATTERN_FILE = ".github/release-gates/secret-patterns.txt"
 def load_lines(path):
     """Non-empty, non-comment lines of a text file, stripped."""
     out = []
-    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+    for raw in Path(path).read_text(encoding="utf-8-sig").splitlines():
         s = raw.strip()
         if s and not s.startswith("#"):
             out.append(s)
@@ -41,7 +41,7 @@ def load_patterns(path):
 
 def scan_text(text, patterns, tokens):
     """Yield (line number, kind) for each hit; at most one generic hit per line."""
-    for n, line in enumerate(text.splitlines(), 1):
+    for n, line in enumerate(text.split("\n"), 1):
         low = line.casefold()
         if any(t in low for t in tokens):
             yield n, "private list entry"
@@ -58,7 +58,7 @@ def tracked_files(root):
 
 def commit_messages(root, rng):
     """Yield (sha, message) for each commit in rng."""
-    out = subprocess.run(["git", "-C", str(root), "log", "--format=%H%x00%B%x01", rng],
+    out = subprocess.run(["git", "-C", str(root), "log", "--format=%H%x00%B%x01", "--end-of-options", rng],
                          capture_output=True, check=True).stdout.decode("utf-8", "replace")
     for rec in out.split("\x01"):
         sha, _, msg = rec.strip("\n").partition("\0")
@@ -84,15 +84,22 @@ def main(argv=None):
             raise ValueError("private list required but missing or empty")
         files = a.paths if a.paths is not None else tracked_files(root)
         for idx, rel in enumerate(files, 1):
+            where = f"path #{idx}"
+            name_hit = False
             for _, kind in scan_text(rel, patterns, tokens):
-                hits.append(f"path #{idx}: {kind}")  # never the name itself
-            data = (root / rel).read_bytes()
+                hits.append(f"{where}: {kind}")  # never the name itself
+                name_hit = True
+            try:
+                data = (root / rel).read_bytes()
+            except OSError as e:
+                print(f"scan_payload: unusable input: {type(e).__name__} reading {where}", file=sys.stderr)
+                return 2
             if b"\0" in data[:8192]:
                 skipped += 1
                 continue
             scanned += 1
             for n, kind in scan_text(data.decode("utf-8", "replace"), patterns, tokens):
-                hits.append(f"{rel}:{n}: {kind}")
+                hits.append(f"{where}:{n}: {kind}" if name_hit else f"{rel}:{n}: {kind}")
         if a.commits:
             for sha, msg in commit_messages(root, a.commits):
                 ncommits += 1

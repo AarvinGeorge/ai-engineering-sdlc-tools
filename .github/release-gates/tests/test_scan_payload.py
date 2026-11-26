@@ -1,4 +1,6 @@
 """Tests for scan_payload.py. Fakes are built by concatenation so this file holds no secret shape."""
+import contextlib
+import io
 import shutil
 import subprocess
 import sys
@@ -43,7 +45,12 @@ class Repo:
         git(self.root, "commit", "-q", "-m", msg)
 
     def run(self, *extra):
-        return sp.main(["--root", str(self.root), *extra])
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return sp.main(["--root", str(self.root), *extra])
+
+    def cli(self, *extra):
+        return subprocess.run([sys.executable, str(HERE.parent / "scan_payload.py"), "--root", str(self.root), *extra],
+                              capture_output=True, text=True)
 
     def __exit__(self, *a):
         self.tokens.unlink(missing_ok=True)
@@ -142,6 +149,42 @@ class Files(unittest.TestCase):
                 self.assertEqual(r.run("--paths", str(ctl)), 1)
             finally:
                 ctl.unlink()
+
+class Leaks(unittest.TestCase):
+    def test_token_as_name_and_content_never_printed(self):
+        with Repo() as r:
+            r.add(f"notes/{PRIVATE}.md", f"{PRIVATE}\n")
+            out = r.cli("--tokens-file", str(r.tokens))
+            self.assertEqual(out.returncode, 1)
+            self.assertIn("path #", out.stdout)
+            self.assertNotIn(PRIVATE.casefold(), (out.stdout + out.stderr).casefold())
+
+    def test_deleted_tracked_file_with_token_name_does_not_leak(self):
+        with Repo() as r:
+            r.add(f"notes/{PRIVATE}.md", "x\n")
+            (r.root / f"notes/{PRIVATE}.md").unlink()
+            out = r.cli("--tokens-file", str(r.tokens))
+            self.assertEqual(out.returncode, 2)
+            self.assertNotIn(PRIVATE.casefold(), (out.stdout + out.stderr).casefold())
+            self.assertIn("path #", out.stderr)
+
+    def test_bom_in_private_list_is_ignored(self):
+        with Repo() as r:
+            r.add("doc.md", PRIVATE + "\n")
+            r.tokens.write_bytes(b"\xef\xbb\xbf" + PRIVATE.encode() + b"\n")
+            self.assertEqual(r.run("--tokens-file", str(r.tokens)), 1)
+
+    def test_commit_range_cannot_be_an_option(self):
+        with Repo() as r:
+            r.add("a.txt", "1\n")
+            self.assertEqual(r.run("--commits=--output=x"), 2)
+            self.assertFalse((r.root / "x").exists())
+
+    def test_line_numbers_count_only_newlines(self):
+        with Repo() as r:
+            r.add("doc.md", "a\u2028" + PRIVATE + "\n")
+            out = r.cli("--tokens-file", str(r.tokens))
+            self.assertIn("doc.md:1:", out.stdout)
 
 
 class Commits(unittest.TestCase):
