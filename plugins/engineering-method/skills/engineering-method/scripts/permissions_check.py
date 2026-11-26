@@ -22,6 +22,9 @@ or "ask", so it is an observed line, not a discovery.
 Undocumented cases (labelled hypotheses, never allow): how a wrapper's own arguments are
 skipped (H1); nested bodies, which are checked for deny and ask only (H2); matching on the raw
 text after a whitespace trim (H3); no matching rule gives "no-rule", the mode decides (H4).
+Claude Code strips wrappers and some env assignments before matching allow rules too (docs,
+"Wrappers"); this checker does not compute allow past wrappers or env assignments and prints
+no-rule there, which is not a statement about what Claude Code does.
 """
 import argparse
 import json
@@ -59,8 +62,28 @@ def rule_matches(spec, cmd):
     if body.endswith(":*"):
         body = body[:-2] + " *"
     if body.count("*") == 1 and body.endswith(" *"):
-        return re.fullmatch(re.escape(body[:-2]) + r"( .*)?", cmd, re.S) is not None
-    return re.fullmatch(".*".join(re.escape(p) for p in body.split("*")), cmd, re.S) is not None
+        return cmd == body[:-2] or cmd.startswith(body[:-1])
+    return _glob(body, cmd)
+
+
+def _glob(body, cmd):
+    """What: whether cmd matches body, where each "*" matches any text (spaces included).
+    Use when: rule_matches(). Inputs: rule body, command text. Output: bool.
+    Side effects: none. Role: the docs' wildcard rule, matched left to right in linear time
+    (a backtracking regex hangs on a rule with many "*")."""
+    segs = body.split("*")
+    if len(segs) == 1:
+        return cmd == body
+    head, tail, mids = segs[0], segs[-1], segs[1:-1]
+    if len(cmd) < len(head) + len(tail) or not cmd.startswith(head) or not cmd.endswith(tail):
+        return False
+    pos, end = len(head), len(cmd) - len(tail)
+    for seg in mids:
+        k = cmd.find(seg, pos, end)
+        if k < 0:
+            return False
+        pos = k + len(seg)
+    return True
 
 
 def _close(cmd, i, end):
@@ -111,6 +134,24 @@ def scan(cmd):
                 q = None
             i += 1
             continue
+        if q is None:
+            if cmd.startswith("$'", i):
+                j = i + 2
+                while j < len(cmd) and cmd[j] != "'":
+                    j += 2 if cmd[j] == "\\" else 1
+                if j >= len(cmd):
+                    parseable = False
+                cur, i = cur + cmd[i:j + 1], j + 1
+                continue
+            if ch == "#" and (i == 0 or cmd[i - 1] in " \t\n;&|("):
+                j = cmd.find("\n", i)
+                i, parseable = (len(cmd) if j < 0 else j), False
+                continue
+            if cmd.startswith("<<", i):
+                parseable = False
+            if cmd[i:i + 2] in (">&", "<&", "&>"):
+                cur, i = cur + cmd[i:i + 2], i + 2
+                continue
         opener = None
         if ch == "`":
             opener, start, end = "`", i + 1, "`"
@@ -291,7 +332,8 @@ def block(cmd, layers, ssh_supplied=False):
     Role: reports the computed facts."""
     parts, _ = split(cmd)
     decision, deciding, also = decide(cmd, layers)
-    out = ["PERMISSIONS_CHECK v1", "COMMAND: %s" % cmd, "SUBCOMMANDS: %d" % len(parts),
+    shown = cmd if ssh_supplied else re.sub(r"(?i)bash\(ssh", "Bash( ssh", cmd)
+    out = ["PERMISSIONS_CHECK v1", "COMMAND: %s" % shown, "SUBCOMMANDS: %d" % len(parts),
            "DECISION: %s" % decision,
            "RULE: %s" % (fmt(deciding[0]) if deciding else "none (the permission mode decides)"),
            "ORDER: deny > ask > allow; first match decides; specificity does not reorder",
@@ -311,7 +353,10 @@ def block(cmd, layers, ssh_supplied=False):
             trial[scope] = (extra, src)
             probe.append("added to %s -> %s" % (scope, decide(cmd, trial)[0]))
         label = "Bash(%s)" % cmd
-        label = '"%s"' % label if (ssh_supplied or SSH not in label) else "for this exact command"
+        if not ssh_supplied and SSH.lower() in label.lower():
+            label = "for this exact command"
+        else:
+            label = '"%s"' % label
         out.append("CROSS_FILE_PROBE: allow %s %s" % (label, "; ".join(probe)))
         out.append("LOOSENED_BY_OTHER_FILE: no (%s)" % (
             "lists merge across managed, cli, local, project and user; a deny in any file is checked "
@@ -323,15 +368,20 @@ def block(cmd, layers, ssh_supplied=False):
             "LIMIT: matches command text as written; /full/path, sh -c and other forms are not covered "
             "(not a security boundary)",
             "NOTES: deny and ask are also checked past wrappers (their own arguments skipped by a "
-            "heuristic), env assignments, control-flow keywords and nested bodies; allow never matches "
-            "past them; redirections and built-in read-only commands are not modelled"]
+            "heuristic), env assignments, control-flow keywords and nested bodies; this checker does not "
+            "compute allow past wrappers or env assignments and prints no-rule there, which is not a "
+            "statement about what Claude Code does; redirections and built-in read-only commands are "
+            "not modelled"]
     for scope in ("project", "local"):
-        data = layers.get(scope, ({}, ""))[0]
-        p = data.get("permissions")
-        mode = (p.get("defaultMode") if isinstance(p, dict) else None) or data.get("defaultMode")
+        p = layers.get(scope, ({}, ""))[0].get("permissions")
+        mode = p.get("defaultMode") if isinstance(p, dict) else None
         if mode in ("bypassPermissions", "auto"):
             out.append("MODE: defaultMode %s in %s -> not applied (only user or managed settings can set it)"
                        % (mode, scope))
+    for scope in SCOPES:
+        if scope in layers and "defaultMode" in layers[scope][0]:
+            out.append("MODE: %s (top-level key, not documented; not evaluated)"
+                       % json.dumps(layers[scope][0]["defaultMode"]).strip('"'))
     out.append("END")
     return [GUARD_KEY.sub("[setting name withheld]", ln) for ln in out]
 
@@ -339,13 +389,18 @@ def block(cmd, layers, ssh_supplied=False):
 def main(argv):
     """What: CLI entry. Use when: run as a script. Inputs: argv. Output: exit code.
     Side effects: reads --file paths, prints. Role: plumbing."""
-    ap = argparse.ArgumentParser(prog="permissions_check.py")
+    ap = argparse.ArgumentParser(prog="permissions_check.py", add_help=False)
     ap.add_argument("--inline", action="append", default=[])
     ap.add_argument("--file", action="append", default=[])
     ap.add_argument("--command", action="append", default=[])
+    if argv and argv[0] in ("-h", "--help"):
+        ap.print_usage(sys.stdout)
+        print("SCOPE: %s; exit 0 = computed, 2 = bad input" % ", ".join(SCOPES))
+        return 0
     try:
         a = ap.parse_args(argv)
     except SystemExit:
+        print("ERROR: bad arguments (see the usage line above)", file=sys.stderr)
         return 2
     try:
         layers, raw = {}, []
@@ -373,7 +428,7 @@ def main(argv):
         if not a.command:
             raise BadInput("give at least one --command")
         specs = rules_of(layers)
-        ssh = any(SSH in t for t in raw) or any(SSH in r[1] for r in specs)
+        ssh = any(SSH.lower() in t.lower() for t in raw)
         lines = [ln for c in a.command for ln in block(c, layers, ssh)]
     except BadInput as e:
         print("ERROR: %s" % GUARD_KEY.sub("[setting name withheld]", str(e)), file=sys.stderr)

@@ -151,10 +151,31 @@ class Contract(unittest.TestCase):
                                 "NOTES", "END"])
 
     def test_mode_line(self):
-        _, out, _ = run({"project": {"defaultMode": "bypassPermissions", "permissions": {"deny": ["Bash(rm *)"]}}},
+        _, out, _ = run({"project": {"permissions": {"defaultMode": "bypassPermissions", "deny": ["Bash(rm *)"]}}},
                         "rm x")
         self.assertIn("MODE: defaultMode bypassPermissions in project -> not applied "
                       "(only user or managed settings can set it)", out)
+
+    def test_top_level_mode_is_not_evaluated(self):
+        _, out, _ = run({"project": {"defaultMode": "bypassPermissions", "permissions": {"deny": ["Bash(rm *)"]}}},
+                        "rm x")
+        self.assertIn("MODE: bypassPermissions (top-level key, not documented; not evaluated)", out)
+        self.assertNotIn("not applied", out)
+
+    def test_help_and_unknown_args(self):
+        p = subprocess.run([sys.executable, SCRIPT, "--help"], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0)
+        self.assertIn("--command", p.stdout)
+        p = subprocess.run([sys.executable, SCRIPT, "--bogus"], capture_output=True, text=True)
+        self.assertEqual((p.returncode, p.stdout), (2, ""))
+        self.assertIn("ERROR:", p.stderr)
+
+    def test_many_stars_do_not_hang(self):
+        spec = "Bash(" + "*a" * 14 + "*b)"
+        p = subprocess.run([sys.executable, SCRIPT, "--inline", json.dumps({"permissions": {"deny": [spec]}}).join(["project=", ""]),
+                            "--command", "a" * 40], capture_output=True, text=True, timeout=1)
+        self.assertEqual(p.returncode, 0)
+        self.assertIn("DECISION: no-rule", p.stdout)
 
     def test_bad_input_exit_2(self):
         for args in (["--inline", "project={bad"], ["--inline", "nowhere={}", "--command", "x"],
@@ -202,12 +223,36 @@ class Undocumented(unittest.TestCase):
         _, out, _ = run({"user": perms(deny=["Bash"])}, "ssh host")
         self.assertIn("DECISION: deny", out)
         self.assertNotIn("Bash(ssh", out)
+        for c in ("SSH host", "grep 'Bash(ssh' f"):
+            _, out, _ = run({"user": perms(deny=["Bash"])}, c)
+            self.assertNotIn("bash(ssh", out.lower(), c)
         _, out, _ = run({"user": perms(deny=["Bash(ssh *)"])}, "ssh host")
         self.assertIn("Bash(ssh", out)
         _, out, _ = run({"user": perms(deny=["Bash(echo disableBypassPermissionsMode*)"])},
                         "echo disableBypassPermissionsMode")
         self.assertIn("DECISION: deny", out)
         self.assertNotIn("disablebypasspermissionsmode", out.lower())
+
+    def test_quote_forms_and_comments_never_hide_a_deny(self):
+        layers = {"user": perms(allow=["Bash(echo *)"], deny=["Bash(rm *)"])}
+        for c in ("echo $'\\'' ; rm -rf x #'", "echo hi # it's\nrm -rf x # '"):
+            _, out, _ = run(layers, c)
+            self.assertIn("DECISION: deny", out, c)
+        _, out, _ = run(layers, "cat <<EOF\nhi\nEOF")
+        self.assertNotIn("DECISION: allow", out)
+        _, out, _ = run({"user": perms(allow=["Bash(cat *)"])}, "cat <<EOF")
+        self.assertNotIn("DECISION: allow", out)
+
+    def test_fd_redirect_is_not_a_separator(self):
+        _, out, _ = run({"user": perms(allow=["Bash(npm test *)"])}, "npm test 2>&1")
+        self.assertIn("SUBCOMMANDS: 1", out)
+        self.assertIn("DECISION: allow", out)
+
+    def test_wrapper_allow_is_not_computed_and_says_so(self):
+        _, out, _ = run({"user": perms(allow=["Bash(npm test *)"])}, "timeout 30 npm test")
+        self.assertIn("DECISION: no-rule", out)
+        self.assertIn("this checker does not compute allow past wrappers or env assignments and prints "
+                      "no-rule there, which is not a statement about what Claude Code does", out)
 
     def test_non_list_rules_are_bad_input(self):
         p = subprocess.run([sys.executable, SCRIPT, "--inline", 'user={"permissions":{"deny":"Bash"}}',
