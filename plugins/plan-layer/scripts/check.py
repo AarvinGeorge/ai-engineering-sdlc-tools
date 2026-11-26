@@ -21,6 +21,7 @@ Stdlib only, no arguments needed.
   check.py           # human output, exit 1 on any FAIL
   check.py --json    # machine output for the session hooks
   check.py --strict  # exit 1 on DRIFT as well
+  check.py --event <name>  # the controller's event rules fire for that event
   check.py --verify  # run the plan's assertions against the real system
                      # (explicit only — never run from a hook)
 """
@@ -34,7 +35,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
-import tracker  # noqa: E402
+import controller  # noqa: E402
 
 VALID_BUILD = {"done", "active", "partial", "not-started"}
 VALID_PLAN = {"planned", "partial", "none"}
@@ -470,7 +471,7 @@ def check_stalled(d):
     return drifts
 
 
-def run(root=None):
+def run(root=None, event=None):
     fails, drifts = [], []
     P = L.paths(root)
     root, SRC, OUT = P["root"], P["src"], P["out"]
@@ -714,24 +715,19 @@ def run(root=None):
                                      "E-NN.Sn, E-NN.Sn.Tn, E-NN.Fn or R-NN first"
                                      % (bucket, p.get("name")))
 
-    # External-tracker mirror (opt-in via meta.tracker). A malformed block FAILs;
-    # a mirror that was never reconciled, or not since the plan last changed,
-    # or reconciled with differences left, DRIFTs. Work-id naming for tracker
-    # rows is the naming check above (meta.naming), not a second copy of it.
-    tcfg, terr = L.tracker_config(d, root)
-    if terr:
-        fails.append(terr)
-    elif tcfg:
-        st = L.tracker_state(root)
-        if not st or not st.get("at"):
-            drifts.append("tracker mirror (%s) was never reconciled — fetch its rows and run "
-                          "tracker.py diff --actual <file>" % tcfg["kind"])
-        elif st.get("expected_hash") != tracker.expected_hash(tracker.expected_rows(d, tcfg), tcfg):
-            drifts.append("tracker mirror (%s): the rows the plan now expects differ from those last "
-                          "reconciled (%s) — fetch the rows and reconcile again" % (tcfg["kind"], st["at"]))
-        elif st.get("drift"):
-            drifts.append("tracker mirror (%s): the last reconcile (%s) left %s difference(s) — "
-                          "apply them and diff again" % (tcfg["kind"], st["at"], st["drift"]))
+    # The controller's diff (0.19.0): one function, read by the gate, the
+    # handoff and the hooks, so nothing computes it twice. A crash inside it
+    # is a FAIL, never silence: the Stop hook fails open on an exception, so
+    # an uncaught one would switch the whole gate off.
+    try:
+        found = controller.findings(root, d, event)
+    except Exception as exc:
+        found = [{"check": "config", "level": "FAIL",
+                  "message": "controller or tracker check crashed (%s: %s) — the plan's controller inputs are malformed"
+                             % (exc.__class__.__name__, exc)}]
+    for f in found:
+        (fails if f["level"] == "FAIL" else drifts).append(f["message"])
+    controller_on = "controller" in d.get("meta", {}) or "inventory" in d
 
     # Pause (meta.paused): present means paused, so it must be well formed.
     if "paused" in meta_ and L.paused_at(d) is None:
@@ -865,6 +861,8 @@ def run(root=None):
             for i in d.get("invariants", []) if i.get("state") != "holding"],
         "open_founder_actions": d.get("founder_actions", []),
     }
+    if controller_on:
+        summary["controller"] = found
     # Staleness detection (0.8.0). Structure was never the thing that rotted;
     # the page quietly disagreeing with itself was.
     if full:
@@ -902,12 +900,27 @@ def main():
             print("  assertions_verified stamped %s" % d["meta"]["assertions_verified"])
         return 1 if bad else 0
 
-    fails, drifts, summary = run()
+    event = None
+    if "--event" in sys.argv:
+        i = sys.argv.index("--event")
+        ev = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        known = ev in controller.EVENTS or any(ev.startswith(x) and ev[len(x):].strip()
+                                               for x in ("stage:", "release:"))
+        if known and ev.startswith("stage:") and L.has_plan():
+            known = ev[6:] in controller.stage_ids(L.load())
+        if not known:
+            print("  usage: check.py --event <stop|session-start|sync|pause|stage:<id>|release:<stage>>")
+            return 2
+        event = sys.argv[i + 1]
+    fails, drifts, summary = run(event=event)
 
     if "--json" in sys.argv:
-        print(json.dumps({"fails": [f for _, f in fails],
-                          "drifts": [f for _, f in drifts],
-                          "summary": summary}, indent=1))
+        out = {"fails": [f for _, f in fails],
+               "drifts": [f for _, f in drifts],
+               "summary": {k: v for k, v in summary.items() if k != "controller"}}
+        if "controller" in summary:
+            out["controller"] = summary["controller"]
+        print(json.dumps(out, indent=1))
         return 1 if fails else 0
 
     for kind, msg in fails:

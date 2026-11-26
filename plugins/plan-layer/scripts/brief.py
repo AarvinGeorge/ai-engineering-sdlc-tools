@@ -41,7 +41,7 @@ def emit(event, text):
 
 def session_start():
     import check
-    fails, drifts, s = check.run()
+    fails, drifts, s = check.run(event="session-start")
 
     lines = []
     at = L.paused_at(L.load())
@@ -80,9 +80,12 @@ def session_start():
         for _, m in drifts:
             lines.append("  - %s" % m)
 
-    lines.append("Cycle: %s. Move the item's stage in the plan as it advances, and "
+    cfg, _ = L.controller_config(L.load())
+    mover = ("with move.py (the plan's one writer)" if cfg and cfg.get("one_writer")
+             else "in the plan")
+    lines.append("Cycle: %s. Move the item's stage %s as it advances, and "
                  "finish the turn by re-rendering and running the check "
-                 "(see the plan-layer skill)." % " -> ".join(s.get("cycle") or []))
+                 "(see the plan-layer skill)." % (" -> ".join(s.get("cycle") or []), mover))
     emit("SessionStart", "\n".join(lines))
 
 

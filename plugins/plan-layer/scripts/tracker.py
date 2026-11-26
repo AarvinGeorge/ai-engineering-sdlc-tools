@@ -21,10 +21,13 @@ plan `updated` it was compared against) so the gate can say when it is stale.
 import hashlib
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plan_lib as L  # noqa: E402
+
+KINDS = ("epic", "story", "task", "release")
 
 
 _SEPARATORS = " \t:\u00b7,;-\u2014\u2013"
@@ -52,7 +55,7 @@ def _optional(cfg, key):
     return cfg["fields"].get(key)
 
 
-def expected_rows(d, cfg):
+def _flat_rows(d, cfg):
     """The rows the tracker should hold, derived from the plan alone.
 
     Covers plans.now, plans.next and the last cfg['recent_done'] items of
@@ -88,6 +91,148 @@ def expected_rows(d, cfg):
     return rows
 
 
+def _epics(d):
+    """The well-formed epics: dicts with a string id and name. Malformed ones are faults, never rows."""
+    return [e for e in d.get("epics") or []
+            if isinstance(e, dict) and isinstance(e.get("id"), str) and isinstance(e.get("name"), str)]
+
+
+def _releases(d):
+    """The well-formed releases: string id, name and stage, a list (or absent) stories."""
+    return [r for r in d.get("releases") or []
+            if isinstance(r, dict) and all(isinstance(r.get(k), str) for k in ("id", "name", "stage"))
+            and isinstance(r.get("stories") or [], list)]
+
+
+def _task_of(sid, tid):
+    """True when tid is a task id of story sid (E-01.S2 -> E-01.S2.T<n>)."""
+    return bool(sid and tid and re.fullmatch(re.escape(sid) + r"\.T[0-9]+", tid))
+
+
+def _story_rows(d, cfg):
+    """The flat rows, each tagged kind=story with its epic and release links.
+
+    Why: relational mode needs each story to name its epic and release. Inputs:
+    plan dict, config. Output: list of row dicts. Side effects: none.
+    """
+    rel = cfg["relations"]
+    epics = {e["id"]: e["name"] for e in _epics(d)}
+    in_release = {}
+    for r in _releases(d):
+        for s in r.get("stories") or []:
+            in_release[s] = r["name"]
+    rows = _flat_rows(d, cfg)
+    for row in rows:
+        row["kind"] = "story"
+        epic = row["key"].split(".")[0]
+        if epic in epics:
+            row[rel["epic"]] = epics[epic]
+        if row["key"] in in_release:
+            row[rel["release"]] = in_release[row["key"]]
+    return rows
+
+
+def expected_rows(d, cfg, root=None):
+    """The rows the tracker should hold, derived from the plan alone.
+
+    Flat mode (the default) is the 0.18 mirror, unchanged. In relational mode:
+    epics, stories, tasks and releases, each with "kind" and its links; a task
+    is mirrored only when its id is <its story id>.T<n> (others are listed by
+    not_mirrored()). An epic's status comes from all the work the plan has held
+    (plans.done plus the archive when root is given), not from mirrored rows.
+    Inputs: plan dict, config, optional project root. Output: list of row dicts
+    keyed by "key". No side effects.
+    """
+    if not cfg.get("relational"):
+        return _flat_rows(d, cfg)
+    f, rel, smap = cfg["fields"], cfg["relations"], cfg["status_map"]
+    tmap = cfg["task_status_map"]
+    stories = _story_rows(d, cfg)
+    plans = d.get("plans") or {}
+    known_ids, _n, done_ids, _dn = _known_names(root, d)
+    now_ids = {L.work_id(p.get("name")) for p in plans.get("now") or []}
+    rows = []
+    for e in _epics(d):
+        mine = {i for i in known_ids if re.fullmatch(re.escape(e["id"]) + r"\.S[0-9]+", i)}
+        if mine and mine <= done_ids:
+            status = smap["done"]
+        elif mine & now_ids:
+            status = smap["paused"] if L.paused_at(d) else smap.get("building", "building")
+        else:
+            status = smap.get("planned" if mine else "intent")
+        rows.append({"key": e["id"], "kind": "epic", f["name"]: e["name"], f["status"]: status})
+    rows += stories
+    for bucket in ("now", "next"):
+        for p in plans.get(bucket) or []:
+            sid = L.work_id(p.get("name"))
+            for t in p.get("tasks") or []:
+                if _task_of(sid, L.work_id(t.get("name"))):
+                    rows.append({"key": L.work_id(t["name"]), "kind": "task", f["name"]: t["name"],
+                                 f["status"]: tmap.get(t.get("state"), t.get("state")),
+                                 rel["story"]: p["name"]})
+    for r in _releases(d):
+        row = {"key": r["id"], "kind": "release", f["name"]: r["name"],
+               f["status"]: cfg["release_status_map"].get(r["stage"], r["stage"])}
+        if f.get("stage"):
+            row[f["stage"]] = r["stage"]
+        rows.append(row)
+    return rows
+
+
+def not_mirrored(d):
+    """Tasks of live items that relational mode does not mirror, as 'E-01.S2: name'.
+
+    Covers a task with no id, one whose id names another story, and one carrying a
+    finding or story id: said, never silent. Pure.
+    """
+    out = []
+    for bucket in ("now", "next"):
+        for p in (d.get("plans") or {}).get(bucket) or []:
+            sid = L.work_id(p.get("name"))
+            for t in p.get("tasks") or []:
+                if not _task_of(sid, L.work_id(t.get("name"))):
+                    out.append("%s: %s" % (sid or p.get("name"), t.get("name")))
+    return out
+
+
+def relational_faults(d, root=None):
+    """Why a plan cannot be mirrored relationally, as plain strings; [] means it can.
+
+    The caller sets the level: tracker_findings makes them FAIL when meta.controller
+    is set and DRIFT otherwise (capped at ten lines). Pure reads.
+    """
+    out = []
+    if (d.get("meta") or {}).get("naming") != "work-ids":
+        out.append("meta.tracker.relational keys rows by work id — set meta.naming to \"work-ids\"")
+    for key, good in (("epics", _epics(d)), ("releases", _releases(d))):
+        for i, e in enumerate(d.get(key) or []):
+            if not any(e is g for g in good):
+                out.append("%s[%d] is malformed (id, name%s must be strings); it is not mirrored"
+                           % (key, i, ", stage" if key == "releases" else ""))
+    epics = {e["id"] for e in _epics(d)}
+    known_ids = _known_names(root, d)[0]
+    seen = {}
+    for r in _releases(d):
+        for s in r.get("stories") or []:
+            if s in seen:
+                out.append("story %s is in two releases (%s, %s)" % (s, seen[s], r["id"]))
+            seen[s] = r["id"]
+            if s not in known_ids:
+                out.append("release %s lists story %s, which the plan does not hold" % (r["id"], s))
+    for bucket in ("now", "next"):
+        for p in (d.get("plans") or {}).get(bucket) or []:
+            sid = L.work_id(p.get("name"))
+            if sid in epics:
+                out.append("item %s carries the declared epic id %s; a story id is E-NN.Sn" % (p.get("name"), sid))
+            elif sid and sid.split(".")[0] not in epics:
+                out.append("story %s: its epic %s is not declared in epics[]" % (sid, sid.split(".")[0]))
+            for t in p.get("tasks") or []:
+                tid = L.work_id(t.get("name"))
+                if tid and not _task_of(sid, tid):
+                    out.append("task %s sits under %s; a task id is its own story's id plus .T<n>" % (tid, sid))
+    return out
+
+
 def _known_names(root, d):
     """Every id and name the plan has ever held, and which of them are finished.
 
@@ -97,9 +242,11 @@ def _known_names(root, d):
     Finished = plans.done plus plan/archive/done.json.
     """
     plans = d.get("plans") or {}
-    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME)
+    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME) if root else None
 
     def archived(fn):
+        if adir is None:
+            return []
         try:
             v = json.load(open(os.path.join(adir, fn), encoding="utf-8"))
             return v if isinstance(v, list) else []
@@ -139,10 +286,14 @@ def read_actual(path, cfg):
     if not isinstance(raw, list):
         return None, "%s must hold a JSON list of row objects fetched from the tracker" % path
     nf = cfg["fields"]["name"]
+    checked = list(cfg["fields"].values()) + (list(cfg["relations"].values()) if cfg.get("relational") else [])
     for i, r in enumerate(raw):
         if not isinstance(r, dict) or not isinstance(r.get(nf), str):
             return None, "row %d of %s is not an object with a %r text field" % (i, path, nf)
-        for fname in cfg["fields"].values():
+        if cfg.get("relational") and r.get("kind") not in KINDS:
+            return None, ("row %d of %s has kind %r, not epic, story, task or release; tag each row by "
+                          "the database it came from" % (i, path, r.get("kind")))
+        for fname in checked:
             v = r.get(fname)
             if v is not None and not isinstance(v, str):
                 return None, ("field %r of row %r is %s, not a plain string: flatten every "
@@ -159,11 +310,20 @@ def expected_hash(rows, cfg):
     """
     f = cfg["fields"]
     cols = [f["name"], f["status"]] + ([f["stage"]] if f.get("stage") else [])
+    if cfg.get("relational"):
+        cols = ["kind"] + cols + [cfg["relations"][k] for k in ("epic", "story", "release")]
     body = json.dumps([[r["key"]] + [r.get(c) for c in cols] for r in rows], ensure_ascii=False)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
 
 
-def diff_rows(expected, actual, cfg, known):
+def _ids(value):
+    """The work ids (else normalised titles) in a flattened link value 'E-01 A, E-02 B'."""
+    parts = [x.strip() for x in str(value or "").split(",") if x.strip()]
+    ided = [L.work_id(x) for x in parts if L.work_id(x)]
+    return set(ided) if ided else {_norm(x) for x in parts}
+
+
+def diff_rows(expected, actual, cfg, known, relations=(), done_value=None):
     """Compare expected with actual rows. Returns a list of instruction strings; [] means clean.
 
     Rows are matched on the work id at the start of the name; a row lacking the
@@ -174,7 +334,7 @@ def diff_rows(expected, actual, cfg, known):
     """
     f = cfg["fields"]
     known_ids, known_names, done_ids, done_names = known
-    done_value = cfg["status_map"]["done"]
+    done_value = done_value or cfg["status_map"]["done"]
     out, seen = [], {}
     for e in expected:
         seen.setdefault(e["key"], []).append(e)
@@ -209,8 +369,10 @@ def diff_rows(expected, actual, cfg, known):
         else:
             hits = [r for r in actual if _norm(r[f["name"]]) == _norm(e[f["name"]])]
         if not hits:
-            cols = [f["name"], f["status"], f.get("stage"), f.get("updated"), f.get("link")]
-            out.append("create row: %s" % ", ".join("%s=%r" % (k, e[k]) for k in cols if k and k in e))
+            cols = [f["name"], f["status"], f.get("stage"), f.get("updated"), f.get("link")] + list(relations)
+            kind = e.get("kind")
+            out.append("create %srow: %s" % (kind + " " if kind else "",
+                                             ", ".join("%s=%r" % (k, e[k]) for k in cols if k and k in e)))
             continue
         used.extend(hits)
         if len(hits) > 1:
@@ -222,8 +384,11 @@ def diff_rows(expected, actual, cfg, known):
         elif L.nfc_text(shown) != L.nfc_text(e[f["name"]]):
             out.append("rename '%s' to '%s'" % (shown, e[f["name"]]))
         for k in ("status", "stage"):
-            if f.get(k) and L.nfc_text(r.get(f[k])) != L.nfc_text(e[f[k]]):
+            if f.get(k) and f[k] in e and L.nfc_text(r.get(f[k])) != L.nfc_text(e[f[k]]):
                 out.append("set %s of '%s' to '%s'" % (f[k], shown, e[f[k]]))
+        for rf in relations:
+            if (rf in e or r.get(rf)) and _ids(r.get(rf)) != _ids(e.get(rf)):
+                out.append("set %s of '%s' to '%s'" % (rf, shown, e.get(rf) or ""))
     for r in actual:
         if any(r is u for u in used):
             continue
@@ -240,12 +405,66 @@ def diff_rows(expected, actual, cfg, known):
     return out
 
 
-def record(root, d, cfg, drift):
+def _task_ids(root, d):
+    """The task ids the plan has held, as (all, finished).
+
+    All: tasks of now, next, done and the archive. Finished: those under plans.done
+    and archive/done.json, whose rows must say the adapter's done value.
+    """
+    plans = d.get("plans") or {}
+    adir = os.path.join(L.paths(root)["dir"], L.ARCHIVE_DIRNAME)
+    live = list(plans.get("now") or []) + list(plans.get("next") or [])
+    done = list(plans.get("done") or [])
+    for fn, bag in (("done.json", done), ("backlog.json", live)):
+        try:
+            bag += json.load(open(os.path.join(adir, fn), encoding="utf-8")) or []
+        except Exception:
+            pass
+
+    def ids(items):
+        return {L.work_id(t.get("name")) for it in items if isinstance(it, dict)
+                for t in (it.get("tasks") if isinstance(it.get("tasks"), list) else [])
+                if isinstance(t, dict) and L.work_id(t.get("name"))}
+    finished = ids(done)
+    return ids(live) | finished, finished
+
+
+def diff_relational(expected, actual, cfg, root, d):
+    """Diff per kind (epic, story, task, release) with link comparison.
+
+    A row matches only rows of its own kind, so R-01 tagged as a story is a
+    stray story and a missing release. Inputs: expected and actual rows, config,
+    project root, plan dict. Output: instruction strings, kinds in order.
+    Side effects: reads the archive. Role: PLUMBING.
+    """
+    rel = cfg["relations"]
+    rels = {"epic": [], "story": [rel["epic"], rel["release"]], "task": [rel["story"]], "release": []}
+    tids, tdone = _task_ids(root, d)
+    epics = [e for e in d.get("epics") or [] if isinstance(e, dict)]
+    releases = [r for r in d.get("releases") or [] if isinstance(r, dict)]
+    known = {
+        "epic": ({e.get("id") for e in epics}, {_norm(e.get("name")) for e in epics}, set(), set()),
+        "story": _known_names(root, d),
+        "task": (tids, set(), tdone, set()),
+        "release": ({r.get("id") for r in releases}, {_norm(r.get("name")) for r in releases}, set(), set()),
+    }
+    out = []
+    for k in KINDS:
+        out += diff_rows([e for e in expected if e.get("kind") == k],
+                         [r for r in actual if r.get("kind") == k], cfg, known[k], relations=rels[k],
+                         done_value=(cfg["task_status_map"].get("done") if k == "task" else None))
+    return out
+
+
+def record(root, d, cfg, drift, actual=None):
     """Write plan/tracker-state.json: when, how much drift, and a hash of the expected rows compared."""
-    L.atomic_write(L.tracker_state_path(root), json.dumps(
-        {"at": L.utc_now(), "drift": drift, "kind": cfg["kind"],
-         "plan_updated": (d.get("meta") or {}).get("updated"),
-         "expected_hash": expected_hash(expected_rows(d, cfg), cfg)}, indent=2) + "\n")
+    state = {"at": L.utc_now(), "drift": drift, "kind": cfg["kind"],
+             "plan_updated": (d.get("meta") or {}).get("updated"),
+             "expected_hash": expected_hash(expected_rows(d, cfg, root), cfg)}
+    if actual is not None:
+        nf = cfg["fields"]["name"]
+        state["actual_keys"] = sorted({L.work_id(r[nf]) or _norm(r[nf]) for r in actual})
+    L.atomic_write(L.tracker_state_path(root), json.dumps(state, indent=2) + "\n")
 
 
 def reconcile(actual_path, quiet=False):
@@ -260,14 +479,21 @@ def reconcile(actual_path, quiet=False):
     if err or cfg is None:
         print("  tracker: %s" % (err or "meta.tracker is not set in plan.json"))
         return 2
+    if cfg.get("relational"):
+        faults = relational_faults(d, p["root"])
+        if faults:
+            for m in faults:
+                print("  tracker: %s -- nothing was compared" % m)
+            return 2
     actual, err = read_actual(actual_path, cfg)
     if err:
         print("  tracker: %s -- nothing was compared" % err)
         return 2
-    exp = expected_rows(d, cfg)
+    exp = expected_rows(d, cfg, p["root"])
     known = _known_names(p["root"], d)
-    todo = diff_rows(exp, actual, cfg, known)
-    record(p["root"], d, cfg, len(todo))
+    todo = (diff_relational(exp, actual, cfg, p["root"], d) if cfg.get("relational")
+            else diff_rows(exp, actual, cfg, known))
+    record(p["root"], d, cfg, len(todo), actual)
     if todo:
         print("  tracker: %d difference(s) from the plan; carry out each, then fetch the rows and diff again:"
               % len(todo))
@@ -278,9 +504,9 @@ def reconcile(actual_path, quiet=False):
     return 0
 
 
-def next_step(d, cfg):
+def next_step(d, cfg, root=None):
     """Print the expected-rows summary and the exact next step for the agent. Returns 0."""
-    exp = expected_rows(d, cfg)
+    exp = expected_rows(d, cfg, root)
     f = cfg["fields"]
     print("  tracker: %s %s -- %d expected row(s):" % (cfg["kind"], cfg["target"], len(exp)))
     for r in exp:
@@ -302,10 +528,12 @@ def main():
         print("  tracker: %s" % (err or "meta.tracker is not set in plan.json"))
         return 2
     if cmd == "expected":
-        print(json.dumps({"tracker": cfg["kind"], "target": cfg["target"],
-                          "plan_updated": (d.get("meta") or {}).get("updated"),
-                          "fetch": cfg["fetch"], "rows": expected_rows(d, cfg)},
-                         indent=2, ensure_ascii=False))
+        out = {"tracker": cfg["kind"], "target": cfg["target"],
+               "plan_updated": (d.get("meta") or {}).get("updated"),
+               "fetch": cfg["fetch"], "rows": expected_rows(d, cfg, L.paths()["root"])}
+        if cfg["relational"]:
+            out["not_mirrored"] = not_mirrored(d)
+        print(json.dumps(out, indent=2, ensure_ascii=False))
         return 0
     if cmd == "diff":
         if "--actual" not in args or args.index("--actual") + 1 >= len(args):

@@ -8,11 +8,24 @@ The through-line: **a coding agent's memory ends with its context window, and a 
 memory of what the agent did ends sooner than that.** These tools put the shared state
 somewhere both sides can read, and make the reading automatic.
 
+## Use cases
+
+- **plan-layer** answers "where are we?" from a file, in every new session. [Use cases](plugins/plan-layer/README.md#use-cases).
+- **engineering-method** makes the agent show evidence and scale its process to the stakes. [Use cases](plugins/engineering-method/README.md#use-cases).
+- **work-log** turns your sessions into a timesheet you can hand to someone. [Use cases](plugins/work-log/README.md#use-cases).
+
+**The three together.** You spend two weeks on a small internal tool. Each morning the session
+opens with the plan's active item and what is next, so you never re-explain. The agent names the
+work "internal", so changes get tests and a review by a different model, and "is it merged?" is
+answered with a command and its output. When tasks finish, `/plan-layer sync` re-renders the page
+and the gate flags anything left behind. On Monday you ask "work log for last week" and get a
+sheet of what was done, with estimated hours per day.
+
 ## Plugins
 
 | Plugin | What it does |
 |---|---|
-| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month; it can mirror the plan into an external tracker (Notion first) and write a handoff when work pauses. Current: 0.18.0. |
+| [`plan-layer`](plugins/plan-layer) | A shared planning surface between you and your coding agent. One JSON file is the state, a self-contained HTML page is the view, a gate catches drift and contradiction, session hooks brief the agent before the first word is typed, and history rolls off the front page into an archive in full so the page shows this month; it can mirror the plan into an external tracker (Notion first) and write a handoff when work pauses. Opt-in controller: one script is the only writer of plan state, co-change rules run on events, and an inventory is checked against every list that must cover it. Current: 0.19.0. |
 | [`engineering-method`](plugins/engineering-method) | An engineering method carried to every project as one skill that hooks re-apply at session start, after compaction and at each stage change: principles with their reason and a test, scaled by stakes (prototype, internal tool, live system with real users), a thin layer over Superpowers. Current: 0.3.0. |
 | [`work-log`](plugins/work-log) | Turns your Claude Code activity into a dated, time-estimated, plain-language work log for any period (last week, October, Q4), saved as a new Google Sheet in a `Work Logs` Drive folder or as a local `.xlsx`. Runs on request or weekly from a Claude Desktop local task, with a pre-upload privacy scan. Current: 0.1.0. |
 

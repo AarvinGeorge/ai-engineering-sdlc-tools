@@ -1,0 +1,112 @@
+name: release-gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: release-gate unit tests
+        run: python -m unittest discover -s .github/release-gates/tests -v
+
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_VERSION: "2.1.322"
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the Claude Code CLI (pinned)
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: claude plugin validate --strict (marketplace and every plugin)
+        run: |
+          set -euo pipefail
+          claude --version
+          claude plugin validate --strict .
+          for d in plugins/*/; do claude plugin validate --strict "$d"; done
+
+  version-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Versions agree (push)
+        if: github.event_name != 'pull_request'
+        run: python .github/release-gates/version_gate.py
+      - name: Versions agree and changed plugins are bumped (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: python .github/release-gates/version_gate.py --base "$BASE"
+
+  payload-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Write the private list (never echoed)
+        env:
+          PRIVATE_LIST: ${{ secrets.RELEASE_GATES_PRIVATE_LIST }}
+        run: |
+          umask 077
+          printf '%s\n' "$PRIVATE_LIST" > "$RUNNER_TEMP/private-list.txt"
+      - name: Control runs (a scan that never fired is not shown able to)
+        env:
+          REQUIRE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+        run: |
+          set -uo pipefail
+          printf 'AK%s%s\n' 'IA' 'CCCCCCCCCCCCCCCC' > "$RUNNER_TEMP/ctl-generic.txt"
+          # the runner uses bash -e: an expected non-zero exit must be captured with || , not with $? afterwards
+          rc=0
+          python .github/release-gates/scan_payload.py --paths "$RUNNER_TEMP/ctl-generic.txt" || rc=$?
+          [ "$rc" -eq 1 ] || { echo "generic control did not fire (exit $rc)"; exit 1; }
+          if [ "$REQUIRE" = "true" ]; then
+            grep -v '^[[:space:]]*\(#\|$\)' "$RUNNER_TEMP/private-list.txt" | head -n1 > "$RUNNER_TEMP/ctl-private.txt"
+            rc=0
+            python .github/release-gates/scan_payload.py --paths "$RUNNER_TEMP/ctl-private.txt" \
+              --tokens-file "$RUNNER_TEMP/private-list.txt" --require-private-list > /dev/null || rc=$?
+            [ "$rc" -eq 1 ] || { echo "private control did not fire (exit $rc)"; exit 1; }
+          fi
+          rm -f "$RUNNER_TEMP"/ctl-*.txt
+      - name: Scan every tracked file and the commit messages
+        env:
+          REQUIRE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
+          RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
+        run: |
+          set -uo pipefail
+          args=(--commits "$RANGE")
+          # first push of a branch: "before" is all zeros; scan every message reachable from the new head
+          case "$RANGE" in 0000000000000000000000000000000000000000..*) args=(--commits "${RANGE#*..}");; esac
+          if [ "$REQUIRE" = "true" ]; then
+            args+=(--tokens-file "$RUNNER_TEMP/private-list.txt" --require-private-list)
+          else
+            echo "::warning::Fork or Dependabot pull request: the private list is not available here. The maintainer runs scan_payload.py --tokens-file on this head before merging; CI checks it again on the push to main (detection after publish)."
+          fi
+          python .github/release-gates/scan_payload.py "${args[@]}"
+      - name: Remove the private list
+        if: always()
+        run: rm -f "$RUNNER_TEMP/private-list.txt"

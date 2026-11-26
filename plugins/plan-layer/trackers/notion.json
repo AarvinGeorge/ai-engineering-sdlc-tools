@@ -18,5 +18,18 @@
     "paused": "Paused",
     "done": "Done"
   },
-  "fetch": "With the Notion connector, fetch the database at meta.tracker.target and query every row (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names: Name (title), Status, Stage, Updated, Link; flatten every property to a plain string (a select or status as its option name, a date as ISO text, empty as an empty string), and save the rows as the tracker holds them: never build the list from the plan."
+  "fetch": "With the Notion connector, fetch the database at meta.tracker.target and query every row (follow pagination). Write a JSON list to a file with one object per row, keyed by this adapter's field names: Name (title), Status, Stage, Updated, Link; flatten every property to a plain string (a select or status as its option name, a date as ISO text, empty as an empty string), and save the rows as the tracker holds them: never build the list from the plan.",
+  "relations": {
+    "epic": "Epic",
+    "story": "Story",
+    "release": "Release"
+  },
+  "task_status_map": {
+    "todo": "Not started",
+    "active": "In progress",
+    "blocked": "Blocked",
+    "done": "Done"
+  },
+  "release_status_map": {},
+  "relational_fetch": "With the connector, query every row of each database the plan's meta.tracker.target names (one for epics, stories, tasks and releases, or one shared database; all pages). Save ONE JSON list; add \"kind\": \"epic\" | \"story\" | \"task\" | \"release\" to each row by the database it came from; flatten a relation to the related rows' titles joined by \", \"; every other property to a plain string as in fetch. Never build the list from the plan."
 }

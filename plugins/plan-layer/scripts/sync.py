@@ -55,7 +55,7 @@ def tracker_step():
         print("  sync: tracker reconcile against %s" % sys.argv[i + 1])
         return tracker.reconcile(sys.argv[i + 1])
     print("  sync: tracker mirror")
-    return tracker.next_step(d, cfg)
+    return tracker.next_step(d, cfg, L.paths()["root"])
 
 
 def main():
@@ -115,7 +115,10 @@ def main():
         if script == "check.py" and "--tracker" in sys.argv:
             tracker_rc = tracker_step()
             sys.stdout.flush()
-        r = subprocess.run([sys.executable, os.path.join(HERE, script)])
+        argv = [sys.executable, os.path.join(HERE, script)]
+        if script == "check.py":
+            argv += ["--event", "sync"]
+        r = subprocess.run(argv)
         if script == "check.py":
             gate_rc = r.returncode or 0
     # Unreadable tracker input is 2 whatever the gate said: nothing was compared.
