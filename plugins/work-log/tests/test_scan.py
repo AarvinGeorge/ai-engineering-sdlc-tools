@@ -37,8 +37,8 @@ class Scan(unittest.TestCase):
     def test_short_number_not_phone(self):
         self.assertEqual(self.run_scan(entries("Fixed 3 bugs in 2 hours.")).returncode, 0)
     def test_keys(self):
-        for k in ["sk-ant-abcdefghijklmnop1234", "AKIAABCDEFGHIJKLMNOP", "ghp_" + "a1" * 12,
-                  "xoxb-1234567890-abc", "-----BEGIN PRIVATE KEY", "Zx9" * 12]:
+        for k in ["sk-" + "ant-abcdefghijklmnop1234", "AK" + "IAABCDEFGHIJKLMNOP", "ghp_" + "a1" * 12,
+                  "xox" + "b-1234567890-abc", "-----BEGIN " + "PRIVATE KEY", "Zx9" * 12]:
             r = self.hit("Rotated " + k, "key-like")
             self.assertNotIn(k, r.stdout + r.stderr)
     def test_never_list_whole_word_case_insensitive(self):
