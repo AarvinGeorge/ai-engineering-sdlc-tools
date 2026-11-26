@@ -14,9 +14,9 @@ steps, RC-1 to RC-10, each invoked at its trigger and written as rule, trigger, 
 prevents and evidence: pin what ran, read the decision record, read the full input, quote the
 objection, diff the served inputs, inventory the concept, trace the dropped fact, label the root then
 fit the fix, close the loop, brief the investigator blind. Most steps are for systems where a model
-makes the decision. RC-5 starts from the working case: the run that worked is the baseline before any
-cause is offered. The reference names where it departs from systematic-debugging and what stays in
-each project. Principle 17 now points at it.
+makes the decision. RC-5 starts from the working case: the run that worked, or a request for it,
+comes before any cause, and a cause after that is a hypothesis. The reference names where it
+departs from systematic-debugging and what stays in each project. Principle 17 now points at it.
 
 **Drift fix and maintainer loop.** `docs-and-decisions.md` described principle 17 as "five steps" while
 `SKILL.md` carries four required lines (Exists, Extends, Unlocks, Goals); it now says four, and a
@@ -39,35 +39,50 @@ departure is named: the first stall stops the loop and sends the open findings t
 Superpowers would carry on to the cap. The duplicate rule in `model-routing-and-cost.md` is replaced by
 a pointer.
 
-**Tests and evals.** 71 unit tests (55 in 0.3.0). 14 new eval cases, each criterion graded on its own:
+**Tests and evals.** 73 unit tests (55 in 0.3.0). 14 new eval cases, each criterion graded on its own:
 `rc-01` to `rc-10`, `rc-activation-loads-reference`, `rc-near-miss-rename` (a regression guard that
 should pass on both versions), `instruction-file-compression` and `fix-loop-bounded`; `rc-03-full-input`
 needs `--scaffold`, and `rc-05-diff` c2 is a guard that 0.3.0 already passes 2 runs of 3.
 `evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43).
 
-**Eval results, after fix round A (07b6c26, current graders)** (same flags; head 3 runs unless
-stated; base 0.3.0 runs used the current case folders). Status: the owner's 0.4.0 release bar is
-**not met**; this release stays held on condition (2).
-- Bar (2), the targeted criteria, need 2 of 3: `rc-01` c1 0/3, c2 1/3; `rc-03` c1 3/3, c2 0/3, c3
-  2/3; `rc-04` c1 1/3; `rc-05` c3 0/3; `fix-loop-bounded` c1 1/3, c2 0/3, c3 2/3 (base 0/9);
-  `instruction-file-compression` c4 0/3. 3 of 11 met. The answers were read. Most fail because the
-  reply still opens with the cause, or argues a suspect out, before the evidence lines (`rc-01`,
-  `rc-03`), or never asks for a working run (`rc-04`, `rc-05`). In `fix-loop-bounded` the
-  recommendation is a fresh implementer rather than stopping (judge doubtful on two runs of c2).
-  Compression c4 run 2 meets the Pass line in substance (judge likely wrong); run 3 uses a
-  same-model reviewer.
-- Bar (1), no existing case drops: `deploy-helper-fault-triage` c1 pooled over 18 runs per version
-  is head 10/18 against base 14/18 (two-sided Fisher p = 0.29). The 12 new runs alone are 7/12
-  against 8/12 (p = 1.0), so the earlier base 6/6 looks like a high draw. Kept traces show that
-  failing and passing head runs read the same two unchanged references. Touched cases keep their
-  2-of-3 verdicts: `reviewer-different-model` 2/3, `blocked-release-first` 11/12,
-  `state-claim-measured` 3/3, `live-deploy-safeguards` 0/3 (0/3 on 0.3.0 too). `intent-over-literal`
-  c3 was not re-run (3/6 against 1/6 earlier, p = 0.55).
-- RC criteria on head: 45/75 (30/75 before fix round A); 16 of 25 green. `rc-10` on 0.3.0 with the
-  rewritten c1: c1 0/3, c2 0/3; on head c1 2/3 (guard), c2 3/3. `rc-activation-loads-reference` c1
-  3/3, `rc-near-miss-rename` c1 3/3.
-- Bar (3), known-red capability evals (follow-up: a further fix round, owner's call): `rc-08` c1 c2,
-  `rc-09` c1 c2, plus the targeted reds above.
+**Release ruling.** The owner ruled on 26 Nov 2026 to ship 0.4.0 on the results below. The two kinds
+of eval are read differently. *Capability evals* test new behaviour (the `rc-*` cases,
+`fix-loop-bounded`, `instruction-file-compression`); they are expected to climb from release to
+release, so a criterion still red is recorded as known red instead of holding the release.
+*Regression evals* test the cases that existed in 0.3.0; they must hold, and they did as far as
+measured. The root-cause criteria rose from 5/75 criterion-runs on 0.3.0 to 45/75 on 0.4.0, with 16
+of 25 criteria green (2 of 3 or better).
+
+**Known red (capability evals), head passes of 3:**
+- Targeted by fix round A and still below 2 of 3: `rc-01` c1 0/3, c2 1/3; `rc-03` c2 0/3; `rc-04` c1
+  1/3; `rc-05` c3 0/3; `fix-loop-bounded` c1 1/3, c2 0/3; `instruction-file-compression` c4 0/3.
+- Not targeted: `rc-08` c1 0/3, c2 0/3; `rc-09` c1 0/3, c2 1/3.
+- The common pattern, read from the answers: the reply still opens with a verdict sentence, or argues
+  a suspect out, before the evidence lines, or never asks for a working run. In `fix-loop-bounded`
+  the reply recommends a fresh implementer rather than stopping. Judge doubts on two criteria
+  (compression c4 run 2, fix-loop c2 runs 1 and 2) would not change either verdict if ruled.
+- Follow-up: **evidence-first ordering made structural**, carried by the shape of the reply rather
+  than by more wording in the reference.
+
+**Regression evals.**
+- `deploy-helper-fault-triage` c1, 18 runs per version: head 10/18, base 14/18 (two-sided Fisher
+  p = 0.29). The 12 later runs alone are 7/12 against 8/12 (p = 1.0). Kept traces show passing and
+  failing head runs read the same two references, both unchanged since 0.3.0, so the gap is read as
+  noise.
+- `intent-over-literal` c3: head 1/6, base 3/6 (p = 0.55); base fails it half the time too. It was
+  not re-run after fix round A, so it is recorded as unresolved, not cleared.
+- Touched cases keep their 2-of-3 verdicts: `reviewer-different-model` 2/3, `blocked-release-first`
+  11/12, `state-claim-measured` 3/3. `live-deploy-safeguards` is 0/3 on both versions (red before
+  0.4.0, not a drop).
+
+**Eval results, after fix round A (07b6c26, current graders)** (Opus agent, Sonnet judge, ablation
+none, `-j 1`; head 3 runs unless stated; base 0.3.0 runs used the current case folders).
+- Targeted criteria met at 2 of 3: `rc-03` c1 3/3, c3 2/3; `fix-loop-bounded` c3 2/3 (base 0/9).
+- RC criteria on head: 45/75 (30/75 before fix round A). `rc-10` on 0.3.0 with the rewritten c1: c1
+  0/3, c2 0/3; on head c1 2/3 (guard), c2 3/3. `rc-activation-loads-reference` c1 3/3,
+  `rc-near-miss-rename` c1 3/3.
+- After these runs, RC-5's evidence line was aligned with the opening rule: a requested working run
+  counts as the RC-5 line, and a cause offered after it is a [hypothesis]. Not re-measured.
 - Cost: about $20.76 (an estimate, billed to a subscription), 84 agent runs.
 
 **Eval results, before fix round A (graders since changed)** (Opus agent, Sonnet judge, 3 runs,
