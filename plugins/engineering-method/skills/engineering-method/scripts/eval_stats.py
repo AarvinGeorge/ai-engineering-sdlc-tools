@@ -22,12 +22,14 @@ import io
 import json
 import math
 import os
+import re
 import sys
 from statistics import NormalDist
 
 Z = NormalDist().inv_cdf(0.975)
 MIN_PER_SIDE = 30
-EMPTY_RESULTS = ("no files found", "does not exist", "no such file", "not found")
+MISS_STARTS = ("no files found", "file does not exist", "no matches found")
+MISS_END = "no such file or directory"
 
 
 class BadInput(Exception):
@@ -61,6 +63,7 @@ def f2(x):
 def floor_block(name, results):
     """What: the floor block for one criterion. Use when: `floor`. Inputs: name, letters P/F/I.
     Output: list of lines. Side effects: none. Role: computes the never-break verdict."""
+    name = " ".join(name.split())
     r = results.strip().upper()
     if not r:
         raise BadInput("no runs for criterion %r" % name)
@@ -97,7 +100,7 @@ def read_labels(path):
         else:
             with open(path, encoding="utf-8") as fh:
                 text = fh.read()
-    except OSError as e:
+    except (OSError, UnicodeDecodeError) as e:
         raise BadInput("cannot read labels: %s" % e)
     rd = csv.DictReader(io.StringIO(text))
     if not rd.fieldnames:
@@ -110,7 +113,9 @@ def read_labels(path):
         owner, judge = (row["owner"] or "").strip().lower(), (row["judge"] or "").strip().lower()
         if owner not in ("pass", "fail") or judge not in ("pass", "fail"):
             raise BadInput("row %d: owner and judge must be pass or fail" % i)
-        key = (row["answer_id"].strip(), row["criterion"].strip())
+        key = ((row["answer_id"] or "").strip(), " ".join((row["criterion"] or "").split()))
+        if not key[0] or not key[1]:
+            raise BadInput("row %d: answer_id and criterion must not be empty" % i)
         if key in seen:
             raise BadInput("row %d: answer %s is labelled twice for %r" % (i, key[0], key[1]))
         seen.add(key)
@@ -174,11 +179,12 @@ def trace_events(path):
                 if not isinstance(b, dict):
                     continue
                 if b.get("type") == "tool_use":
-                    uses[b.get("id")] = (b.get("name"), b.get("input") or {})
+                    uses[b.get("id")] = (b.get("name"), b.get("input") if isinstance(b.get("input"), dict) else {})
                 elif b.get("type") == "tool_result" and b.get("tool_use_id") in uses:
                     c = b.get("content")
                     text = c if isinstance(c, str) else " ".join(
-                        x.get("text", "") for x in c or [] if isinstance(x, dict))
+                        str(x.get("text") or "") if x.get("type", "text") == "text" else "[%s block]" % x.get("type")
+                        for x in (c if isinstance(c, list) else [c] if c else []) if isinstance(x, dict))
                     name, inp = uses[b["tool_use_id"]]
                     pairs.append((name, inp, text, bool(b.get("is_error")) or "<tool_use_error>" in text))
     return pairs
@@ -188,13 +194,20 @@ def delivered(pairs, prefix):
     """What: True when a tool call on a path under prefix returned content. Use when: `runs`
     with --fixture. Inputs: pairs, prefix. Output: bool. Side effects: none.
     Role: the 'confirmed in a kept trace' fact."""
+    want = re.compile(r"(?:^|[\s'\"=/])" + re.escape(prefix.strip("/")) + r"(?:$|[\s'\"/])")
     for _name, inp, text, err in pairs:
         targets = [v for v in inp.values() if isinstance(v, str)]
-        if any(t.startswith(prefix) or ("/" + prefix) in t for t in targets) and not err:
-            low = text.strip().lower()
-            if low and not any(e in low for e in EMPTY_RESULTS):
-                return True
+        if any(want.search(t) for t in targets) and not err and not is_miss(text):
+            return True
     return False
+
+
+def is_miss(text):
+    """What: True when a tool result is only a nothing-there message, not content.
+    Use when: deciding delivery or a SIGNAL line. Inputs: result text. Output: bool.
+    Side effects: none. Role: reads the whole message, so file text that quotes such a phrase is content."""
+    low = text.strip().lower()
+    return not low or low.startswith(MISS_STARTS) or ("\n" not in low and low.endswith(MISS_END))
 
 
 def runs_block(path, fixtures):
@@ -205,11 +218,16 @@ def runs_block(path, fixtures):
             data = json.load(fh)
     except (OSError, ValueError) as e:
         raise BadInput("cannot read %s: %s" % (path, e))
+    if not isinstance(data, dict):
+        raise BadInput("%s is not a JSON object" % path)
     if data.get("schemaVersion") != 1:
         raise BadInput("schemaVersion is %r; this script reads 1" % data.get("schemaVersion"))
     cases = data.get("cases")
     if not isinstance(cases, list):
         raise BadInput("result has no cases list")
+    for c in cases:
+        if not isinstance(c, dict) or not isinstance(c.get("name"), str):
+            raise BadInput("a case in %s is not an object with a name" % path)
     names = [c.get("name") for c in cases]
     for f in fixtures:
         if f not in names:
@@ -224,9 +242,13 @@ def runs_block(path, fixtures):
         for arm, runs in arms.items():
             per = {"valid": 0, "invalid": 0, "errored": 0, "no-trace": 0}
             confirmed, tallies = 0, {}
+            if not isinstance(runs, list):
+                raise BadInput("case %r arm %r is not a list of runs" % (c["name"], arm))
             for i, r in enumerate(runs, 1):
                 total += 1
-                if "graders" not in r or "passed" not in r:
+                if not isinstance(r, dict) or not isinstance(r.get("graders"), list) or "passed" not in r \
+                        or not all(isinstance(g, dict) for g in r["graders"]) \
+                        or not isinstance(r.get("tracePath"), (str, type(None))):
                     raise BadInput("case %r run %d lacks graders or passed" % (c.get("name"), i))
                 tp = r.get("tracePath")
                 tpath = tp if tp and os.path.isabs(tp) and os.path.exists(tp) else (
@@ -236,16 +258,19 @@ def runs_block(path, fixtures):
                 elif not tpath or not os.path.exists(tpath):
                     kind = "no-trace"
                 else:
-                    pairs = trace_events(tpath)
+                    try:
+                        pairs = trace_events(tpath)
+                    except (OSError, UnicodeDecodeError) as e:
+                        raise BadInput("cannot read trace %s: %s" % (tpath, e))
                     if c["name"] in fixtures:
                         ok = delivered(pairs, fixtures[c["name"]])
                         kind, confirmed = ("valid", confirmed + 1) if ok else ("invalid", confirmed)
                     else:
                         kind = "valid"
                         for name, _inp, text, _err in pairs:
-                            if any(e in text.strip().lower() for e in EMPTY_RESULTS[:1]):
+                            if text.strip().lower().startswith(MISS_STARTS[0]):
                                 signals.append('SIGNAL: %s run %d: %s returned "%s"' % (
-                                    c["name"], i, name, text.strip()[:60]))
+                                    c["name"], i, name, " ".join(text.split())[:60]))
                 per[kind] += 1
                 counts[kind] += 1
                 if kind == "valid":
@@ -258,7 +283,8 @@ def runs_block(path, fixtures):
             if per["invalid"]:
                 case_lines.append("CASE: %s: invalid %d of %d (no tool result under %s returned content "
                                   "in the kept trace)" % (label, per["invalid"], n, fixtures[c["name"]]))
-                reruns.append(c["name"])
+                if c["name"] not in reruns:
+                    reruns.append(c["name"])
             else:
                 gr = ", ".join("%s %d of %d" % (g, k, m) for g, (k, m) in tallies.items())
                 conf = ("; delivery confirmed in %d of %d kept traces" % (confirmed, n)) if c["name"] in fixtures else ""
@@ -284,10 +310,22 @@ def runs_block(path, fixtures):
     return out + ["EVAL_STATS end"]
 
 
+class Parser(argparse.ArgumentParser):
+    """What: argparse that raises BadInput on a usage error instead of exiting.
+    Use when: building the CLI (subparsers inherit it). Inputs: as argparse.
+    Output: a parser. Side effects: none. Role: keeps every bad input on the one ERROR: exit-2 path."""
+
+    def error(self, message):
+        """What: turn argparse's usage error into BadInput. Use when: argparse rejects argv.
+        Inputs: argparse's message. Output: none (raises BadInput). Side effects: none.
+        Role: plumbing for the exit-2 contract."""
+        raise BadInput(message)
+
+
 def main(argv):
     """What: CLI entry. Use when: run as a script. Inputs: argv. Output: exit code.
     Side effects: prints the block or an error. Role: plumbing."""
-    ap = argparse.ArgumentParser(prog="eval_stats.py")
+    ap = Parser(prog="eval_stats.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("floor")
     f.add_argument("--name", action="append", default=[])
@@ -298,10 +336,10 @@ def main(argv):
     r.add_argument("result")
     r.add_argument("--fixture", action="append", default=[])
     try:
-        a = ap.parse_args(argv)
-    except SystemExit:
-        return 2
-    try:
+        try:
+            a = ap.parse_args(argv)
+        except SystemExit as e:
+            return 0 if e.code in (0, None) else 2
         if a.cmd == "floor":
             if not a.name or len(a.name) != len(a.results):
                 raise BadInput("give --name and --results in pairs")
@@ -314,6 +352,8 @@ def main(argv):
                 if "=" not in item:
                     raise BadInput("--fixture takes CASE=PATH_PREFIX, got %r" % item)
                 k, v = item.split("=", 1)
+                if not k or not v.strip("/") or k in fx:
+                    raise BadInput("--fixture needs one non-empty CASE=PATH_PREFIX per case, got %r" % item)
                 fx[k] = v
             lines = runs_block(a.result, fx)
     except BadInput as e:
