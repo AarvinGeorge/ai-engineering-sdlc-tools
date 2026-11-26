@@ -45,8 +45,33 @@ should pass on both versions), `instruction-file-compression` and `fix-loop-boun
 needs `--scaffold`, and `rc-05-diff` c2 is a guard that 0.3.0 already passes 2 runs of 3.
 `evals/COVERAGE.md` maps every criterion to its gap id (G30 to G43).
 
+**Eval results, after fix round A (07b6c26, current graders)** (same flags; head 3 runs unless
+stated; base 0.3.0 runs used the current case folders). Status: the owner's 0.4.0 release bar is
+**not met**; this release stays held on condition (2).
+- Bar (2), the targeted criteria, need 2 of 3: `rc-01` c1 0/3, c2 1/3; `rc-03` c1 3/3, c2 0/3, c3
+  2/3; `rc-04` c1 1/3; `rc-05` c3 0/3; `fix-loop-bounded` c1 1/3, c2 0/3, c3 2/3 (base 0/9);
+  `instruction-file-compression` c4 0/3. 3 of 11 met. The answers were read. Most fail because the
+  reply still opens with the cause, or argues a suspect out, before the evidence lines (`rc-01`,
+  `rc-03`), or never asks for a working run (`rc-04`, `rc-05`). In `fix-loop-bounded` the
+  recommendation is a fresh implementer rather than stopping (judge doubtful on two runs of c2).
+  Compression c4 run 2 meets the Pass line in substance (judge likely wrong); run 3 uses a
+  same-model reviewer.
+- Bar (1), no existing case drops: `deploy-helper-fault-triage` c1 pooled over 18 runs per version
+  is head 10/18 against base 14/18 (two-sided Fisher p = 0.29). The 12 new runs alone are 7/12
+  against 8/12 (p = 1.0), so the earlier base 6/6 looks like a high draw. Kept traces show that
+  failing and passing head runs read the same two unchanged references. Touched cases keep their
+  2-of-3 verdicts: `reviewer-different-model` 2/3, `blocked-release-first` 11/12,
+  `state-claim-measured` 3/3, `live-deploy-safeguards` 0/3 (0/3 on 0.3.0 too). `intent-over-literal`
+  c3 was not re-run (3/6 against 1/6 earlier, p = 0.55).
+- RC criteria on head: 45/75 (30/75 before fix round A); 16 of 25 green. `rc-10` on 0.3.0 with the
+  rewritten c1: c1 0/3, c2 0/3; on head c1 2/3 (guard), c2 3/3. `rc-activation-loads-reference` c1
+  3/3, `rc-near-miss-rename` c1 3/3.
+- Bar (3), known-red capability evals (follow-up: a further fix round, owner's call): `rc-08` c1 c2,
+  `rc-09` c1 c2, plus the targeted reds above.
+- Cost: about $20.76 (an estimate, billed to a subscription), 84 agent runs.
+
 **Eval results, before fix round A (graders since changed)** (Opus agent, Sonnet judge, 3 runs,
-ablation none, `-j 1`; criterion-runs passed, base 0.3.0 versus head 0.4.0). The head run is not green; this release is held on these results.
+ablation none, `-j 1`; criterion-runs passed, base 0.3.0 versus head 0.4.0). Status at that time: the head run was not green, and this release was held on these results.
 - The reference loads: the hook prints `stage debug ... read references/root-cause-investigation.md`
   on a debugging prompt; `rc-activation-loads-reference` c1 3 of 3; `rc-near-miss-rename` c1 3 of 3
   (no read). A kept trace of an `rc-01` run shows the reference read after the skill fired.
