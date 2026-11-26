@@ -119,7 +119,9 @@ explanation.
   each difference sorted as mechanism candidate or correlate.
 - **Prevents:** randomness as the explanation; a correlate (a name, a phrasing) taken for the
   mechanism; comparing only the nearest sibling; the working instance waved off as luck.
-- **Evidence:** the working run's id, named before any cause; the diff with run ids; N and k.
+- **Evidence:** the working run's id before any cause, or the RC-5 `requested` line for it under
+  the opening rule (a cause after that line is a [hypothesis] until the diff is read); the diff
+  with run ids; N and k.
 
 *Why:* "the model is not deterministic" closed the source case's inquiry for an hour; a diff of
 served inputs would have shown that no instance received the fact and that only names and
