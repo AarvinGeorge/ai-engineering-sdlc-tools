@@ -36,15 +36,15 @@ def parse(text):
     for line in text.splitlines():
         low = line.lower()
         if line.startswith("```"):
-            in_diff = line.strip() == "```diff" or (not in_diff and HEAD.match(line) is not None)
+            in_diff = line.strip() == "```diff"
             continue
         m = STAT.match(line)
         if m:
             files.append(m.group(1))
             continue
         h = HEAD.match(line)
-        if h:
-            cur = h.group(1)
+        if h or line.startswith("@@"):
+            cur, in_diff = (h.group(1) if h else cur), True
             continue
         if in_diff and line.startswith("-") and not line.startswith("---"):
             removed.append((cur, line[1:]))
@@ -52,13 +52,14 @@ def parse(text):
         if in_diff and line.startswith("+") and not line.startswith("+++"):
             added.append((cur, line[1:]))
             continue
-        if re.search(r"out[- ]of[- ]scope", low) and len(line) < 60:
+        item = re.match(r"\s*(\d+\.|[-*] )", line)
+        if re.search(r"out[- ]of[- ]scope", low) and len(line) < 60 and not item:
             section = "oos"
             continue
-        if re.search(r"\bsteps?\b", low) and len(line) < 60 and not re.match(r"\s*\d+\.", line):
+        if re.search(r"\bsteps?\b", low) and len(line) < 60 and not item:
             section = "steps"
             continue
-        hit = [f for f in files if f in line] or [p for p in PATH.findall(line) if "/" in p]
+        hit = [f for f in files if names(line, f)] or [p for p in PATH.findall(line) if "/" in p]
         if hit and not re.match(r"\s*(\d+\.|[-*] )", line):
             cur = hit[0]
         if section == "steps" and re.match(r"\s*\d+\.", line):
@@ -81,6 +82,12 @@ def names(text, word):
     Use when: deciding if a step names a key or a file. Inputs: text, word (str).
     Output: bool. Side effects: none. Role: parsing."""
     return re.search(r"(?<![\w./-])%s(?![\w/-])" % re.escape(word), text) is not None
+
+
+def count(n, word):
+    """What: "<n> <word>", plural (s, or es after ch) unless n is 1. Use when: the CONFORMANCE
+    line. Inputs: int, singular word. Output: str. Side effects: none. Role: plumbing."""
+    return "%d %s%s" % (n, word, "" if n == 1 else ("es" if word.endswith("ch") else "s"))
 
 
 def globbed(p):
@@ -107,7 +114,8 @@ def conformance(text):
     for cur, old in removed:
         k = key(old)
         new = next((n for c, n in added if c == cur and key(n) == k and n != old), None)
-        if k and new is not None and not names(step_code, k):
+        if k and new is not None and not (
+                names(step_code, k) or (re.search(r"[-_\dA-Z]", k) and names(step_text, k))):
             named = bool(cur) and names(step_text, cur)
             held += not named
             checks.append("CHECK changed-existing %s %s (%s -> %s) (existing definition changed; %s; "
@@ -124,8 +132,9 @@ def conformance(text):
         if not names(flagged, f) and not names(step_text, f):
             unmatched.append("UNMATCHED %s (no step names it; you judge)" % f)
     out = ["PLAN_CONFORMANCE v1",
-           "CONFORMANCE: %d mismatches, %d check%s (%d steps, %d out-of-scope items, %d files changed)"
-           % (len(mism), len(checks), "" if len(checks) == 1 else "s", len(steps), len(oos), len(files))]
+           "CONFORMANCE: %s, %s (%s, %s, %s changed)"
+           % (count(len(mism), "mismatch"), count(len(checks), "check"), count(len(steps), "step"),
+              count(len(oos), "out-of-scope item"), count(len(files), "file"))]
     out += mism + checks + unmatched
     out.append(WITHHELD if mism or held else
                "VERIFIED: ok (diff matches the plan: %d steps, 0 out-of-scope changes)" % len(steps))

@@ -144,6 +144,61 @@ class Conformance(unittest.TestCase):
             "```", " pkg/data.py | 2 +-", " a.py        | 2 +-", "```", ""])
         self.assertIn("UNMATCHED a.py", run(text)[1])
 
+    def test_headerless_hunk_goes_to_the_whole_name_match(self):
+        text = "\n".join([
+            "Plan, steps:", "1. Add a `--totals` option in `cli.py`.", "",
+            "```", " cli.py        | 3 +++", " report/cli.py | 2 +-", "```", "",
+            "Part of `report/cli.py`:", "",
+            "```diff",
+            '-    parser.add_argument("--since", type=int, default=7)',
+            '+    parser.add_argument("--since", type=int, default=30)',
+            "```", ""])
+        out = run(text)[1]
+        self.assertIn("CHECK changed-existing report/cli.py --since", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_raw_git_diff_hunks_are_read(self):
+        text = "\n".join([
+            "Plan, steps:", "1. Add a `--totals` option to the report command.", "",
+            "Plan, out of scope:", "- Changing the behaviour of existing command options.", "",
+            " report/cli.py | 3 ++-", " 1 file changed, 2 insertions(+), 1 deletion(-)", "",
+            "diff --git a/report/cli.py b/report/cli.py",
+            "index 1111111..2222222 100644", "--- a/report/cli.py", "+++ b/report/cli.py",
+            "@@ -10,3 +10,4 @@ def build():",
+            '-    parser.add_argument("--since", type=int, default=7)',
+            '+    parser.add_argument("--since", type=int, default=30)',
+            '+    parser.add_argument("--totals", action="store_true")', ""])
+        out = run(text)[1]
+        self.assertIn("1 out-of-scope item,", out)
+        self.assertIn("CHECK changed-existing report/cli.py --since", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_list_item_saying_step_does_not_flip_the_section(self):
+        text = "\n".join([
+            "Plan, steps:", "1. Add `report_totals(rows)` in `report/totals.py`.", "",
+            "Plan, out of scope:", "- The deploy step.", "- The purge job and anything under `jobs/`.", "",
+            "```", " jobs/purge.py    | 4 ++--", " report/totals.py | 31 +++++++", "```", ""])
+        out = run(text)[1]
+        self.assertIn("MISMATCH out-of-scope jobs/purge.py", out)
+        self.assertIn("VERIFIED: withheld", out)
+
+    def test_code_shaped_key_in_step_prose_covers_the_change(self):
+        text = "\n".join([
+            "Plan, steps:", "1. Raise MAX_TRIES to 5 in the client.", "",
+            "```", " net/client.py | 2 +-", "```", "",
+            "```diff", "+++ b/net/client.py", "-MAX_TRIES = 3", "+MAX_TRIES = 5", "```", ""])
+        out = run(text)[1]
+        self.assertIn("0 checks", out)
+        self.assertIn("VERIFIED: ok", out)
+
+    def test_singular_counts(self):
+        text = "\n".join([
+            "Plan, steps:", "1. Change `jobs/x.py`.", "",
+            "Plan, out of scope:", "- Anything under `jobs/`.", "",
+            "```", " jobs/x.py | 2 +-", "```", ""])
+        self.assertIn("CONFORMANCE: 1 mismatch, 0 checks (1 step, 1 out-of-scope item, 1 file changed)",
+                      run(text)[1])
+
     def test_block_shape(self):
         lines = run(FIXTURE)[1].splitlines()
         self.assertEqual((lines[0], lines[-1]), ("PLAN_CONFORMANCE v1", "PLAN_CONFORMANCE end"))
