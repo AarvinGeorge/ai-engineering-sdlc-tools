@@ -32,6 +32,12 @@ class Snippets(unittest.TestCase):
     def test_one_snippet_per_tier(self):
         self.assertEqual(sorted(profiles()), sorted(TIERS))
 
+    def test_every_json_fence_is_a_tier_snippet(self):
+        """A json block outside a '### <tier>' section would escape every other check."""
+        with open(REF, encoding="utf-8") as fh:
+            fences = re.findall(r"^```json\s*$", fh.read(), re.M)
+        self.assertEqual(len(fences), len(TIERS))
+
     def test_rules_have_the_documented_form(self):
         for tier, d in profiles().items():
             perms = d["permissions"]
