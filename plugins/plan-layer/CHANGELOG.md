@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.19.0 — 2026-11-25
+
+**The controller (opt-in).** The plan is the declared state; git, the tracker and named files are
+observed; `scripts/controller.py` computes the one diff (`findings()`), and the gate, the handoff
+and the hooks read it, so nothing computes it twice. A crash inside it is a FAIL, never silence.
+`meta.controller` takes `one_writer`, `base` (default `main`), `decision_log` and `rules`; an
+unknown key or a wrong type FAILs.
+
+**One writer.** With `meta.controller.one_writer` (it needs `meta.naming: "work-ids"`),
+`scripts/move.py` (`/plan-layer move`) is the only writer of stage, task state, bucket and
+release stage, and records each write in `plan/controller-state.json`. Any controlled field that
+differs from that record FAILs the gate as a hand edit, naming the field, both values and the
+remedy; so do a duplicate work id or a duplicate task name in one item. `move.py` refuses to write
+while hand edits are pending (exit 1), so it can never silently adopt one. `move.py --adopt`
+stamps the current state: the first opt-in records without firing stage rules; later it accepts
+only the owner's deliberate edits and refuses if a rule on an accepted stage fails. Adding an
+item to `plans.next` at the first stage with every task `todo`, removing one still there, and
+rolling finished work into the archive need no `move.py`. The skill carries the writer matrix as
+a table that a test holds equal to `plan_lib.WRITERS`.
+
+**Rules on events.** `meta.controller.rules` holds co-change rules (`name`, `on`, `if_changed`,
+`then_changed`, `why`) over the paths changed since the merge-base with `base`, plus uncommitted
+and untracked files; `fnmatch`'s `*` also matches `/`. Events: `stop` (Stop hook),
+`session-start` (session brief), `sync` (`sync.py`), `pause` (`pause.py`), and `stage:<id>`,
+`release:<stage>` (`move.py`, where a failing rule refuses the move). `check.py --event <name>`
+fires one by hand; an unknown event is a usage error (exit 2). A rule that cannot measure is never
+a pass: on the base branch a session event gives DRIFT ("measured nothing") so the session is not
+blocked, and a move FAILs.
+
+**Tracker drift as one gate, and relational mode.** With `meta.controller` set, a tracker mirror
+never reconciled, reconciled against other expected rows, or left with differences FAILs the gate;
+without it, it stays DRIFT as in 0.18.0. `meta.tracker.relational: true` mirrors epics, stories,
+tasks and releases as linked rows: adapters gain `relations`, `task_status_map`,
+`release_status_map` and `relational_fetch`; rows in `--actual` carry `kind`; the diff compares
+each kind only with its own and links by work id. A plan that cannot be mirrored this way says
+why (FAIL under `meta.controller`, DRIFT otherwise). `move.py` reminds the agent to reconcile.
+The handoff, under `meta.controller`, adds the controller's diff, git per active item and the
+decision ids added to `decision_log` since the last handoff (or "cannot measure", never "none");
+`pause.py` never blocks on what it finds.
+
+**Inventory parity.** A top-level `inventory` declares named lists (`items`, or `from` a JSON
+file) and the lists that must cover each (`covered_by`: a file matched by whole word, a JSON path,
+or the last tracker reconcile). Each gap FAILs naming the missing items; an unreadable or empty
+list FAILs; an exemption needs `item`, `list` and `why`. It needs no `meta.controller`.
+
+**Compatibility.** Everything here is opt-in. A plan without `meta.controller`, `inventory` or
+`meta.tracker.relational` gives output byte-identical to 0.18.0. A flat 0.18 reconcile now also writes `actual_keys` into
+`plan/tracker-state.json` (same hash, output unchanged).
+
+Tests: 158 new (`tests/test_controller.py`, `tests/test_relational.py`, `tests/test_inventory.py`
+and additions to the existing suites), written red first; 404 passed, 0 skipped (base 246).
+Review: a different model reviewed each part with executed probes; every Important finding
+closed.
+
 ## 0.18.0 — 2026-11-16
 
 **External-tracker mirror (plan-layer owns it).** A plan may declare `meta.tracker` (`kind`, `target`).
