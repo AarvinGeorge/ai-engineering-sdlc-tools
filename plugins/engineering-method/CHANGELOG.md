@@ -64,7 +64,7 @@ a judge for the residual.
     summarised, not pasted), c4 3/3 after the `LIMIT:` line fix, which resolved a 3/3 → 0/3 drop
     seen on `81e9ccf`.
   - **Base 0.5.0 on the edited cases** (fresh base, `fddb809` with the five case folders): the
-    script-ran graders 0/3 by construction. The judged graders held or rose against it:
+    script-ran graders 0/3 by construction. The judged graders held against it (and rose on calibrated c4, 0/3 → 3/3, and permission c4, 2/3 → 3/3):
     pass-k c1 3/3 and 3/3, calibrated c2 3/3 and 3/3, run-accounting c2 3/3 and 3/3,
     verified c4 0/3 and 0/3, permission c1 3/3 and 3/3 (base, then head).
   - **Regression: all 9 existing cases hold** (measured on `2df82fb`; the later text commits were
