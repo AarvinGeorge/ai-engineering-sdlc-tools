@@ -1,6 +1,6 @@
 ---
-max_turns: 8
-allowed_tools: [Read, Glob, Grep, Skill]
+max_turns: 16
+allowed_tools: [Read, Glob, Grep, Skill, Bash]
 description: "contamination strings: refund amount; 0.78; help page"
 ---
 

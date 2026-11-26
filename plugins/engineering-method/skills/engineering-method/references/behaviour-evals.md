@@ -51,6 +51,10 @@ near 100%, and a capability case that holds graduates into the regression set.
   a kept trace of one run of each fixture case before counting it. A run invalidated by the harness
   or a fixture is re-run once the delivery is fixed. *Why:* a fixture case was scored on runs that
   never saw their files.
+  Classify runs with `python3 <the skill's base directory>/scripts/eval_stats.py runs <result.json> --fixture
+  <case>=<path prefix of its inputs>` (one `--fixture` per case with fixture inputs), paste the whole block, every line, as printed, and run it again on the re-run's result to confirm delivery.
+  Run it as one plain command that starts with python3 and the full path: nothing before or after it
+  (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.
 
 ## Scoring: code first, a judge only where code cannot decide
 
@@ -73,7 +77,12 @@ near 100%, and a capability case that holds graduates into the regression set.
   (τ-bench, Yao et al.). Per-trial 75% gives about 42% over three runs (Anthropic, as above). *Test:*
   floor criteria report n of n, and a floor criterion with any failing run is not called reliable.
   A new floor criterion is still a capability eval for the release; n of n is what lets it be called
-  reliable.
+  reliable. For a never-break criterion run
+  `python3 <the skill's base directory>/scripts/eval_stats.py floor --name "<criterion>" --results <one letter per run, no spaces or commas: P, F or I>`
+  (I = invalid, not counted; the base directory is the one the Skill tool printed when the skill
+  loaded) and paste the whole block, every line, as printed; do not work the figures out by hand.
+  Run it as one plain command that starts with python3 and the full path: nothing before or after it
+  (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.
 - **Small samples prove little.** 2 of 3 is consistent with a true rate from about 21% to 94% (95%
   Wilson interval); even 6 of 6 against 3 of 6 is not a significant difference. Compare versions run
   for run on the same cases, model and judge (paired, as in Anthropic's "A statistical approach to
@@ -98,6 +107,11 @@ near 100%, and a capability case that holds graduates into the regression set.
   Below about 30 labels a side, call the judge "uncalibrated, n = …" and give its agreement as raw
   k of n, not as a rate. Re-check the labels when the judge model changes. *Test:* each judged
   criterion's report line carries its rates and label count, or "uncalibrated, n = …" with raw counts.
+  Compute agreement with `python3 <the skill's base directory>/scripts/eval_stats.py calibrate --labels <labels.csv>`
+  (save the labels to a CSV file first if they are not one: columns answer_id, criterion, owner,
+  judge) and paste the whole block, every line, as printed; it prints rates only at 30 labels a side.
+  Run it as one plain command that starts with python3 and the full path: nothing before or after it
+  (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.
 - **Two judges that disagree go to a person**, and the ruling becomes a label. Never a tie-break rule.
 - **A grader that fails sound answers is fixed in the case** by a ruling on which is right, the grader
   or the reference; never by bending the instructions to the grader.

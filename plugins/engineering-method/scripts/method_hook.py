@@ -61,7 +61,9 @@ STAGES = [
      "words": ["test", "tests", "testing", "tested", "bench", "benchmark", "eval", "evals",
                "verify", "verifies", "verifying", "verified", "pytest"],
      "skill": "superpowers:verification-before-completion",
-     "references": ["measurement-and-state-claims.md", "behaviour-evals.md"]},
+     "references": ["measurement-and-state-claims.md", "behaviour-evals.md"],
+     "note": "plan (tier b, c): before \"verified\", run python3 <skill dir>/scripts/plan_conformance.py "
+             "<plan+diff file> alone, nothing before/after; owner rules mismatches; "},
     {"stage": "deploy",
      "words": ["deploy", "deploys", "deploying", "deployed", "deployment", "deployments", "rollout", "rollouts",
                "rollback", "rollbacks", "restart", "restarts", "restarting", "restarted",

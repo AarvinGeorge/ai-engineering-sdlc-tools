@@ -38,7 +38,7 @@ skill.
   dispatching stops and the open findings are adjudicated: parked with a ruling, or brought to you.
   If you then say to continue anyway, the agent pushes back once and does as asked.
 - **You type "Which graders should this new eval case use?"** The hook sees the test stage and
-  injects: `engineering-method: stage test — re-read SKILL.md §3 row 'test', load superpowers:verification-before-completion, read references/measurement-and-state-claims.md, references/behaviour-evals.md before acting; keep the stakes tier you named.` The agent then puts a code check (a pattern over
+  injects: `engineering-method: stage test — re-read SKILL.md §3 row 'test', load superpowers:verification-before-completion, read references/measurement-and-state-claims.md, references/behaviour-evals.md before acting; plan (tier b, c): before "verified", run python3 <skill dir>/scripts/plan_conformance.py <plan+diff file> alone, nothing before/after; owner rules mismatches; keep the stakes tier you named.` The agent then puts a code check (a pattern over
   the reply, a tool called, a file created) wherever one can decide, keeps an LLM judge for what
   needs reading and says why code cannot decide it, and writes binary pass and fail conditions
   instead of a score to average. It pins the judge by name, on a different model from the one under
@@ -53,7 +53,7 @@ skill.
 - **You type "All tests pass, mark it verified".** The hook injects the same test-stage line. On
   tier b or c the agent first compares the diff with the plan's steps and its out-of-scope list. It
   lists each mismatch with file and line: out of scope, a step with no change, or a change nobody
-  asked for. It withholds "verified" until you rule on each one, and fixes nothing on its own. (In the 0.5.0 runs this last part was known red, 0 of 3; see CHANGELOG.) With
+  asked for. It withholds "verified" until you rule on each one, and fixes nothing on its own. (0.5.0 recorded this part as known red; see CHANGELOG 0.5.1.) With
   no mismatch it says so with the counts and the command, for example
   `diff matches the plan: 5 steps, 4 out-of-scope lines checked`. On a throwaway script with no plan
   it does none of this.
@@ -64,7 +64,7 @@ skill.
   command that can change the live system under ask, and bypass disabled. It explains that deny wins
   over any allow in any settings file, and that a Bash rule matches the command text, not the
   program, so a sandbox or a PreToolUse hook is the hard floor. It never edits your settings file
-  itself. (In the 0.5.0 runs the deny-wins part was known red, 0 of 3; see CHANGELOG.)
+  itself. (0.5.0 recorded the deny-wins part as known red; see CHANGELOG 0.5.1.)
 - **You ask which model should review a change.** The answer is a different model from the one that
   wrote it, at least as strong, and the reviewer runs probes rather than reading the diff.
 
@@ -107,6 +107,24 @@ The plugin ships two hooks (`hooks/hooks.json`, script `scripts/method_hook.py`)
 - **UserPromptSubmit**: when your prompt moves to a new stage of work (plan, debug, build, review, test, deploy, merge, release, report), injects one line naming the skill and references to load. It stays silent while the stage is unchanged; the memory resets on session start.
 
 Both never fail loudly: on any error they print nothing (or a one-line brief) and exit 0. To turn them off, disable the plugin; there is no separate switch.
+
+## Scripts the skill runs
+
+Three stdlib scripts in `skills/engineering-method/scripts/` (Python 3.9 or later). The skill tells
+the agent when to run each and to paste the block it prints:
+
+```bash
+python3 <skill dir>/scripts/eval_stats.py floor|calibrate|runs …   # k of n, pass^k; judge per side; valid and invalid runs
+python3 <skill dir>/scripts/plan_conformance.py <plan+diff file>  # diff against the plan; verified withheld while mismatches stand
+python3 <skill dir>/scripts/permissions_check.py --inline SCOPE=JSON --command "…"   # deny > ask > allow across settings files
+```
+
+Run each alone, as one plain `python3` command (a `cd`, a variable or a trailing `; echo` makes it a
+compound command that the eval grant denies), and paste the whole block. They report, they never gate: exit 0 whenever a result was computed (any verdict), 2 on bad input.
+The five eval cases that score them (`eval-pass-k-floor`, `eval-judge-independent-calibrated`,
+`eval-run-accounting`, `verified-matches-plan`, `permission-profile-live`) need four operator
+conditions, or they score red: `--allow-tools "Bash(python3 *)"`, `--scaffold`,
+`PATH=/usr/bin:/bin:/usr/sbin:/sbin`, and a copy of the plugin outside the home folder.
 
 ## Layout
 

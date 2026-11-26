@@ -1,5 +1,97 @@
 # Changelog
 
+## 0.5.1 — 2026-11-26
+
+**Hybrid: code computes the verdict, a judge reads only what is left.** The five behaviours that
+shipped as known red (capability) in 0.5.0 each get a small shipped script. The agent runs it and
+pastes the fixed block it prints; code graders score the block, and an LLM judge stays only for the
+residual reading that code cannot decide. This is the owner's intent: deterministic where possible,
+a judge for the residual.
+
+- **Three scripts** in `skills/engineering-method/scripts/`, Python 3.9 or later, stdlib only. Each
+  prints a versioned `KEY: value` block, exits 0 whenever it computed a result (whatever the
+  verdict: it reports, it never gates) and exits 2 on bad input.
+  - `eval_stats.py floor` (k of n, Wilson 95% interval, pass^k at the observed rate and at the
+    interval's low end, verdict for a never-break rule), `calibrate` (a labels file read per side:
+    true positive and true negative counts, "uncalibrated, n = …" below 30 a side) and `runs` (valid,
+    invalid, errored and no-trace counts from a run's `result.json`, invalid runs reported apart with
+    a re-run line). Blocks `EVAL_STATS floor v1`, `EVAL_STATS calibrate v1`, `EVAL_STATS runs v1`.
+  - `plan_conformance.py` (plan, diff stat and hunks in one file): `MISMATCH` lines for a changed
+    file under an out-of-scope path and a step with no change, `CHECK` lines for a changed existing
+    definition, and a last line `VERIFIED: withheld (owner rules on each …)` or `VERIFIED: ok`.
+    Block `PLAN_CONFORMANCE v1`. It reports and does not block, with or without plan-layer.
+  - `permissions_check.py` (settings layers as `--inline SCOPE=JSON` or `--file SCOPE=PATH`, one or
+    more `--command`): the decision per command, the rule and file that decided it, deny > ask >
+    allow across files, a cross-file probe and `LOOSENED_BY_OTHER_FILE`. Block `PERMISSIONS_CHECK
+    v1`. What it does not model (wrappers, env prefixes, nested subshells, redirections, hooks, mods)
+    is printed as `NOTES: not modelled …`, never guessed.
+- **Routing fix at the `test` stage** (0.5.0 traces showed no reference read there). The SKILL.md
+  test cell now gives the command, `` `python3 ${CLAUDE_SKILL_DIR}/scripts/plan_conformance.py <file>`
+  alone; owner rules mismatches`` (cell 20 → 22 words, limit 25; body 2,197 → 2,199 words, limit
+  2,200), and the hook's test-stage line gives it before "verified", run alone with nothing before or
+  after it (398 characters, limit 400). The references name the three scripts, say to run each as
+  one plain `python3` command, and to paste the whole block, every line. The permission checker's
+  `LIMIT:` line names the stronger floor (the sandbox or a PreToolUse hook).
+- **The five cases' graders.** Each gains a code grader on `target: trace` proving the script ran
+  (its block header in the tool output), regex graders on the fixed lines in the reply, and a judge
+  narrowed to the residual. The prompts name a fixture file, list `Bash` in `allowed_tools` and set
+  `max_turns` to 16. Base comparability: on base the five script-ran graders are red by
+  construction; the content graders are expected red and `c4c` expected green, read per run (an
+  answer can type the figures by hand); base against head is read on the judged and unchanged
+  graders, on the fresh base only, never against the 0.5.0 published figures.
+- **A correct prose-only answer now fails these criteria by design.** Without the tool's block the
+  script-ran and fixed-line graders are red, however sound the prose. This is the owner's intent.
+- **Known issues from 0.5.0.** Closed: `eval-pass-k-floor` c1's strictness (the pass^k figure moved
+  to code) and the `test`-stage routing gap (agents there still read no reference, measured, so the
+  command now sits in the cell and the hook line they do see). **Redefined, not closed:**
+  `eval-judge-independent-calibrated` c2 and c3, because the prompt now supplies labels and the
+  criteria test a different thing from the 0.5.0 wording.
+- **Operator conditions for running these five cases** (without them they score red):
+  `--allow-tools "Bash(python3 *)"`, `--scaffold`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, and a copy
+  of the plugin outside the home folder.
+- **Results, k of n per criterion** (runner `claude-opus-5-5`, 3 runs a case, no invalid runs). The
+  text changed between batches, so every figure names the commit it was measured on.
+  - **`2df82fb`, the first head:** the scripts ran in 1 of 20 head runs across the five cases. The
+    agents wrapped the call in a compound command (`cd …;`, `S=…;`, a trailing `; echo "exit=$?"`, a
+    `for` loop), which the `Bash(python3 *)` grant does not cover, so it was denied. That finding
+    led to the plain-command text: run each script alone, as one `python3` command.
+  - **`397dfd4`:** `eval-pass-k-floor` c1a, c1b, c1c 2/3 each; `eval-judge-independent-calibrated`
+    c2a, c2b, c2c 2/3 each; `eval-run-accounting` c2a, c2b, c2d 2/3 each and c2c 0/3. Pass-k and
+    calibrated were not re-measured on the final paste wording.
+  - **`81e9ccf`:** `verified-matches-plan` c4a and c4b 1/3, c4 0/3; `eval-run-accounting`
+    script-ran 0/3 (each run's first compound command was denied, and the agent gave up on Bash).
+  - **`f179b71`, the shipped head:** `permission-profile-live` c1a 3/3, c1b 0/3 (the block
+    summarised, not pasted), c4 3/3 after the `LIMIT:` line fix, which resolved a 3/3 → 0/3 drop
+    seen on `81e9ccf`.
+  - **Base 0.5.0 on the edited cases** (fresh base, `fddb809` with the five case folders): the
+    script-ran graders 0/3 by construction. The judged graders held against it (and rose on calibrated c4, 0/3 → 3/3, and permission c4, 2/3 → 3/3):
+    pass-k c1 3/3 and 3/3, calibrated c2 3/3 and 3/3, run-accounting c2 3/3 and 3/3,
+    verified c4 0/3 and 0/3, permission c1 3/3 and 3/3 (base, then head).
+  - **Regression: all 9 existing cases hold** (measured on `2df82fb`; the later text commits were
+    not re-run on these nine). The dips, each read as
+    variance: `eval-plan-as-dataset` c3 3/3 → 2/3 (p = 0.50; the 0.5.0 head pool was 4 of 6);
+    `eval-run-accounting` c1, judged and unchanged, 2/3 on base and 0/3, 3/3, 1/3 across the head
+    batches on the same cost text (p = 0.20 at the lowest); `permission-profile-live` c2, judged and
+    unchanged, 2/3 against base 3/3 (p = 0.50, the same 2/3 as the 0.5.0 head).
+  - **Known red for the next release, with cause:** `verified-matches-plan` c4a and c4b (the agent
+    appends `; echo "exit=$?"`, which the grant denies) and c4 (the agent picks the fixes, and its own
+    path to verified, itself); `eval-run-accounting` script-ran (the agent gives up on Bash after one
+    denied compound command) and c2c (the pasted block leaves out the `RERUN:` line);
+    `permission-profile-live` c1b (a prose summary instead of the pasted block).
+  - **Operator conditions** unchanged (above).
+  - **Sessions:** 91 including 2 probes, about $23.83 list-price estimate, billed to a claude.ai Max
+    subscription, not spend. One session past the original 90 was approved by the owner for the
+    regression check.
+- **NORTH-STAR.md** is added at the repository root in this release, adopted by the owner, and
+  linked from the README.
+- **Parked:** a plan-layer `move.py` gate that refuses `verified` while mismatches stand; a blocking
+  Stop hook for plan conformance; the history-mode release scan; Bash-enabled twins of the two
+  near-miss guards; a real kept-trace line as a trace-grader fixture; `--out PATH` with a file-target
+  grader; `plan_conformance.py` reading a Markdown table row without a leading pipe (`name | 12 |`) as a
+  diff-stat line (probed on this release: read as a changed file, and flagged by its `UNREAD` line); whether the
+  UserPromptSubmit hook fires in eval runs; why `permission-profile-exploration-light` costs about
+  four times the other cases; cost and cap lines in `eval_stats.py runs`.
+
 ## 0.5.0 — 2026-11-26
 
 **Evaluation method.** `references/behaviour-evals.md` now says how a behaviour eval is graded,

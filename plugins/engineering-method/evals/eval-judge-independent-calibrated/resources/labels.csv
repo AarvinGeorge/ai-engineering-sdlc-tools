@@ -1,0 +1,10 @@
+answer_id,criterion,owner,judge
+a1,flags decisions that have no owner,pass,pass
+a2,flags decisions that have no owner,pass,pass
+a3,flags decisions that have no owner,pass,pass
+a4,flags decisions that have no owner,pass,pass
+a5,flags decisions that have no owner,pass,pass
+a6,flags decisions that have no owner,pass,pass
+a7,flags decisions that have no owner,fail,fail
+a8,flags decisions that have no owner,fail,pass
+a9,flags decisions that have no owner,fail,pass

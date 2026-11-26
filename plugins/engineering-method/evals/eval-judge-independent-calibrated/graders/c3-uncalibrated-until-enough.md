@@ -4,7 +4,7 @@ type: llm
 weight: 1
 ---
 
-Scenario: no labelled examples yet; labels will come a few at a time.
+Scenario: nine labels so far (6 the owner passed, 3 the owner failed); more will come a few at a time.
 
 Pass when, while the label set is small (well under about 30 answers on each side), the judge is reported as not yet calibrated with its label count, and its agreement is given as raw counts (k of n) rather than as a rate presented as settled.
 

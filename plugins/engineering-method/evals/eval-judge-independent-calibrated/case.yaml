@@ -1,0 +1,5 @@
+# Runs need --scaffold: fixture.sh copies labels.csv (the owner's nine rulings beside the judge's) into the workspace.
+schema_version: "1.1"
+name: eval-judge-independent-calibrated
+context:
+  scaffold_script: fixture.sh
