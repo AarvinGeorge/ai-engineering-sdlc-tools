@@ -18,7 +18,9 @@ Paste it; never let an agent rewrite a settings file to loosen it.
   as one-line JSON>' --command "<a command the profile must stop>"` (or `--file <scope>=<settings
   file>` when that profile is already saved in a file; the base directory is the one the Skill tool
   printed when the skill loaded) and paste each block as printed; its CROSS_FILE_PROBE line shows an
-  allow in user or local settings cannot undo the deny. Call it by its full path, not after cd.
+  allow in user or local settings cannot undo the deny.
+  Run it as one plain command that starts with python3 and the full path: nothing before or after it
+  (no cd, variable, `;`, `&&`, `|` or echo), so a `python3` allow rule covers it.
 - **Every mode:** deny blocks in every mode, `bypassPermissions` included. A call matching an ask
   rule is never auto-approved in any mode: it prompts, or is denied where no prompt is possible
   (`dontAsk`); an installed mod is the one exception ("Mods" below). Command-content ask rules fall back to a prompt in auto mode; allow rules do nothing
