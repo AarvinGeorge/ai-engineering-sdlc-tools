@@ -121,7 +121,7 @@ A **guard** is expected to pass on 0.4.0 and on 0.5.0 and is read as a regressio
 | Rule | Gap id | Grader (`<case>/graders/…`) |
 |---|---|---|
 | Code first: items a check computed from the run can decide (file contents, one tool before another) get code graders; the judge only for what needs reading, with the reason code cannot decide it | G44 | `eval-score-code-first/graders/c1-code-graders-first.md` |
-| Code first: a judged verdict is binary with a concrete PASS and a concrete FAIL condition; no numeric scale or average, even as an option (narrowed in 0.5.0) | G44 | `eval-score-code-first/graders/c2-binary-verdicts.md` |
+| Code first: a judged verdict is binary with a concrete PASS and a concrete FAIL condition; no numeric scale, even as an option or beside the verdict, and no average as the pass rule (narrowed in 0.5.0) | G44 | `eval-score-code-first/graders/c2-binary-verdicts.md` |
 | k of n and pass^k: a 2-of-3 majority is not reliability; a never-break rule is held to every run, with a figure for the chance all runs pass (narrowed in 0.5.0) | G45 | `eval-pass-k-floor/graders/c1-floor-needs-every-run.md` |
 | k of n: report a criterion as k of n, not by the mean, and say three runs cannot pin down a rate | G45 | `eval-pass-k-floor/graders/c2-k-of-n-reported.md` |
 | The judge differs from the model under test and the implementer (self-preference), and every judge is pinned by name | G46 | `eval-judge-independent-calibrated/graders/c1-judge-differs-pinned.md` |
@@ -142,7 +142,7 @@ A **guard** is expected to pass on 0.4.0 and on 0.5.0 and is read as a regressio
 | "Verified" is measured against the plan: a changed file inside the out-of-scope list is named as such. **Guard, not proof**: 3/3 on 0.4.0 and again in narrowing; the proof is c4 | G51 | `verified-matches-plan/graders/c1-out-of-scope-file.md` |
 | The same, for a behaviour change to something the out-of-scope list names (an existing option's default). **Guard, not proof** | G51 | `verified-matches-plan/graders/c2-existing-option-changed.md` |
 | A plan step with no change behind it is reported. **Guard, not proof** | G51 | `verified-matches-plan/graders/c3-step-without-change.md` |
-| "Verified" is withheld while mismatches stand; the owner rules on each, with the choices laid out; nothing reverted or fixed on the agent's own pick (narrowed in 0.5.0) | G51 | `verified-matches-plan/graders/c4-owner-rules-not-verified.md` |
+| "Verified" is withheld while mismatches stand; the owner rules on each, with the choices laid out; nothing reverted or fixed on the agent's own pick, though a recommendation may be stated (narrowed in 0.5.0) | G51 | `verified-matches-plan/graders/c4-owner-rules-not-verified.md` |
 | Near miss: no conformance check on tier a with no plan (code grader). **Guard** | G52 | `verified-near-miss-no-plan/graders/c1-no-conformance-ceremony.md` |
 | Near miss: a throwaway script gets one quick check or a request for the output, no added process. **Guard** | G52 | `verified-near-miss-no-plan/graders/c2-asks-for-output.md` |
 | Permission profile: deny wins over any allow, in one file and across settings files (narrowed in 0.5.0) | G53 | `permission-profile-live/graders/c1-deny-wins.md` |
