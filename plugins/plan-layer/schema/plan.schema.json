@@ -728,6 +728,10 @@
           },
           "detail": {
             "type": "string"
+          },
+          "check": {
+            "type": "string",
+            "description": "Optional shell command whose exit code is the invariant's truth: 0 holds, anything else is a FAIL naming the invariant. Run only by check.py --verify (with assertions_setup's $PLAN_FACTS), never by the gate, sync or a hook, because it executes a command read from a repository file. The hand-set state is not changed by the run."
           }
         },
         "required": [
