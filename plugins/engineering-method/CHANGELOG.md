@@ -26,10 +26,12 @@ a judge for the residual.
     v1`. What it does not model (wrappers, env prefixes, nested subshells, redirections, hooks, mods)
     is printed as `NOTES: not modelled …`, never guessed.
 - **Routing fix at the `test` stage** (0.5.0 traces showed no reference read there). The SKILL.md
-  test cell now reads `plan: run scripts/plan_conformance.py <file>; owner rules mismatches;` (cell
-  20 → 22 words, limit 25; body 2,197 → 2,199 words, limit 2,200), and the hook's test-stage line
-  names the script before "verified" (382 characters, limit 400). The references name the three
-  scripts and say to paste each block as printed.
+  test cell now gives the command, `` `python3 ${CLAUDE_SKILL_DIR}/scripts/plan_conformance.py <file>`
+  alone; owner rules mismatches`` (cell 20 → 22 words, limit 25; body 2,197 → 2,199 words, limit
+  2,200), and the hook's test-stage line gives it before "verified", run alone with nothing before or
+  after it (398 characters, limit 400). The references name the three scripts, say to run each as
+  one plain `python3` command, and to paste the whole block, every line. The permission checker's
+  `LIMIT:` line names the stronger floor (the sandbox or a PreToolUse hook).
 - **The five cases' graders.** Each gains a code grader on `target: trace` proving the script ran
   (its block header in the tool output), regex graders on the fixed lines in the reply, and a judge
   narrowed to the residual. The prompts name a fixture file, list `Bash` in `allowed_tools` and set
@@ -40,19 +42,53 @@ a judge for the residual.
 - **A correct prose-only answer now fails these criteria by design.** Without the tool's block the
   script-ran and fixed-line graders are red, however sound the prose. This is the owner's intent.
 - **Known issues from 0.5.0.** Closed: `eval-pass-k-floor` c1's strictness (the pass^k figure moved
-  to code) and the 0 reads at the `test` stage (routing fix). **Redefined, not closed:**
+  to code) and the `test`-stage routing gap (agents there still read no reference, measured, so the
+  command now sits in the cell and the hook line they do see). **Redefined, not closed:**
   `eval-judge-independent-calibrated` c2 and c3, because the prompt now supplies labels and the
   criteria test a different thing from the 0.5.0 wording.
 - **Operator conditions for running these five cases** (without them they score red):
   `--allow-tools "Bash(python3 *)"`, `--scaffold`, `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, and a copy
   of the plugin outside the home folder.
-- RESULTS: FILLED AFTER TASK 7
+- **Results, k of n per criterion** (runner `claude-opus-5-5`, 3 runs a case, no invalid runs). The
+  text changed between batches, so every figure names the commit it was measured on.
+  - **`2df82fb`, the first head:** the scripts ran in 1 of 20 head runs across the five cases. The
+    agents wrapped the call in a compound command (`cd …;`, `S=…;`, a trailing `; echo "exit=$?"`, a
+    `for` loop), which the `Bash(python3 *)` grant does not cover, so it was denied. That finding
+    led to the plain-command text: run each script alone, as one `python3` command.
+  - **`397dfd4`:** `eval-pass-k-floor` c1a, c1b, c1c 2/3 each; `eval-judge-independent-calibrated`
+    c2a, c2b, c2c 2/3 each; `eval-run-accounting` c2a, c2b, c2d 2/3 each and c2c 0/3. Pass-k and
+    calibrated were not re-measured on the final paste wording.
+  - **`81e9ccf`:** `verified-matches-plan` c4a and c4b 1/3, c4 0/3; `eval-run-accounting`
+    script-ran 0/3 (each run's first compound command was denied, and the agent gave up on Bash).
+  - **`f179b71`, the shipped head:** `permission-profile-live` c1a 3/3, c1b 0/3 (the block
+    summarised, not pasted), c4 3/3 after the `LIMIT:` line fix, which resolved a 3/3 → 0/3 drop
+    seen on `81e9ccf`.
+  - **Base 0.5.0 on the edited cases** (fresh base, `fddb809` with the five case folders): the
+    script-ran graders 0/3 by construction. The judged graders held or rose against it:
+    pass-k c1 3/3 and 3/3, calibrated c2 3/3 and 3/3, run-accounting c2 3/3 and 3/3,
+    verified c4 0/3 and 0/3, permission c1 3/3 and 3/3 (base, then head).
+  - **Regression: all 9 existing cases hold** (measured on `2df82fb`; the later text commits were
+    not re-run on these nine). The dips, each read as
+    variance: `eval-plan-as-dataset` c3 3/3 → 2/3 (p = 0.50; the 0.5.0 head pool was 4 of 6);
+    `eval-run-accounting` c1, judged and unchanged, 2/3 on base and 0/3, 3/3, 1/3 across the head
+    batches on the same cost text (p = 0.20 at the lowest); `permission-profile-live` c2, judged and
+    unchanged, 2/3 against base 3/3 (p = 0.50, the same 2/3 as the 0.5.0 head).
+  - **Known red for the next release, with cause:** `verified-matches-plan` c4a and c4b (the agent
+    appends `; echo "exit=$?"`, which the grant denies) and c4 (the agent picks the fixes, and its own
+    path to verified, itself); `eval-run-accounting` script-ran (the agent gives up on Bash after one
+    denied compound command) and c2c (the pasted block leaves out the `RERUN:` line);
+    `permission-profile-live` c1b (a prose summary instead of the pasted block).
+  - **Operator conditions** unchanged (above).
+  - **Sessions:** 91 including 2 probes, about $23.83 list-price estimate, billed to a claude.ai Max
+    subscription, not spend. One session past the original 90 was approved by the owner for the
+    regression check.
 - **NORTH-STAR.md** is added at the repository root in this release, adopted by the owner, and
   linked from the README.
 - **Parked:** a plan-layer `move.py` gate that refuses `verified` while mismatches stand; a blocking
   Stop hook for plan conformance; the history-mode release scan; Bash-enabled twins of the two
   near-miss guards; a real kept-trace line as a trace-grader fixture; `--out PATH` with a file-target
-  grader; `plan_conformance.py` reading Markdown table rows that parse as stat lines; whether the
+  grader; `plan_conformance.py` reading a Markdown table row without a leading pipe (`name | 12 |`) as a
+  diff-stat line (probed on this release: read as a changed file, and flagged by its `UNREAD` line); whether the
   UserPromptSubmit hook fires in eval runs; why `permission-profile-exploration-light` costs about
   four times the other cases; cost and cap lines in `eval_stats.py runs`.
 

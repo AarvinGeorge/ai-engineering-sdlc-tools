@@ -38,7 +38,7 @@ skill.
   dispatching stops and the open findings are adjudicated: parked with a ruling, or brought to you.
   If you then say to continue anyway, the agent pushes back once and does as asked.
 - **You type "Which graders should this new eval case use?"** The hook sees the test stage and
-  injects: `engineering-method: stage test — re-read SKILL.md §3 row 'test', load superpowers:verification-before-completion, read references/measurement-and-state-claims.md, references/behaviour-evals.md before acting; keep the stakes tier you named.` The agent then puts a code check (a pattern over
+  injects: `engineering-method: stage test — re-read SKILL.md §3 row 'test', load superpowers:verification-before-completion, read references/measurement-and-state-claims.md, references/behaviour-evals.md before acting; plan (tier b, c): before "verified", run python3 <skill dir>/scripts/plan_conformance.py <plan+diff file> alone, nothing before/after; owner rules mismatches; keep the stakes tier you named.` The agent then puts a code check (a pattern over
   the reply, a tool called, a file created) wherever one can decide, keeps an LLM judge for what
   needs reading and says why code cannot decide it, and writes binary pass and fail conditions
   instead of a score to average. It pins the judge by name, on a different model from the one under
@@ -119,7 +119,8 @@ python3 <skill dir>/scripts/plan_conformance.py <plan+diff file>  # diff against
 python3 <skill dir>/scripts/permissions_check.py --inline SCOPE=JSON --command "…"   # deny > ask > allow across settings files
 ```
 
-They report, they never gate: exit 0 whenever a result was computed (any verdict), 2 on bad input.
+Run each alone, as one plain `python3` command (a `cd`, a variable or a trailing `; echo` makes it a
+compound command that the eval grant denies), and paste the whole block. They report, they never gate: exit 0 whenever a result was computed (any verdict), 2 on bad input.
 The five eval cases that score them (`eval-pass-k-floor`, `eval-judge-independent-calibrated`,
 `eval-run-accounting`, `verified-matches-plan`, `permission-profile-live`) need four operator
 conditions, or they score red: `--allow-tools "Bash(python3 *)"`, `--scaffold`,
