@@ -102,10 +102,11 @@ python3 <plugin>/scripts/render.py && python3 <plugin>/scripts/check.py
 **The fresh template fails the gate until `meta.updated` is set from a clock.** It ships with a
 placeholder (`REPLACE WITH ISO-8601 UTC READ FROM A CLOCK`) on purpose: a date recalled from memory
 is the usual way a plan goes stale, so the gate refuses the template until a real time is written.
-That first red `check.py` is expected, not a broken install.
+That first red `check.py` is expected, not a broken install. A DRIFT line about the next item naming
+no capability is a signal, not a failure.
 
-**Nothing to install beyond Python 3.10 or newer**, which macOS and most Linux ship. Zero
-third-party packages, by design.
+**Nothing to install beyond Python 3.10 or newer** (check `python3 --version`; the system Python on
+macOS can be older). Zero third-party packages, by design.
 
 ## What you get
 

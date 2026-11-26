@@ -67,7 +67,7 @@ python3 plugins/work-log/scripts/periods.py last-week
 # {"start": "2026-11-16", "end": "2026-11-22"}
 python3 plugins/work-log/scripts/collect.py --start 2026-11-16 --end 2026-11-22 --scope .
 # a folder with no Claude Code transcripts in that period prints a JSON error and exits 2:
-# {"error": "no transcripts found", "projects_dir": "~/.claude/projects", "scope_name": "proj"}
+# {"error": "no transcripts found", "projects_dir": "/home/you/.claude/projects", "scope_name": "Proj"}
 python3 plugins/work-log/scripts/scan.py entries.json
 # on an entries file with no problems: scan: clean (0 entries)   (exit 0; hits exit 1)
 ```
@@ -76,7 +76,7 @@ python3 plugins/work-log/scripts/scan.py entries.json
 the folder's git log; it needs `--start`, `--end` and `--scope PATH` (or `--all`). Exit 2 means
 nothing was found, which is a loud result, not a silent empty report. `scan.py` takes the entries
 JSON the summaries step produces (`{"meta": {...}, "entries": [...]}`) and prints one line per hit,
-never the matched text. The weekly catch-up helper `periods.py missing-weeks` takes
+never the matched text. The weekly catch-up helper `periods.py missing-weeks --scope-name NAME …` (`--scope-name` is required) takes
 `--titles-json FILE`, a path to a JSON file holding an array of existing sheet titles (or `-` to
 read that array from stdin), not the JSON itself.
 

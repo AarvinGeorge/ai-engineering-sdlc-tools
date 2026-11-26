@@ -112,7 +112,7 @@ plugin in this marketplace (it is a different job)? Leaning inside plan-layer â€
 worthless without the plan format, and a plugin that cannot work alone should not pretend to.
 
 **Prerequisite already met:** the maintainer authorized subagent-driven development for this
-workstream on 2026-07-28. It has never been used this way.
+plugin's development. It has never been used this way.
 
 **Effort:** medium. The agent definition is small; deciding what it is allowed to conclude,
 and how it reports without becoming noise, is the work.
