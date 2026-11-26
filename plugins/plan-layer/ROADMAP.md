@@ -13,7 +13,7 @@ so the reasoning survives the session it came from.
 > untouched while work runs against it, a dependency pointing at something merely queued. Those
 > are objective and need no reviewer. What remains open is the harder half: a claim that is
 > internally consistent and simply wrong about the world. Executable assertions cover that for a
-> fixed set of facts (twelve, in the project this came from), not for the whole page. **An
+> fixed set of facts (twelve, in the first project that used it), not for the whole page. **An
 > independent reviewer is still the right answer for the rest.**
 >
 > **Gap 3 is unchanged and now the most valuable.** Every miss so far — three of them — was caught
@@ -111,7 +111,7 @@ the working tree shows.
 plugin in this marketplace (it is a different job)? Leaning inside plan-layer — it is
 worthless without the plan format, and a plugin that cannot work alone should not pretend to.
 
-**Prerequisite already met:** the founder authorized subagent-driven development for this
+**Prerequisite already met:** the maintainer authorized subagent-driven development for this
 workstream on 2026-07-28. It has never been used this way.
 
 **Effort:** medium. The agent definition is small; deciding what it is allowed to conclude,
@@ -124,7 +124,7 @@ and how it reports without becoming noise, is the work.
 The artifact tells the human what the agent did. There is no path for the human to *inject* a
 correction except by telling the agent in conversation.
 
-On 2026-08-09 the founder corrected the artifact four separate times — a missing capability, a
+On 2026-08-09 the maintainer corrected the artifact four separate times — a missing capability, a
 figure/table mismatch, absent tracing, drifted facts. **Each time, following the thread found
 more than had been flagged.** That is a signal, not a compliment: **the human is currently
 the drift detector**, and a detector that only fires when someone happens to read carefully is

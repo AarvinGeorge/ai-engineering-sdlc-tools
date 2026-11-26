@@ -167,6 +167,15 @@ class InvariantChecks(Base):
         self.assertLess(took, 8, "verify blocked on a child holding the pipes (%.1fs)" % took)
         print("measured return time %.1fs" % took, file=sys.stderr)
 
+    def test_nothing_declared_does_not_stamp(self):
+        self.plan_with([])
+        before = self.stamp()
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("nothing to verify", r.stdout)
+        self.assertNotIn("stamped", r.stdout)
+        self.assertEqual(self.stamp(), before)
+
     def test_check_does_not_inherit_stdin(self):
         self.plan_with([{"rule": "reads", "state": "holding",
                          "check": "read x && test -n \"$x\""}])

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.20.1 — 2026-11-26
+
+**Fix: `check.py --verify` no longer stamps when nothing was declared.** With no assertions and no
+invariant checks it printed "nothing to verify" and still wrote `meta.assertions_verified`, a
+verified stamp for a run that verified nothing, and a file change from a check. It now stamps only
+when something was declared and ran clean. One new test (plan-layer suite 428 to 429).
+
+Docs from a cold-start read: README first-run steps (`/plan-layer init` runs through the skill; the
+by-hand equivalent; the fresh template fails the gate until `meta.updated` is set from a clock, on
+purpose), the invariant example now shows its `check` command, the duplicated `archive/` in the tree
+removed, one stated Python minimum (3.10), and ROADMAP wording a stranger can read.
+
 ## 0.20.0 — 2026-11-26
 
 **Runnable invariants.** An invariant may carry an optional `check`: a shell command whose exit

@@ -51,13 +51,34 @@ claude plugin marketplace add AarvinGeorge/ai-engineering-sdlc-tools
 claude plugin install work-log@ai-engineering-sdlc-tools
 ```
 
-Needs `python3` (3.9 or later, standard library only). The Google Drive connector is optional.
+Needs `python3` (3.10 or later, standard library only). The Google Drive connector is optional.
 
 ## First use
 
 Open Claude Code in the folder you want logged and ask: "work log for last week". Claude says which
 dates and folder it will cover, collects the activity, writes the summaries, checks them, builds the
 workbook, uploads it to `Work Logs` and reads it back before giving you the link and the day totals.
+
+To run the scripts by hand, from a clone of this repository (standard library only; nothing is
+installed or written outside the folders you name):
+
+```bash
+python3 plugins/work-log/scripts/periods.py last-week
+# {"start": "2026-11-16", "end": "2026-11-22"}
+python3 plugins/work-log/scripts/collect.py --start 2026-11-16 --end 2026-11-22 --scope .
+# a folder with no Claude Code transcripts in that period prints a JSON error and exits 2:
+# {"error": "no transcripts found", "projects_dir": "~/.claude/projects", "scope_name": "proj"}
+python3 plugins/work-log/scripts/scan.py entries.json
+# on an entries file with no problems: scan: clean (0 entries)   (exit 0; hits exit 1)
+```
+
+`collect.py` reads `~/.claude/projects` (override with `--projects-dir`) and, unless `--no-git`,
+the folder's git log; it needs `--start`, `--end` and `--scope PATH` (or `--all`). Exit 2 means
+nothing was found, which is a loud result, not a silent empty report. `scan.py` takes the entries
+JSON the summaries step produces (`{"meta": {...}, "entries": [...]}`) and prints one line per hit,
+never the matched text. The weekly catch-up helper `periods.py missing-weeks` takes
+`--titles-json FILE`, a path to a JSON file holding an array of existing sheet titles (or `-` to
+read that array from stdin), not the JSON itself.
 
 The default scope is the current folder and everything under it. Say "all projects" for everything,
 or name folders.
