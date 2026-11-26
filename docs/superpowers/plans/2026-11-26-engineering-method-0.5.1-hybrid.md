@@ -2118,3 +2118,12 @@ The cap per command is runs × max($0.35, the case's measured cost per run) × 1
   - `<cap>` is computed by the stated formula.
   - The `checked` count in Step 5.4 is re-counted from the files in Step 5.5.
 - **Names agree across tasks:** `EVAL_STATS … v1`, `PLAN_CONFORMANCE v1`, `PERMISSIONS_CHECK v1`, and the grader patterns match the golden lines in Tasks 1-3.
+
+## Controller ruling, 26 Nov 2026 16:35 UTC: Task 0 run 3 not run
+
+Run 3's setup command was declined at the permission prompt, so the probe stopped (0 sessions) and
+is not retried. Heredoc stdin and multi-line quoted arguments stay unverified, so the cases do not
+use them. Decision rule applied (fallback): every multi-line input reaches a script as a **file in
+the scaffolded workspace**, passed by path (plan + diff, labels, result.json, settings drafts where
+multi-line); short inputs stay plain one-line arguments (`--results PPF`, one-line `--inline` JSON),
+the shape runs 1-2 proved. Reference sentences give the path form, never a heredoc.

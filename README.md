@@ -8,6 +8,8 @@ The through-line: **a coding agent's memory ends with its context window, and a 
 memory of what the agent did ends sooner than that.** These tools put the shared state
 somewhere both sides can read, and make the reading automatic.
 
+The goal and what "done" means are in [NORTH-STAR.md](NORTH-STAR.md), which only the owner changes.
+
 ## Use cases
 
 - **plan-layer** answers "where are we?" from a file, in every new session. [Use cases](plugins/plan-layer/README.md#use-cases).
