@@ -13,7 +13,17 @@ No new flag: `--verify` already is the explicit runner, so nothing else (gate, `
 
 Gate: a `check` that is not a non-empty string is a structural FAIL, and under `--verify` it FAILs
 with "check is not a runnable command". The never-run drift now counts assertions and invariant
-checks together. Schema gains `check`. 11 new tests (plan-layer suite 412 to 423).
+checks together. Schema gains `check`. 15 new tests (plan-layer suite 412 to 427).
+
+A check, like an assertion, runs as `bash -lc` with the user's full environment and write access,
+with stdin closed, in its own process group that is killed on timeout (60 s). Exit 127 is reported
+as ERRORED (could not run), a timeout as "timed out after Ns"; the FAIL line shows only the first
+output line, with anything outside printable ASCII replaced by `?`.
+
+The only output changes for plans without checks are three message strings: "no assertions or
+invariant checks declared" (was "no assertions declared"), the failing-assertion note ("ERRORED
+means the command could not run ... MISMATCH or FAIL means it ran and disagreed"), and the
+never-run DRIFT text ("assertion(s) and invariant check(s) declared but never recorded as run").
 
 ## 0.19.0 — 2026-11-25
 

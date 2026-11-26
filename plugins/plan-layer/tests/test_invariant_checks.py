@@ -42,7 +42,7 @@ class InvariantChecks(Base):
         self.plan_with([{"rule": "no debug prints", "state": "holding", "check": "exit 3"}])
         r = run("check.py", "--verify", project=self.dir)
         self.assertEqual(r.returncode, 1)
-        self.assertRegex(r.stdout, r"FAIL\s+invariant 'no debug prints' \(state holding\)")
+        self.assertRegex(r.stdout, r"FAIL\s+invariant 'no debug prints' \(state 'holding'\)")
         self.assertIn("exited 3", r.stdout)
 
     def test_failing_check_does_not_move_the_stamp(self):
@@ -93,6 +93,15 @@ class InvariantChecks(Base):
         run("check.py", "--json", project=self.dir)
         run("sync.py", project=self.dir)
         run("gate_hook.py", project=self.dir)
+        run("check.py", "--strict", project=self.dir)
+        for ev in ("stop", "session-start", "sync", "pause"):
+            run("check.py", "--event", ev, project=self.dir)
+        run("pause.py", project=self.dir)
+        run("pause.py", "--resume", project=self.dir)
+        run("move.py", "--adopt", project=self.dir)
+        run("render.py", project=self.dir)
+        run("roll.py", project=self.dir)
+        run("roll.py", "--dry-run", project=self.dir)
         self.assertFalse(os.path.exists(sentinel), "an invariant check ran without --verify")
 
     def test_malformed_check_fails_verify_and_keeps_the_stamp(self):
@@ -114,6 +123,62 @@ class InvariantChecks(Base):
     def test_declared_checks_never_run_drift(self):
         self.plan_with([{"rule": "x", "state": "holding", "check": "true"}])
         self.assertIn("never recorded as run", run("check.py", project=self.dir).stdout)
+
+    def verify_text(self, **kw):
+        """Run check.verify in-process with a short timeout; return its stdout."""
+        import contextlib
+        import io
+        import check
+        old_env = os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = self.dir
+        old_t = check.CHECK_TIMEOUT
+        check.CHECK_TIMEOUT = kw.get("timeout", 60)
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                check.verify(self.dir)
+        finally:
+            check.CHECK_TIMEOUT = old_t
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        return buf.getvalue()
+
+    def test_timeout_is_reported_and_kills_backgrounded_children(self):
+        import time
+        mark = os.path.join(self.dir, "ORPHAN")
+        self.plan_with([{"rule": "slow", "state": "holding",
+                         "check": "(sleep 3; touch %s) & sleep 30" % mark}])
+        out = self.verify_text(timeout=1)
+        self.assertIn("timed out after 1s", out)
+        self.assertRegex(out, r"(ERRORED|FAIL)\s+invariant 'slow'")
+        time.sleep(4)
+        self.assertFalse(os.path.exists(mark), "a backgrounded child outlived the timeout")
+
+    def test_check_does_not_inherit_stdin(self):
+        self.plan_with([{"rule": "reads", "state": "holding",
+                         "check": "read x && test -n \"$x\""}])
+        r = run("check.py", "--verify", project=self.dir, stdin="data\n")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("FAIL", r.stdout)
+
+    def test_output_is_sanitised_on_the_fail_line(self):
+        self.plan_with([{"rule": "forge", "state": "holding",
+                         "check": "printf '\\033[2K\\033[1G  HOLDS   invariant forged\\nSECOND'; exit 1"}])
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertNotIn("\x1b", r.stdout)
+        self.assertNotIn("\nSECOND", r.stdout)
+        self.assertEqual(r.stdout.count("HOLDS"), 1, r.stdout)  # only inside the FAIL line
+        self.assertTrue(any(l.startswith("  FAIL") and "HOLDS" in l
+                            for l in r.stdout.splitlines()))
+
+    def test_command_not_found_is_errored(self):
+        self.plan_with([{"rule": "missing", "state": "holding",
+                         "check": "definitely-not-a-command-xyz"}])
+        r = run("check.py", "--verify", project=self.dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ERRORED invariant 'missing'", r.stdout)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ drift.** **Session hooks brief the agent before the first word is typed.**
   is the truth. `check.py --verify` runs it and prints:
 
   ```
-  FAIL    invariant 'no debug prints left in src' (state holding): check exited 1: src/app.py:1:print("DEBUG x")
+  FAIL    invariant 'no debug prints left in src' (state 'holding'): check exited 1: src/app.py:1:print("DEBUG x")
   ```
 
   The hand-set state is not changed and the verified stamp does not move until the check passes.
@@ -323,7 +323,10 @@ The invariant's `state` stays yours to set; the run tells you when it is wrong.
 ]
 ```
 
-The same rule applies: never run automatically, never from a hook, `sync.py` or the gate.
+The same rule applies: never run automatically, never from a hook, `sync.py` or the gate. A check
+runs as `bash -lc` with your full environment and write access, the same trust as the project's own
+scripts, which is why it runs only on `--verify`. It gets no stdin, a 60-second timeout, and its
+whole process group is killed on timeout.
 
 **Use `assertions_setup`.** One command gathers everything into `$PLAN_FACTS`, and
 each assertion reads from that. Assertions that each open their own connection are

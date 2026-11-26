@@ -154,14 +154,27 @@ def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
     What: `bash -lc <cmd>` in the project root with the --verify environment.
     Use when: only from verify(), which runs only on an explicit `check.py --verify`.
     Inputs: command string, working directory, environment dict, timeout seconds.
-    Output: (returncode, stripped stdout, stripped stderr); raises on timeout or spawn error.
-    Side effects: executes a command read from plan.json.
+    Output: (returncode, stripped stdout, stripped stderr); raises subprocess.TimeoutExpired
+    on timeout (the whole process group is killed first) or another error on spawn failure.
+    Side effects: executes a command read from plan.json, in its own session, with stdin
+    closed (/dev/null); on timeout its whole process group is killed.
     Role: PLUMBING (one runner for assertions and invariant checks).
     """
+    import signal
     import subprocess as sp
-    r = sp.run(["bash", "-lc", cmd], cwd=cwd, capture_output=True, text=True,
-               timeout=timeout, env=env)
-    return r.returncode, r.stdout.strip(), (r.stderr or "").strip()
+    p = sp.Popen(["bash", "-lc", cmd], cwd=cwd, stdin=sp.DEVNULL, stdout=sp.PIPE,
+                 stderr=sp.PIPE, env=env, start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except sp.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        p.communicate()
+        raise
+    dec = lambda b: (b or b"").decode("utf-8", errors="replace").strip()  # noqa: E731
+    return p.returncode, dec(out), dec(err)
 
 
 def verify(root=None):
@@ -251,7 +264,6 @@ def verify(root=None):
         else:
             bad += 1
             print("  MISMATCH %-45s expected=%r actual=%r" % (claim, exp, got[:80]))
-    errored = 0
     for inv in inv_declared:
         rule, state = inv.get("rule", "?"), inv.get("state")
         if inv not in inv_checks:
@@ -261,22 +273,31 @@ def verify(root=None):
             print("  FAIL    invariant %r: check is not a runnable command" % rule)
             continue
         try:
-            rc, out, err = run_command(inv["check"], P["root"], env)
+            rc, out, err = run_command(inv["check"], P["root"], env, CHECK_TIMEOUT)
+        except sp.TimeoutExpired:
+            bad += 1
+            print("  ERRORED invariant %r (state %r): check timed out after %ds"
+                  % (rule, state, CHECK_TIMEOUT))
+            continue
         except Exception as exc:
             bad += 1
-            errored += 1
-            print("  ERRORED invariant %r (state %s): check could not run: %s"
+            print("  ERRORED invariant %r (state %r): check could not run: %s"
                   % (rule, state, str(exc).splitlines()[0][:80] if str(exc) else type(exc).__name__))
             continue
-        if rc == 0:
+        if rc == 127:
+            bad += 1
+            print("  ERRORED invariant %r (state %r): check could not run: command not found (exit 127)"
+                  % (rule, state))
+        elif rc == 0:
             ok += 1
-            print("  HOLDS   invariant %r (state %s)" % (rule, state))
+            print("  HOLDS   invariant %r (state %r)" % (rule, state))
         else:
             bad += 1
             # First line only, on the FAIL line itself, so a check's own output
             # can never print a forged HOLDS line of its own.
             first = ((err or out).splitlines() or [""])[0][:80]
-            print("  FAIL    invariant %r (state %s): check exited %d: %s"
+            first = re.sub(r"[^\x20-\x7e]", "?", first)
+            print("  FAIL    invariant %r (state %r): check exited %d: %s"
                   % (rule, state, rc, first))
     if facts_path:
         try:
