@@ -104,7 +104,7 @@ money or touches credentials; the lower one otherwise.
 **Record and report**
 15. **Record as you go, not after.** Decisions append to a log, never rewritten; new documents are
     indexed the same day. The plan's stage and a configured tracker move at each stage change, pause, handoff and
-    release, reconciled at every progress report (plan-layer: `/plan-layer sync --tracker`;
+    release, reconciled on events by plan-layer's controller (`move.py`, `sync --tracker`;
     `/plan-layer pause` before stopping; it owns how, this skill when). *Why:* the next session re-derives what this one did not write. *Test:* the report says when.
 16. **Plain words, exact terms, progress as a ladder.** Short sentences; the real technical name,
     defined once; words whose plain meaning matches ("tested on the bench", never "benched", which
@@ -153,7 +153,7 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 | debug | `superpowers:systematic-debugging` | root-cause-investigation.md, measurement-and-state-claims.md | steps RC-1 to RC-10 by name; decided, told and judged kept apart |
 | build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; tier b/c: headers on touched code, with their check (docs-and-decisions.md); the full suite once before reporting; a held release first |
 | review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; usage read before launching; re-reviews cover the delta; nothing competes with a held release |
-| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts read entry by entry; behaviour evals: a cost cap first, layered, isolated, sends fail closed |
+| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts entry by entry; diff vs plan steps, out-of-scope; evals: cost cap, layered, isolated, fail-closed sends |
 | deploy | (none) | live-system-changes.md | principle 13; what the diff does not show, handled first; pre-launch instances get no test traffic; helper faults split read-only from state-changing |
 | merge | `superpowers:finishing-a-development-branch` | live-system-changes.md | the push guard covers every party's identifiers and every git dir pushed from |
 | release | (none) | live-system-changes.md, progress-ladder.md | a summary is not proof: full suite on the current head and a different-model review, then the deploy row |
@@ -164,8 +164,8 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 `references/`: `review-loop.md` (reviewer, probes, fix rounds, briefs, autonomy),
 `model-routing-and-cost.md` (models, capacity, cheap ticks), `measurement-and-state-claims.md` (exit
 codes, skips, counts, negatives, state words), `progress-ladder.md` (ladder, release tree, grid,
-updates, checklists), `parallel-and-worktrees.md` (fan-out, who writes where, lanes),
+updates, checklists), `parallel-and-worktrees.md` (fan-out, writers, lanes),
 `live-system-changes.md` (deploy standard and file, proving a release, pre-launch, pushing),
-`docs-and-decisions.md` (docs, headers and their check, decision log, the record, names),
+`docs-and-decisions.md` (docs, headers, decision log, the record, names),
 `behaviour-evals.md` (evals as a dataset, cost cap, contamination, baselines),
-`root-cause-investigation.md` (RC-1 to RC-10).
+`root-cause-investigation.md` (RC-1 to RC-10), `permission-profiles.md` (settings per tier).

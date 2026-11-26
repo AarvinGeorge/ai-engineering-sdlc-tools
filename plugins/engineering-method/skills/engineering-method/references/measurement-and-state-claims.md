@@ -5,7 +5,7 @@ ways a verification lies.
 
 The global measurement rules (proven zeros, fail loudly on an unparseable value, dates read in the
 same pass, remote clocks read on the host) apply; this file adds exit codes, suite results, counts,
-negatives and time, state words and labels.
+negatives and time, state words, verified against the plan, and labels.
 
 ## Exit codes
 
@@ -76,6 +76,33 @@ negatives and time, state words and labels.
 
 A summary written before an event and read after it is the classic trap: a branch recorded as
 parked, copied into the next session's notes unchecked, then cited as fact while it was live.
+
+## "Verified" is measured against the plan
+
+"Verified" is a state word too (tier b and c, wherever a plan document exists). Before using it, or
+moving a plan item to its `verified` stage, compare the diff with the plan's steps and its
+out-of-scope list:
+
+1. Read the plan's steps and out-of-scope list, then `git diff --stat <base>...HEAD` and the hunks.
+2. List every mismatch with file and line, in three kinds:
+   - **out of scope:** a change the out-of-scope list rules out, including a change in behaviour to
+     something it names, not only a file or folder it names;
+   - **step with no change:** a step that nothing in the diff carries out;
+   - **unasked:** a change no step asked for.
+3. Report them as findings and withhold "verified" while any stands. The owner rules on each (keep
+   and add it to the plan, revert it, move it to a later item, or carry out the step). Do not revert or fix on your own.
+4. None found: say so with the counts and the command, e.g. "diff matches the plan: 5 steps, 4
+   out-of-scope lines checked (`git diff --stat <base>...HEAD`)".
+
+Tier a has no plan; nothing here applies, and nothing about it is said.
+
+*Why:* the out-of-scope list is written at plan time and no later stage read it; a list nobody
+checks is advisory text, and scope creep is the failure it exists for. Industry baseline: review
+against the ticket's acceptance criteria, and Warp's `/validate-changes-match-specs` skill, where the
+agent rechecks its work against the specs and the author decides how to address each inconsistency.
+This method departs in two ways: the plan document is the spec (no second spec file), and findings
+go to the owner, never auto-fixed. *Test:* the report that says "verified" carries the three-kind
+list or the "matches the plan" line with its command.
 
 ## Labels
 

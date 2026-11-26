@@ -1,5 +1,181 @@
 # Changelog
 
+## 0.5.0 — 2026-11-26
+
+**Evaluation method.** `references/behaviour-evals.md` now says how a behaviour eval is graded,
+repeated, judged, gated and paid for, built on Anthropic's "Demystifying evals for AI agents" and
+Husain and Shankar's Evals FAQ.
+
+- **Code first.** A criterion a check computed from the run can decide (a pattern over the reply or a
+  file, a tool called or not, one tool before another, a file created) gets a code grader; an LLM
+  judge is kept for what needs reading, and each judged criterion says in its header why code cannot
+  decide it. Verdicts are binary with a concrete PASS and FAIL condition, never a numeric scale or an
+  average. Grade the outcome, then the path, loosely.
+- **k of n and pass^k.** Each criterion is reported as k of n runs beside any mean, because a
+  majority is a reading of a noisy sample, not a reliability figure. A rule that must never break is
+  held to every run (pass^k, the chance all k runs pass); the floor layer's repeats now read
+  "reliable only when every run passes". The reference states how little three runs prove (2 of 3
+  fits a true rate from about 21% to 94%) and asks for paired comparisons on the same cases, model
+  and judge.
+- **Judges independent of the model under test.** The judge differs from the model under test and
+  from the model that wrote the instructions or the cases (self-preference bias), is at least mid
+  tier, and is pinned by name on every command. A contested criterion gets a second judge from
+  another model family where the runner allows it, otherwise another tier, which reduces the bias
+  without removing it.
+- **Judges calibrated on the owner's rulings.** Each ruling on a read answer (failing ones and a
+  sample of passing ones) is a label. Per criterion the judge's true positive and true negative rates
+  are reported, not one agreement figure; below about 30 labels a side the judge is "uncalibrated,
+  n = …" with raw k of n. Two judges that disagree go to a person, never to a tie-break rule.
+- **Capability evals report; regression evals hold** (the owner's ruling of 26 Nov 2026, written into
+  the rule). A new rule's criteria are capability evals: k of n on the old and new version, and one
+  below 2 of 3 on the new version is recorded as known red (capability) instead of holding the
+  release. Criteria that existed before are regression evals: they hold, and an unexplained drop
+  stops the release (principle 18). A score threshold on a new metric gates only after it has a
+  history, a code grader or a calibrated judge, and the owner's decision; until then the exit code
+  means run errors only. The test-first bullet now records the new version's result beside the red
+  result on the old one instead of requiring green, which writes 0.4.0's recorded exception into the
+  rule.
+- **Run accounting.** A runner's cost figure is an estimate (usually list price, judge calls
+  included, so never added again); the bill is the account, which the report names. A cap checked
+  before each run is overshot by the runs in flight, so run `-j 1` or leave room, with caps set from
+  a measured calibration run. A run whose inputs never reached the agent is invalid, reported apart
+  and re-run once delivery is fixed and confirmed in a kept trace.
+- **Narrowing and labels.** A criterion green on the old version is narrowed to what the rule adds,
+  at most two rounds; still green, it becomes a guard and the rule rests on its other criteria.
+  Reading results now includes a sample of passing answers, and each reading is a label.
+  `references/model-routing-and-cost.md` points to "Judges" instead of its own judge line.
+
+**"Verified" measured against the plan.** `references/measurement-and-state-claims.md` treats
+"verified" as a state word. On tier b and c, wherever a plan exists, the agent compares the diff
+with the plan's steps and out-of-scope list before using it, lists each mismatch with file and line
+in three kinds (out of scope, including a behaviour change to something the list names; a step with
+no change; a change nobody asked for), and withholds "verified" while any stands. The owner rules on
+each; the agent does not revert or fix on its own. With none, it says so with the counts and the
+command. Tier a has no plan and gets none of this. Baseline: review against acceptance criteria, and
+Warp's `/validate-changes-match-specs` skill; the departures are that the plan is the spec and that
+findings go to the owner instead of being fixed automatically.
+
+**Permission profiles per stakes tier.** New `references/permission-profiles.md` gives a Claude Code
+settings profile for each tier (exploration, internal, live), cumulative, for a person to paste into
+the committed `.claude/settings.json`. It records what the harness does, each line cited to the
+Claude Code permissions, permission-modes and settings pages: deny, then ask, then allow; deny wins
+across user, project, local and managed settings; a call matching an ask rule is never
+auto-approved in any mode, with an installed mod as the one exception; `bypassPermissions` or `auto`
+as `defaultMode` in a project file does not take effect. It also records what it does not do: a Bash
+rule matches the command text, so a sandbox or a PreToolUse hook is the hard floor. The live profile
+puts every command that can change the live system under ask and disables bypass.
+`references/live-system-changes.md` gains a standing rule: paste the live profile before the first
+live session. Baseline: least privilege and Warp's agent profiles, whose denylist "takes precedence
+over your other permission settings"; this method departs by setting the profile per stakes tier
+instead of per user and by printing it rather than writing it.
+
+**Plan-layer controller pointers.** Principle 15 now says the plan and tracker are reconciled on
+events by plan-layer's controller (`move.py`, `sync --tracker`), and `docs-and-decisions.md` adds
+that a "changed X, so Y must change" rule is a co-change rule in `meta.controller.rules`, fired on a
+stage event (plan-layer 0.19.0).
+
+**SKILL.md.** The `test` row names the diff against the plan's steps and out-of-scope list (cell 20
+words, unchanged); two reference glosses are shortened; `permission-profiles.md` joins the reference
+list; principle 15 swaps its pointer word for word. Body 2,198 → 2,197 words (limit 2,200).
+
+**Tests and evals.** 79 unit tests (73 in 0.4.0): `tests/test_permission_profiles.py` checks every
+profile snippet (valid JSON, documented rule form, no mode a project file cannot set, cumulative deny
+and ask, bypass disabled on live). Ten new eval cases, each criterion graded on its own:
+`eval-score-code-first`, `eval-pass-k-floor`, `eval-metrics-report-only`,
+`eval-judge-independent-calibrated`, `eval-run-accounting`, `verified-matches-plan`,
+`permission-profile-live`, and three near-miss guards that should pass on both versions,
+`eval-near-miss-unit-test`, `verified-near-miss-no-plan` and `permission-profile-exploration-light`.
+`evals/COVERAGE.md` maps every criterion to its gap id (G44 to G54).
+
+**Release bar.** Unit suites, `claude plugin validate` and the release gates gate. The 35 existing
+cases are regression evals and must hold: a drop is pooled to 6 runs per version with a two-sided
+Fisher exact test and read; an unexplained one stops the release. The new criteria are capability
+evals and are reported; the three near-miss guards are read as regression evals and must stay green.
+
+**Base results on 0.4.0** (Opus agent, Sonnet judge, ablation none, `-j 1`, threshold 0, 3 runs per
+case; P pass, F fail). Every target criterion is red on 0.4.0, so each case measures its rule.
+- `eval-score-code-first` c1 0/3, c2 0/3 (2/3 before narrowing); `eval-pass-k-floor` c1 0/3 (3/3
+  before narrowing), c2 0/3; `eval-metrics-report-only` c1 0/3, c2 1/3;
+  `eval-judge-independent-calibrated` c1 1/3, c2 0/3, c3 0/3, c4 0/3; `eval-run-accounting` c1 0/3,
+  c2 1/3.
+- `verified-matches-plan` c4 0/3 (3/3 before narrowing); c1, c2 and c3 3/3, kept as guards, not
+  proof: the prompt already lays the plan beside the diff, and narrowing them would grade the rule's
+  labels rather than behaviour.
+- `permission-profile-live` c1 0/2 valid runs plus 1 invalid (3/3 before narrowing; the invalid run
+  hit the cap before its judges ran), c2 0/3, c3 0/3, c4 0/3.
+- Guards green as intended: `eval-near-miss-unit-test` c1 3/3, c2 3/3; `verified-near-miss-no-plan`
+  c1 3/3, c2 3/3; `permission-profile-exploration-light` c1 3/3, c2 3/3 (the skill did not load in
+  one of its runs, so those criteria do not need the method).
+- Narrowing: four criteria green on base were narrowed once each, to what the 0.5.0 text adds (the
+  pass^k figure; a FAIL condition and no scale even as an option; the owner ruling on each mismatch
+  with the choices laid out; deny winning across settings files). Each base green was read and held:
+  the rule was already in 0.4.0 or in model knowledge, not a judge error. Two of the four
+  (`eval-score-code-first` c2, `verified-matches-plan` c4) were reworded once more after their base
+  run (the first only tightened; the second allows a stated recommendation); their 0.4.0 answers
+  were re-read under the shipped wording and still fail, by reading, not a judge count.
+- Cost: 42 agent runs (30 base, 12 narrowing), about $9.03 (an estimate, billed to a subscription),
+  against a $14 stage cap. Two caps were overshot by the run in flight.
+
+**Head results on 0.5.0** (same flags, 3 runs per case, base column from the base run above). Read
+under the owner's ruling of 26 Nov 2026: the new criteria are capability evals and are reported; one
+below 2 of 3 on the head is known red; the existing cases are held. **12 of the 17 target criteria
+are 2 of 3 or better on the head** (0 of 17 on 0.4.0); the three guard criteria of
+`verified-matches-plan` are 3/3 on both versions. Counted with those guards, 15 of 20 (3 of 20 on
+0.4.0).
+- Green: `eval-score-code-first` c1 0/3 → 3/3, c2 0/3 → 3/3; `eval-pass-k-floor` c2 0/3 → 3/3;
+  `eval-metrics-report-only` c1 0/3 → 3/3, c2 1/3 → 2/3; `eval-judge-independent-calibrated` c1
+  1/3 → 2/3, c3 0/3 → 3/3, c4 0/3 → 2/3; `eval-run-accounting` c1 0/3 → 2/3;
+  `permission-profile-live` c2 0/3 → 2/3, c3 0/3 → 3/3, c4 0/3 → 2/3.
+- **Known red (capability), head passes of 3:** `eval-pass-k-floor` c1 1/3 (read: two of three
+  answers carry the pass^k figure, one a judge error); `eval-judge-independent-calibrated` c2 0/3
+  (grader, below); `eval-run-accounting` c2 1/3 (the reference was read; the answers re-run the
+  invalid case without tying it to a kept trace); `verified-matches-plan` c4 0/3 (no reference was
+  read in any run: the `test` stage cell alone produced the mismatch list but not the hand-back to the
+  owner); `permission-profile-live` c1 0/3 (the reference was read; no answer says the committed
+  deny holds against a teammate's user or local settings). Three of these
+  (`eval-judge-independent-calibrated` c2, `verified-matches-plan` c4, `permission-profile-live` c1)
+  have not passed in any run on either version in their shipped wording, so it is not yet shown that
+  the grader can pass.
+- Guards hold: `verified-matches-plan` c1, c2, c3 3/3; `eval-near-miss-unit-test` c1, c2 3/3;
+  `verified-near-miss-no-plan` c1, c2 3/3; `permission-profile-exploration-light` c1, c2 2/2 valid
+  runs (the third was not started: the two runs cost about $0.9 each against about $0.37 on 0.4.0,
+  and the second crossed the cap).
+
+**Regression results** (the 35 existing cases: 26 paired, base 0.4.0 and head, 3 runs each; 9 smoke
+cases with one head run against 3 base runs or the stored 0.4.0 record, `rc-02-decision-record`
+extended to 3 and re-run on the base). No unexplained drop. Criteria already below 2 of 3 on 0.4.0
+stay red and are not drops (listed in `evals/COVERAGE.md`); five of them moved from 1/3 to 0/3.
+Five criteria in four cases fell below 2 of 3; each was read and tested (two-sided Fisher exact):
+- `eval-plan-as-dataset` c4 3/3 → 0/3, pooled to 6 runs per version: base 3/6, head 1/6, p = 0.55.
+  The criterion is a coin flip on 0.4.0 too, decided by whether the answer states that the agent
+  never sees the graders; noise.
+- `rc-07-trace-dropped-fact` c1 3/3 → 1/3, p = 0.40: the failing answers do what the Pass line asks
+  and the judges split; judge error or noise. The files the runs read are unchanged in 0.5.0.
+- `rc-10-blind-brief` c1 3/3 → 1/3, p = 0.40: run-to-run wording (a cache detail named before the
+  hypothesis section); files unchanged.
+- `instruction-file-compression` c2 and c3 2/3 → 1/3, p = 1.0 each: phrasing variance on a criterion
+  already borderline on 0.4.0; the one sentence 0.5.0 adds to that file is unrelated.
+- `rc-02-decision-record` c2, 0/3 on the head against a 2/3 record from before 0.4.0's own edits:
+  re-run on the 0.4.0 base, c1 2/3 and c2 0/3 on both versions (p = 1.0), the same files read and the
+  same answers (the tool and turn counts on the logged line left unmapped). Red before 0.5.0, not a
+  drop.
+
+**Known issues, for a later release (not fixed here):** two graders disagree with the reference they
+test. `eval-judge-independent-calibrated` c2 asks for true positive and true negative rates without saying
+what a small label set changes, while the reference, and c3, give raw counts below about 30 labels a
+side. The head answers report raw counts as the reference asks, but none separates agreement on
+answers the owner passed from agreement on answers the owner failed, which the reference also asks;
+the red is part grader wording, part behaviour. `eval-pass-k-floor` c1 asks for a pass^k figure,
+which is stricter than the rule's Test line (floor criteria report n of n). Neither grader was edited
+after the head run, since that would need a fresh base run to keep the two versions comparable.
+At the test stage the plan-conformance rule is routed through `measurement-and-state-claims.md` but
+was not read in any head run (0 Read calls); a routing fix to the SKILL.md `test` cell is planned for
+the next release.
+
+**Cost:** 265 agent sessions in the release (42 base and narrowing, 29 head, 191 regression and
+re-runs, 3 for the `rc-02` base check), about $61.31. These are list-price estimates from the
+runner, billed to a claude.ai subscription, not spend.
+
 ## 0.4.0 — 2026-11-26
 
 **A debug stage.** A prompt that moves to debugging (debug, investigate, diagnose, bug, root cause)
