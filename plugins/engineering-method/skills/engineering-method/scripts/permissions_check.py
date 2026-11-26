@@ -42,6 +42,8 @@ KEYWORDS = ("if", "then", "else", "elif", "do", "while", "until", "{", "!")
 ENV = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=(\"[^\"]*\"|'[^']*'|\S*)\s*")
 GUARD_KEY = re.compile("disablebypasspermissionsmode", re.I)
 SSH = "Bash(ssh"
+HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n"
+                     r"(?:[^\n]*\n)*?[ \t]*\2[ \t]*(?=\n|$)")
 
 
 class BadInput(Exception):
@@ -119,8 +121,11 @@ def scan(cmd):
     Use when: split() and analyse(). Inputs: command text.
     Output: (parts, nested_flags, bodies, parseable). nested_flags[i] says part i holds a
     $(...), backtick or (...) body; bodies are those bodies' texts; a dangling && or ||, an
-    unclosed quote or an unclosed body makes it unparseable for allow.
+    unclosed quote or an unclosed body makes it unparseable for allow. Here-doc bodies are
+    dropped before quote tracking (an apostrophe in a body must not hide a later command from
+    deny); any "<<" still makes the command never-allow.
     Side effects: none. Role: parsing."""
+    cmd = HEREDOC.sub(lambda m: "<<" + m.group(2) + m.group(3), cmd)
     parts, flags, bodies = [], [], []
     cur, q, i, parseable, nested = "", None, 0, True, False
     while i < len(cmd):
@@ -380,7 +385,7 @@ def block(cmd, layers, ssh_supplied=False):
                        % (mode, scope))
     for scope in SCOPES:
         if scope in layers and "defaultMode" in layers[scope][0]:
-            out.append("MODE: %s (top-level key, not documented; not evaluated)"
+            out.append("MODE: %s (top-level defaultMode key, not documented; not evaluated)"
                        % json.dumps(layers[scope][0]["defaultMode"]).strip('"'))
     out.append("END")
     return [GUARD_KEY.sub("[setting name withheld]", ln) for ln in out]

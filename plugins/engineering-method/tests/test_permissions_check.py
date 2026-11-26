@@ -159,7 +159,7 @@ class Contract(unittest.TestCase):
     def test_top_level_mode_is_not_evaluated(self):
         _, out, _ = run({"project": {"defaultMode": "bypassPermissions", "permissions": {"deny": ["Bash(rm *)"]}}},
                         "rm x")
-        self.assertIn("MODE: bypassPermissions (top-level key, not documented; not evaluated)", out)
+        self.assertIn("MODE: bypassPermissions (top-level defaultMode key, not documented; not evaluated)", out)
         self.assertNotIn("not applied", out)
 
     def test_help_and_unknown_args(self):
@@ -242,6 +242,13 @@ class Undocumented(unittest.TestCase):
         self.assertNotIn("DECISION: allow", out)
         _, out, _ = run({"user": perms(allow=["Bash(cat *)"])}, "cat <<EOF")
         self.assertNotIn("DECISION: allow", out)
+
+    def test_heredoc_body_never_hides_a_deny(self):
+        layers = {"user": perms(deny=["Bash(git push *)", "Bash(rm *)"])}
+        for c in ("git commit -m \"$(cat <<'EOF'\ndon't break\nEOF\n)\" && git push origin main",
+                  "cat <<EOF\nit's\nEOF\nrm -rf x"):
+            _, out, _ = run(layers, c)
+            self.assertIn("DECISION: deny", out, c)
 
     def test_fd_redirect_is_not_a_separator(self):
         _, out, _ = run({"user": perms(allow=["Bash(npm test *)"])}, "npm test 2>&1")
