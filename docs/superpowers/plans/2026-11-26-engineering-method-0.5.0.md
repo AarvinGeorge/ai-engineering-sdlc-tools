@@ -49,11 +49,15 @@ Every figure below was read in this pass. Task I-0 re-reads them before building
 - **0.5.0 for everything.** W's "0.6.0" becomes 0.5.0 everywhere it appears: its Task 6 headings, version lines and commit messages, and the File structure line. 0.5.x is kept for fixes to 0.5.0.
 - **One CHANGELOG entry**, `## 0.5.0 — <date -u at commit>`, in this order: evaluation method (EV's rules R1-R7, one paragraph each; it says the test-first bullet now records a red-on-head result instead of requiring green, which writes 0.4.0's recorded exception into the rule); "verified" measured against the plan (A); permission profiles per tier (B); controller pointers (c); the SKILL.md swaps with net words (2,198 → 2,197); the new unit test; the ten cases; the release ruling (section 5); eval results; spend.
 - **COVERAGE.md:** two sections, the same shape as 0.4.0: `## Evaluation method (0.5.0)` (EV's rows) and `## Rules added in 0.5.0` (W Task 6's rows for A and B). Gap ids continue from **G44** (0.4.0's last is G43), in task order: EV's rules first, then A, then B. Guard rows and known-red rows are marked as 0.4.0 marks them.
-- **Dropped:** EV Task 4 (principle 18, conditional on the owner's Q1). The owner has **not** said yes, so this plan leaves it out. If the owner later says yes, it fits (measured: 2,197 → 2,199) and ships as 0.5.1 with its own regression run.
+- **Dropped:** EV Task 4 (principle 18, conditional on the owner's Q1). The owner has **not** said yes, so this plan leaves it out. With the ruling below, the reference agrees with principle 18 as it stands, so Q1 is no longer needed. If the owner says yes anyway, it fits (measured: 2,197 → 2,199) and ships as 0.5.1 with its own regression run.
+- **Owner's ruling, 26 Nov 2026 (carried into EV's R5).** This is the ruling the owner made for 0.4.0, and it now replaces EV's "report, do not gate". New criteria are **capability evals**: they are reported, and one below 2 of 3 is recorded as known red. Existing cases are **regression evals**: they hold, and an unexplained drop goes to the owner. A score threshold on a new metric gates a release only after it has a history. I-3 writes this as literal text (section 3); EV L603-616 does not ship as written.
 
 ## 3. Tasks, in order, with the files each one edits
 
-One branch, serial, one writer. The only file more than one task edits is SKILL.md, and each of those tasks touches a different region: §3 (I-4), §4 (I-5) and §2 principle 15 (I-6). Each is measured with the budget test's counter before and after.
+One branch, serial, one writer. Files that more than one task edits, always one task after another, never at once:
+- **SKILL.md:** each task touches a different region, §3 (I-4), §4 (I-5) and §2 principle 15 (I-6), and each is measured with the budget test's counter before and after.
+- **CHANGELOG.md and COVERAGE.md:** I-2 drafts the results notes (W T3 Step 5), I-7 writes the entry and the rows, and I-10 fills in the measured results.
+- **Grader files in the ten case folders:** created in I-1, narrowed in I-2, and fixed in I-8 only when a judge or grader is shown wrong.
 
 | # | Task | Source | Files edited (all under `plugins/engineering-method/` unless rooted) |
 |---|---|---|---|
@@ -75,10 +79,32 @@ What combining changes inside each task:
 
 - **I-0.** Record the OK count (73 expected), the body word count (2,198) and the cells, and run the anchor check from section 1 (23 strings, each found once). Re-read every public page in EV "Vendor and baseline facts" and W "Measured facts" (Claude Code permissions, permission-modes, settings, settings-reference, plugin-evals; the Warp pages; the cited papers). Mark each fact confirmed, contradicted or changed, with its quote. Settle W's `disableAutoMode` key path. Record `claude --version` and which account the runs bill to (EV T2 Step 2, done once).
 - **I-1.** Three commits, keeping the source messages (EV T1 Step 8; W T1 Step 5; W T2 Step 8). In every contamination grep, write `--since` as `--regexp=--since`, join wrapped lines (`tr '\n' ' ' | tr -s ' '`, the 0.4.0 form), and prove each grep can fire on the plan file. Routing was already measured (section 1); re-probe only a prompt that changed. Expected unit result: the new snippet tests ERROR and everything else passes (W T2 Step 6).
-- **I-2.** One base worktree at `87016f8` with the ten case folders copied in (`diff -r` one of them). **One** calibration run: `eval-run-accounting`, cap $1, which also answers EV T2 Step 3's question about whether the hook fires in eval runs. Then the ten cases at 3 runs each, one command per case. Narrowing budget: EV's three predicted-green cases, up to two rounds each; W's `verified-matches-plan`, up to four rounds; `permission-profile-live`, up to two. Every round is base only and committed separately. A Fable 5.2 review of the narrowed graders closes the task (EV T2 Step 8; W T3 Step 3's labels). The regression base is **not** run here; it runs in I-9, paired with head.
-- **I-3 to I-6** follow the source text as written, adjusted only where I-0 found a page changed. After each one: the unit suite, the body count, and the contamination checks from section 6. I-4's "snippet tests still red" holds until I-5.
+- **I-2.** One base worktree at `87016f8` with the ten case folders copied in (`diff -r` one of them). **One** calibration run: `eval-run-accounting`, cap $1. It counts as run 1 of that case's three base runs (same flags) and also answers EV T2 Step 3's question about whether the hook fires in eval runs. Then the ten cases at 3 runs each, one command per case. Narrowing budget, cut to fit the $70 stop: **18 runs in all** (six case-rounds of 3), spent first on whichever criteria come back green on base, and at most two rounds per criterion. A criterion still green when the budget is spent becomes a guard row (the source plans' own reclassification rule). Every round is base only and committed separately. A Fable 5.2 review of the narrowed graders closes the task (EV T2 Step 8; W T3 Step 3's labels). The regression base is **not** run here; it runs in I-9, paired with head.
+- **I-3 to I-6** follow the source text as written, with two exceptions: I-3's R5 text below, and any line where I-0 found a page changed. After each task: the unit suite, the body count, and the contamination checks from section 6. I-4's "snippet tests still red" holds until I-5.
+- **I-3, R5 (the owner's ruling, section 2).** In EV Task 3 Step 4's inserted block, replace the heading `## Report, do not gate, until a metric has a history` and its first bullet ("**A judged behaviour score informs the release; it does not block it** … each gating metric names when it graduated.") with the text below. EV's second bullet ("A difference from the base is read, explained and ruled on …") and its third bullet ("A new rule's case still has to be red …") stay as they are. 5-gram check, measured: 0 sequences shared with all 45 prompts (35 existing, 10 planned); 0 hits from both plans' string lists (that grep fires on a planted line).
+
+```markdown
+## Capability evals report; regression evals hold
+
+- **A new rule's criteria are capability evals: they are reported and do not hold the release.**
+  Show k of n on the old and the new version; a criterion below 2 of 3 on the new version is recorded
+  as known red (capability) in the coverage map and the changelog, and is expected to climb from
+  release to release.
+- **Criteria that existed before the change are regression evals: they hold.** A drop is read and
+  ruled on as the next bullet says; an unexplained one stops the release (principle 18).
+- **A score threshold on a new metric gates a release only after it has a history**: stored results
+  across several versions, a code grader or a calibrated judge, and the owner's decision that it now
+  gates. Until then, run so the exit code means run errors only (for example a threshold of 0) and
+  read the verdicts from the result file. *Why:* with three runs and an unchecked judge, a new
+  criterion's red is as likely noise or a judge error as a missing behaviour, and an automatic stop
+  holds releases on chance; a criterion that already held is what a release must not lose. *Test:*
+  the release notes list known-red capability criteria apart from the regression results, and no
+  release step fails on a score threshold that has no history.
+```
+
+  EV Task 3 Step 8's commit message becomes `behaviour-evals: code first, k of n and pass^k, independent calibrated judges, capability evals report and regression evals hold`. In EV Task 6 Step 2, "under report-only, a red criterion is stated, not a hold" becomes "a new criterion below 2 of 3 is recorded as known red (capability), not a hold; a drop on an existing case follows section 5". `eval-metrics-report-only` keeps its graders: its suite is new, so its c1 (no block yet, the exit code for run errors, when a metric graduates) is met by the third bullet, and its c2 by EV's unchanged second bullet.
 - **I-6.** Swap in principle 15: `reconciled at every progress report (plan-layer: \`/plan-layer sync --tracker\`;` becomes `reconciled on events by plan-layer's controller (\`move.py\`, \`sync --tracker\`;` (9 → 9 words, measured). In `docs-and-decisions.md`, after "…(SKILL.md principle 7)." (lines 95-96, wrapped), add: `With plan-layer, a "changed X, so Y must change" rule is a co-change rule in \`meta.controller.rules\`, fired on a stage event.` Commit: `engineering-method: principle 15 and docs-and-decisions point at plan-layer's controller`.
-- **I-7.** Sections 2 and 8 settle the headings and the use-case text. One commit: `engineering-method 0.5.0: coverage, changelog, version, use cases`.
+- **I-7.** Sections 2 and 8 settle the headings and the use-case text. EV T6's COVERAGE rows and CHANGELOG paragraphs are not literal in EV, so Opus writes them (section 7). One commit: `engineering-method 0.5.0: coverage, changelog, version, use cases`.
 - **I-10.** `git diff main --stat` lists only the files in the table above plus this plan and the EV plan. The identifier scan follows EV T7 Step 3. Commit: `engineering-method 0.5.0: measured eval results`.
 
 ## 4. SKILL.md word budget (body ≤ 2,200)
@@ -105,33 +131,49 @@ Every cell stays ≤ 25 words. `method_hook.py` is not edited, and no reference 
 
 ## 6. Runs, cost and billing
 
-**Billing line.** Evals run through `claude plugin eval` on the logged-in Claude subscription (I-0 confirms the account and records it). The runner's `costUsd` is a list-price **estimate** that already includes the judge calls; it is not plan usage and not a bill. **The owner's yes is required before the first run** (the calibration run in I-2).
+**Billing line.** Evals run through `claude plugin eval` on the logged-in Claude subscription, a Max plan (I-0 confirms the account and records it). The runner's `costUsd` is a list-price **estimate** that already includes the judge calls; it is not plan usage and not a bill. **The owner approved the runs on 26 Nov 2026:** up to ~265 sessions, with a hard stop at a $70 estimate. The table below plans ≤ 268; the $70 stop decides, not the count.
 
-**Flags on every command:** `--model opus --judge-model sonnet --ablation none -j 1 --runs 3 --threshold 0 --no-publish --trust-plugin --keep-temp --json <out>`. Each command's `--max-cost-usd` (its runs × that case's measured cost × 1.25) is written in the task before the command runs.
+**Flags on every command:** `--model opus --judge-model sonnet --ablation none -j 1 --threshold 0 --no-publish --trust-plugin --keep-temp --json <out>`, with `--runs 3` except on the calibration run and the smoke head runs (`--runs 1`). **Caps** are written in the task before each command runs, as `--max-cost-usd` = its runs × cost per run × 1.25. A case run for the first time has no measured cost yet, so its cap uses the calibration figure `c`; `rc-03-full-input` (fixtures) uses 0.4.0's highest measured $0.38 instead. Every later command on that case uses its own measured cost. **Hard stop:** before each command, add the `costUsd` summed so far to that command's cap; if the total would pass **$70**, do not start it. Stop and report.
+
+**Run table (re-planned within the owner's $70 hard stop: ~269 runs at $0.26).** The 6 cases that read files 0.5.0 edits (plan → `docs-and-decisions.md`; build → `model-routing-and-cost.md`) are now paired.
 
 | Phase | Runs (max) |
 |---|---|
-| I-2 calibration (one, shared) | 1 |
-| I-2 base: 10 new cases × 3 | 30 |
-| I-2 narrowing, base only: EV ≤ 18, W ≤ 18 | ≤ 36 |
+| I-2 base: 10 new cases × 3 (the calibration run is run 1 of `eval-run-accounting`) | 30 |
+| I-2 narrowing, base only (cut from ≤ 36) | ≤ 18 |
 | I-8 head: 10 new cases × 3 | 30 |
-| I-9 paired regression: the 20 cases routed to a stage whose reference changes (test, debug, report, deploy, merge, release), base and head, × 3 | 120 |
-| I-9 smoke: the other 15 (plan, build, review, silent; `rc-03` with `--scaffold`), head × 1, compared with 0.4.0's recorded verdicts (valid because their loaded text is unchanged since 969d99b except SKILL.md's swaps) | 15 |
-| Pooling and smoke escalation (a smoke fail on a criterion green on 0.4.0 → 3 runs on both versions) | ≤ 30 |
-| I-11 reviewer re-run of one new case on head | 3 |
-| **Total** | **≤ 265 (expected about 229)** |
+| I-9 paired regression, base and head × 3: the 20 cases routed to test, debug, report, deploy, merge or release, plus the 4 plan and 2 build cases | 26 × 6 = 156 |
+| I-9 smoke head × 1: `fix-loop-bounded` and the 8 silent cases | 9 |
+| I-9 smoke base × 3: the 6 smoke cases with no recorded head verdict on current text (table below) | 18 |
+| I-11 reviewer re-run, one new case on head (cut from 3) | 1 |
+| Pooling: one drop, +3 runs on each version | ≤ 6 |
+| **Total** | **≤ 268, ≤ ~$70 at $0.26 (~$66 at 0.4.0's measured $0.247); expected ~259 (narrowing 12, pooling 3), ~$64-67** |
 
-At ~$0.26 a run (0.4.0's measured figure: $20.76 for 84 runs is $0.25), the estimate is **≤ ~$69, expected ~$60**. A session ceiling of **$70** is written before the first run; past it, stop and report.
+**Remaining gap, named:** the budget holds **one** pooled drop. A second drop, or a smoke escalation (a fail on a smoke case's single head run where its record was green), does not fit under $70. Either one stops at the hard stop and goes to the owner with its numbers. 0.4.0 needed two drops pooled, one of them to 18 runs.
 
-**Deduplication.** As written, the two plans' separate estimates were 94 (EV, without Q1) + 138 (W) = 232 runs (~$60). Re-counted on today's measured routing, W alone becomes 174 (15 routed cases, not 9), and 204 once the 5 debug and report cases it left out are added; the two plans separately would then cost 298. Combined, this plan saves one calibration run, EV's 24 test-routed regression runs (inside I-9's 120), EV's separate pooling budget, and most of W's single-run whole-suite pass (41 → 15, since the cases already at 3 runs and the new cases are not run again).
+**Smoke baselines (I2): 0.4.0's recorded head verdicts.** The files are in 0.4.0's run folder, kept outside the repo. Each `aggregate-result.json` carries no commit sha, so the commit is read from its `startedAt` against the 0.4.0 CHANGELOG's run record ("after fix round A (969d99b)"). The rerunA files started 26 Nov 00:01-00:26 UTC; the "head-" files started 25 Nov 22:44-23:09 UTC, before fix round A. A record counts only if what the case loads and is graded by is the same at that commit and at `87016f8`. I-0 copies the three records it uses into this release's run folder and opens each one; if one is missing, that case gets 3 base runs, which do not fit and are named as a gap.
+
+| Smoke case | Recorded head verdict (file, commit) | Valid on `87016f8`? | Base runs |
+|---|---|---|---|
+| `rc-02-decision-record` | `rerunA-head-rc-02-decision-record/aggregate-result.json`, 969d99b: c1 3/3, c2 2/3 | yes: since 969d99b the reference changed in two places (a requested line also names its command; RC-5's working-run line), and `grep -i -E 'command\|working run\|requested'` finds neither in this case's graders | 0 |
+| `rc-03-full-input` | `rerunA-head-rc-03-full-input/…`, 969d99b: c1 3/3, c2 0/3 (known red), c3 2/3 | yes, same reason | 0 |
+| `rc-near-miss-rename` | `rerunA-head-rc-near-miss-rename/…`, 969d99b: c1 3/3, c2 3/3 | yes, same reason | 0 |
+| `rc-04-objection` | `rerunA-head-rc-04-objection/…`, 969d99b: c1 1/3, c2 3/3 | no: the RC-5 alignment (98fcc60) changes what counts as asking for a working run, which is rc-04's known-red gap | 3 |
+| `rc-05-diff` | `rerunA-head-rc-05-diff/…`, 969d99b: c1 3/3, c2 3/3, c3 0/3 | no: its c2 grader and RC-5 changed after | 3 |
+| `fix-loop-bounded` | `rerunA-head-fix-loop-bounded/…`, 969d99b: c1 1/3, c2 0/3, c3 2/3 | no: `review-loop.md` changed after | 3 |
+| `intent-over-literal` | `head-t10x-intent-over-literal/…`, before fix round A: c3 1/3 | no: the hook, `docs-and-decisions.md`, `review-loop.md` and `root-cause-investigation.md` changed since | 3 |
+| `prototype-no-ceremony` | `head-prototype-no-ceremony/…`, before fix round A: 3/3 | no, same reason | 3 |
+| `zero-must-be-proven` | `head-zero-must-be-proven/…`, before fix round A: 3/3 | no, same reason | 3 |
+
+**Deduplication.** As written, the two plans' separate estimates were 94 (EV, without Q1) + 138 (W) = 232 runs (~$60). Re-counted on today's measured routing, W alone becomes 174 (15 routed cases, not 9), and 204 once the 5 debug and report cases it left out are added; the two plans separately would then cost 298. Combined, this plan saves one calibration run, EV's 24 test-routed regression runs (inside I-9's paired set), EV's separate pooling budget, and most of W's single-run whole-suite pass (41 → 9, since the cases already at 3 runs and the new cases are not run again).
 
 **0.4.0 lessons that bind every run:**
 - `rc-03-full-input` runs only with `--scaffold` (its `case.yaml` copies `resources/`). Read one kept trace to confirm the files arrived. A run with "No files found" is invalid, not a fail.
 - `-j 1`. In-flight runs passed a cap under `-j 3`.
-- Caps are written before each run, from each case's own measured cost. Never add the judge cost to `costUsd` a second time.
+- Caps are written before each run (the rule above). Never add the judge cost to `costUsd` a second time.
 - Read the failing answers, and a sample of passing ones, **before** narrowing a criterion or calling a drop. Label each one: rule absent, judge error, or prompt/grader fault.
 - **Fisher exact** (two-sided) on pooled runs whenever a drop appears; state the p value.
-- **Contamination, 5-word check:** after I-3, I-4, I-5, I-6 and again in I-10, the count of 5-word sequences shared between the instructions and all case prompts (frontmatter stripped) must stay at the measured **1**, plus 0 hits from both plans' distinctive-string greps (`--regexp=` form, wrapped lines joined). Grader overlaps are listed, not gated.
+- **Contamination, 5-word check:** after I-3, I-4, I-5, I-6 and again in I-10, the count of 5-word sequences shared between the instructions and all case prompts (frontmatter stripped) must stay at the measured **1**, plus 0 new hits from both plans' distinctive-string greps (baseline: `pytest` ×2) (`--regexp=` form, wrapped lines joined). Grader overlaps are listed, not gated.
 - Runs that end on a usage or rate limit score 0 with no grader results. They are re-run, never counted as fails.
 
 ## 7. Model routing per task
@@ -147,12 +189,12 @@ At ~$0.26 a run (0.4.0's measured figure: $20.76 for 84 runs is $0.25), the esti
 | I-4 A's text | Sonnet (the text is literal in W T4) | Fable 5.2 |
 | I-5 B's text | Opus (every behaviour line is checked against the re-read pages) | Fable 5.2 (pastes each snippet into a scratch `.claude/settings.json`) |
 | I-6 controller pointers | Sonnet (two literal edits) | Fable 5.2 |
-| I-7 coverage, changelog, version, use cases | Sonnet (rows and text literal in EV T6, W T6 and section 8) | Fable 5.2 |
+| I-7 coverage, changelog, version, use cases | Opus (EV T6's rows and paragraphs are not literal); Sonnet may transcribe only W T6's literal rows and section 8 | Fable 5.2 |
 | I-8, I-9 runs | Opus (controller) | — |
 | I-10 results | Opus (the results need reading) | Fable 5.2 |
 | I-11 whole branch | — | Fable 5.2, fresh, blind brief, executes probes |
 
-The eval judge is Sonnet. That differs from the Opus agent under test, the Opus implementers and the Fable reviewers. Every agent reports the model id it ran as. Each builder is capped at 60 tool calls per task; an agent past its cap is told to stop and report. Review rounds follow `review-loop.md` (five-round cap, re-reviews cover the delta only).
+Sonnet transcribes Opus-authored literal text only; anything it would have to word itself goes to Opus. The eval judge is Sonnet. That differs from the Opus agent under test, the Opus implementers and the Fable reviewers. Every agent reports the model id it ran as. Each builder is capped at 60 tool calls per task; an agent past its cap is told to stop and report. Review rounds follow `review-loop.md` (five-round cap, re-reviews cover the delta only).
 
 ## 8. README "Use cases" entries (I-7, `plugins/engineering-method/README.md`)
 
@@ -200,6 +242,5 @@ A fresh Fable 5.2 agent in its own worktree of `87016f8` gets this file, the two
 
 ## Open questions (for the owner, each with a recommendation)
 
-- **Q-1. EV's R5 against the 26 Nov ruling.** R5's first bullet says a judged score "does not block" a release. The 0.4.0 ruling splits evals: capability evals report, regression evals hold. Principle 18 (unchanged, since there is no Q1 yes) says an unexplained difference stops the release. *Recommendation:* in I-3, word R5's first bullet as that split (new-rule cases report; existing cases hold, and an unexplained drop goes to the owner). That writes down a ruling already made, removes the SKILL.md-versus-reference disagreement EV's Q1 warned about, and makes Q1 unnecessary. It edits reviewed text, so it needs the owner's yes; without one, EV's text ships as reviewed and the disagreement is stated in the CHANGELOG.
-- **Q-2. Regression depth.** *Recommendation:* section 6 (20 routed cases paired at 3 runs, 15 others at 1 run against 0.4.0's record; ≤ 265 runs, ~$60-69). Alternative: all 35 paired at 3 runs (210 regression runs instead of 135, ≤ 340 in total, ~$88).
-- **Q-3. The go for the runs:** the owner's yes on the billing line above, before I-2's calibration run.
+- **Q-2. Regression depth beyond the $70 stop.** *Recommendation:* section 6 as planned (26 paired cases, 9 smoke, one pooled drop). A second drop, or a smoke escalation, is the named gap: it stops at $70 and comes to the owner with its numbers. Pairing all 35 cases at 3 runs would mean about 295 runs (~$77), over the stop.
+- Q-1 (R5) is settled by the owner's ruling (section 2), and Q-3 (the go for the runs) by the 26 Nov approval (section 6).
