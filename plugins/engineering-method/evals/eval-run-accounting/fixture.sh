@@ -3,4 +3,4 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cp -R "$here/resources/eval-out" eval-out
-ls -R eval-out | head -20
+ls -R eval-out

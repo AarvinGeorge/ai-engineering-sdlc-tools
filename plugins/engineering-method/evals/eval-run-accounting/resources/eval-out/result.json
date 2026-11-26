@@ -15,7 +15,7 @@
       "score": 0,
       "passed": false,
       "turns": 4,
-      "costUsd": 0.15,
+      "costUsd": 0.26,
       "error": null,
       "tracePath": "traces/parse-invoices-1.jsonl",
       "graders": [
@@ -33,7 +33,7 @@
       "score": 0,
       "passed": false,
       "turns": 4,
-      "costUsd": 0.15,
+      "costUsd": 0.26,
       "error": null,
       "tracePath": "traces/parse-invoices-2.jsonl",
       "graders": [

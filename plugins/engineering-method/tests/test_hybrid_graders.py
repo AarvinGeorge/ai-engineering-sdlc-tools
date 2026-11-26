@@ -37,6 +37,9 @@ PROPOSAL = json.dumps({"permissions": {
     "allow": ["Bash(kubectl get *)", "Bash(kubectl describe *)"],
     "ask": ["Bash(./ops/release.sh *)"],
     "deny": ["Bash(kubectl delete *)", "Bash(dropdb *)"]}})
+SCRIPT_OF = {"eval-pass-k-floor": "eval_stats.py", "eval-judge-independent-calibrated": "eval_stats.py",
+             "eval-run-accounting": "eval_stats.py", "verified-matches-plan": "plan_conformance.py",
+             "permission-profile-live": "permissions_check.py"}
 NEW_CODE_GRADER = re.compile(r"^c\d[a-z]-.*\.md$")
 SHARED_SUBSET_BANNED = re.compile(r"\(\?<[=!]|\(\?[imsx]|\(\?P?<\w")
 
@@ -86,6 +89,46 @@ def search(g, text):
     Use when: every proof. Inputs: grader dict, text. Output: match object or None.
     Side effects: none. Role: plumbing."""
     return re.search(g["pattern"], text, re.I if g["flags"] == "i" else 0)
+
+
+def compact(obj):
+    """What: one trace line in the kept-trace encoding (compact JSON, one message per line).
+    Use when: building trace text for the trace graders. Inputs: a message dict.
+    Output: str. Side effects: none. Role: plumbing."""
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+
+def bash_result(out):
+    """What: a trace line for a Bash tool result whose stdout is `out` (one stderr line first,
+    as /usr/bin/python3 prints in the sandbox). Use when: the "tool ran" positive case.
+    Inputs: script stdout. Output: trace line. Side effects: none. Role: plumbing."""
+    return compact({"type": "user", "message": {"role": "user", "content": [
+        {"tool_use_id": "t1", "type": "tool_result", "content": "stderr note\n" + out}]}})
+
+
+def read_result(path):
+    """What: a trace line for a Read tool result of `path` (each line numbered, then a tab).
+    Use when: must-miss case, the agent read the script source instead of running it.
+    Inputs: file path. Output: trace line. Side effects: reads the file. Role: plumbing."""
+    src = open(path, encoding="utf-8").read()
+    body = "\n".join("%d\t%s" % (i + 1, line) for i, line in enumerate(src.split("\n")))
+    return compact({"type": "user", "message": {"role": "user", "content": [
+        {"tool_use_id": "t2", "type": "tool_result", "content": body}]}})
+
+
+def final_text(out):
+    """What: a trace line for an assistant text message holding the block (typed, not run).
+    Use when: must-miss case for the trace graders. Inputs: block text. Output: trace line.
+    Side effects: none. Role: plumbing."""
+    return compact({"type": "assistant", "message": {"role": "assistant", "content": [
+        {"type": "text", "text": "Here is the block:\n\n```\n" + out + "```"}]}})
+
+
+def bold_keys(text):
+    """What: every line's KEY: in Markdown bold ("RULE: x" -> "**RULE:** x").
+    Use when: checking a \\W{0,4} pattern survives a bolded paste. Inputs: text. Output: text.
+    Side effects: none. Role: plumbing."""
+    return re.sub(r"(?m)^([A-Z][A-Z0-9_]*):", r"**\1:**", text)
 
 
 def bolded(line):
@@ -142,8 +185,15 @@ class Graders(unittest.TestCase):
                 self.assertEqual(g["type"], "regex", (case, name))
                 self.assertIsNone(SHARED_SUBSET_BANNED.search(g["pattern"]), (case, name))
                 for out in outs:
-                    # A trace carries the tool result JSON-encoded; last_message carries it pasted.
-                    seen = json.dumps(out) if g["target"] == "trace" else out
+                    if g["target"] == "trace":
+                        self.assertIsNotNone(search(g, bash_result(out)), (case, name, "ran"))
+                        self.assertIsNone(search(g, final_text(out)), (case, name, "typed only"))
+                        self.assertIsNone(search(g, read_result(os.path.join(SCRIPTS, SCRIPT_OF[case]))),
+                                          (case, name, "read source"))
+                        self.assertIsNone(search(g, compact({"type": "user", "message": {"content": [
+                            {"type": "tool_result", "content": prose}]}})), (case, name, "prose"))
+                        continue
+                    seen = out
                     if g["match"] == "not_contains":
                         self.assertIsNone(search(g, seen), (case, name))
                         ok = seen.replace("VERIFIED: withheld", "VERIFIED: ok")
@@ -155,6 +205,7 @@ class Graders(unittest.TestCase):
                     self.assertIsNone(search(g, prose), (case, name))
                     if r"\W{0,4}" in g["pattern"]:
                         self.assertIsNotNone(search(g, bolded(m.group(0))), (case, name))
+                        self.assertIsNotNone(search(g, bold_keys(out)), (case, name, "bold keys"))
                 checked += 1
         self.assertEqual(checked, 15)  # 3 + 3 + 4 + 3 + 2 new regex graders: proves the loop ran
 
@@ -176,6 +227,37 @@ class Graders(unittest.TestCase):
                      "--command", "kubectl delete pod x", cwd=draft)
         self.assertIn("PERMISSIONS_CHECK v1", out)
         self.assertIsNone(search(g, out))  # the user's draft does not deny kubectl delete
+        self.assertIsNone(search(g, bold_keys(out)))
+
+    def test_content_graders_tolerate_bold_keys(self):
+        for case, outs in self.outputs().items():
+            for name, g in new_code_graders(case):
+                if g["target"] == "trace" or g["match"] == "not_contains" or ":" not in g["pattern"]:
+                    continue
+                self.assertIn(r"\W{0,4}", g["pattern"], (case, name))
+                self.assertIsNotNone(search(g, bold_keys(outs[0])), (case, name))
+
+    def test_permission_c1b_sound_deny_spellings(self):
+        g = grader("permission-profile-live", "c1b-delete-deny-holds-across-files.md")
+        for rule, cmd in (("Bash(kubectl delete *)", "kubectl delete pod x"),
+                          ("Bash(kubectl delete*)", "kubectl delete pod x"),
+                          ("Bash(kubectl delete:*)", "kubectl delete pod x"),
+                          ("Bash(kubectl * delete *)", "kubectl -n prod delete pod x")):
+            prof = json.dumps({"permissions": {"allow": ["Bash(kubectl get *)"], "deny": [rule]}})
+            out = script("permissions_check.py", "--inline", "project=" + prof, "--command", cmd)
+            self.assertIn("DECISION: deny", out, rule)
+            self.assertIsNotNone(search(g, out), rule)
+            self.assertIsNotNone(search(g, bold_keys(out)), (rule, "bold"))
+        # must miss: a deny that is not on kubectl delete, and a LOOSENED line that is not "no"
+        self.assertIsNone(search(g, "RULE: Bash(kubectl deletex *) [deny] in project\nLOOSENED_BY_OTHER_FILE: no"))
+        self.assertIsNone(search(g, "RULE: Bash(kubectl delete *) [deny] in project\nLOOSENED_BY_OTHER_FILE: nope"))
+        self.assertIsNone(search(g, "RULE: Bash(kubectl delete *) [deny] in project\nLOOSENED_BY_OTHER_FILE: n/a"))
+
+    def test_result_json_costs_add_up(self):
+        res = json.load(open(os.path.join(EVALS, "eval-run-accounting", "resources", "eval-out", "result.json")))
+        runs = [r for c in res["cases"] for r in c["arms"]["with"]]
+        self.assertEqual(len(runs), 36)
+        self.assertAlmostEqual(sum(r["costUsd"] for r in runs), res["costUsd"], places=6)
 
     def test_no_new_tool_used_graders(self):
         for case in CASES:
