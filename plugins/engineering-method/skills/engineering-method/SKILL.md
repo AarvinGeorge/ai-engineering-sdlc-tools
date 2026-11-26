@@ -164,8 +164,8 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 `references/`: `review-loop.md` (reviewer, probes, fix rounds, briefs, autonomy),
 `model-routing-and-cost.md` (models, capacity, cheap ticks), `measurement-and-state-claims.md` (exit
 codes, skips, counts, negatives, state words), `progress-ladder.md` (ladder, release tree, grid,
-updates, checklists), `parallel-and-worktrees.md` (fan-out, who writes where, lanes),
+updates, checklists), `parallel-and-worktrees.md` (fan-out, writers, lanes),
 `live-system-changes.md` (deploy standard and file, proving a release, pre-launch, pushing),
-`docs-and-decisions.md` (docs, headers and their check, decision log, the record, names),
+`docs-and-decisions.md` (docs, headers, decision log, the record, names),
 `behaviour-evals.md` (evals as a dataset, cost cap, contamination, baselines),
-`root-cause-investigation.md` (RC-1 to RC-10).
+`root-cause-investigation.md` (RC-1 to RC-10), `permission-profiles.md` (settings per tier).
