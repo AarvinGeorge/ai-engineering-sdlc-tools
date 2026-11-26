@@ -52,6 +52,11 @@ def stage_rows(body):
 
 
 class SkillBudget(unittest.TestCase):
+    def test_test_cell_routes_to_the_conformance_script(self):
+        _, body = split_skill()
+        row = [r for r in stage_rows(body) if r[0] == "test"][0]
+        self.assertIn("scripts/plan_conformance.py", row[-1])
+
     def test_body_word_budget(self):
         _, body = split_skill()
         words = len(body.split())

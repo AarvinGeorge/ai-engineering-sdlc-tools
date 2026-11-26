@@ -153,7 +153,7 @@ fire, do it anyway. A stage needs no trigger word: handing finished work to user
 | debug | `superpowers:systematic-debugging` | root-cause-investigation.md, measurement-and-state-claims.md | steps RC-1 to RC-10 by name; decided, told and judged kept apart |
 | build | `superpowers:test-driven-development` | model-routing-and-cost.md, parallel-and-worktrees.md | principle 9; tier b/c: headers on touched code, with their check (docs-and-decisions.md); the full suite once before reporting; a held release first |
 | review | `superpowers:requesting-code-review` | review-loop.md | a different model that runs probes; usage read before launching; re-reviews cover the delta; nothing competes with a held release |
-| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts entry by entry; diff vs plan steps, out-of-scope; evals: cost cap, layered, isolated, fail-closed sends |
+| test | `superpowers:verification-before-completion` | measurement-and-state-claims.md, behaviour-evals.md | principles 1, 2, 4; counts entry by entry; plan: run scripts/plan_conformance.py; owner rules mismatches; evals: cost cap, layered, isolated, fail-closed sends |
 | deploy | (none) | live-system-changes.md | principle 13; what the diff does not show, handled first; pre-launch instances get no test traffic; helper faults split read-only from state-changing |
 | merge | `superpowers:finishing-a-development-branch` | live-system-changes.md | the push guard covers every party's identifiers and every git dir pushed from |
 | release | (none) | live-system-changes.md, progress-ladder.md | a summary is not proof: full suite on the current head and a different-model review, then the deploy row |
