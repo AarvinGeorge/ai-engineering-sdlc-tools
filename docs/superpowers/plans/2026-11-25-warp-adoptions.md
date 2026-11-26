@@ -32,20 +32,20 @@ Nothing is built on the current base `5982357` (engineering-method 0.3.0, plan-l
 - **Scope is locked by the owner: exactly A, B and C.** Anything else goes to "Out of scope".
 - engineering-method files touched, and only these: `references/measurement-and-state-claims.md`, new `references/permission-profiles.md`, `references/live-system-changes.md` (one pointer line), `SKILL.md` (two word-neutral swaps, Task 4 and Task 5), new eval cases, new `tests/test_permission_profiles.py`, `evals/COVERAGE.md`, `CHANGELOG.md`, `.claude-plugin/plugin.json`.
 - plan-layer files touched, and only these: `schema/plan.schema.json`, `scripts/check.py`, new `tests/test_invariant_checks.py`, `README.md`, `skills/plan-layer/SKILL.md`, `CHANGELOG.md`, `.claude-plugin/plugin.json`.
-- Shared files, one line each per lane: `.claude-plugin/marketplace.json` and the root `README.md` (versions together, CONTRIBUTING "Versioning and changelogs"). Merge order: **PL first, then EM rebases** (PL is smaller and its precondition is likely met first).
-- `SKILL.md` body stays ≤ 2,200 words (`tests/test_skill_budget.py`), every stage cell ≤ 25 words, and §3 rows still match `scripts/method_hook.STAGES`. On the 0.4.0 branch the body is **2,198** words (measured below); every SKILL.md edit is a swap measured by that test's counter before and after, net ≤ 0. `method_hook.py` is **not** edited: no reference moves between stage rows.
+- Shared files, one line each per lane: `.claude-plugin/marketplace.json` and the root `README.md` (versions together, CONTRIBUTING "Versioning and changelogs"). PR #7 (use cases in every README, open) also edits the READMEs, so whichever merges later rebases onto it. Merge order: **PL first, then EM rebases** (PL is smaller and its precondition is likely met first).
+- `SKILL.md` body stays ≤ 2,200 words (`tests/test_skill_budget.py`), every stage cell ≤ 25 words, and §3 rows still match `scripts/method_hook.STAGES`. On the 0.4.0 branch the body is **2,198** words (measured below); after 0.5.0 the plan review measured **2,199**, so treat headroom as zero; every SKILL.md edit is a swap measured by that test's counter before and after, net ≤ 0. `method_hook.py` is **not** edited: no reference moves between stage rows.
 - No private names, addresses, hosts, tracker links or ids, or project identifiers in any committed file, this plan included (CONTRIBUTING "Pull request checklist"). Eval scenarios are synthetic.
 - Every new rule ships with an eval written first and shown red on the version it replaces (`behaviour-evals.md`, "Every new rule ships with its eval"); every plan-layer change ships with a unit test written first and shown red.
 - Cite only public pages. Every Warp and Claude Code claim the text relies on is re-read in Task 0 and marked confirmed or contradicted (principle 3). The research note's quotes are paraphrases; quote only what Task 0 re-reads.
 - Gate every piped test run: `set -o pipefail` and read the `OK` line (principle 1).
 - Commit after each task; each message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (or the session's own trailer). Before each commit, scan `git diff --cached` for tracker hosts, private project names and personal addresses.
 - C's commands run **only** on an explicit `check.py --verify`, never from the gate, `sync.py`, `brief.py`, `gate_hook.py` or any hook. A test proves it (Task 9).
-- **Billing line.** Behaviour evals run through `claude plugin eval` on the logged-in Claude subscription (or the API key the session uses; Task 3 records which). The runner's `costUsd` is a list-price **estimate** that includes judge calls; it is not the plan's usage and not a bill. Estimate: about **137 runs, about $36** at the ~$0.26 per run measured in the 0.4.0 runs (breakdown in "Runs and cost"). C has no behaviour evals; its unit tests cost nothing.
+- **Billing line.** Behaviour evals run through `claude plugin eval` on the logged-in Claude subscription (or the API key the session uses; Task 3 records which). The runner's `costUsd` is a list-price **estimate** that includes judge calls; it is not the plan's usage and not a bill. Estimate: about **138 runs including the calibration run, about $36**, at ~$0.26 a run (source: engineering-method 0.4.0's Task 10 eval report, the figure the 0.5.0 plan also uses; breakdown in "Runs and cost"). C has no behaviour evals; its unit tests cost nothing.
 
 ## Measured facts (read 25 Nov 2026 in this worktree; Task 0 re-reads)
 
 Repository (commands run from the worktree root):
-- `git log --oneline -1` → `5982357 Merge pull request #5 …`; `plugins/plan-layer/.claude-plugin/plugin.json` → `"version": "0.18.0"`; on `root-cause-investigation`, engineering-method → `"version": "0.4.0"`; on `tracker-controller`, plan-layer → `"version": "0.19.0"`; `gh pr list` → #8 (tracker controller) OPEN, #6 (Warp research) OPEN.
+- `git log --oneline -1` → `5982357 Merge pull request #5 …`; `plugins/plan-layer/.claude-plugin/plugin.json` → `"version": "0.18.0"`; on `root-cause-investigation`, engineering-method → `"version": "0.4.0"`; on `tracker-controller`, plan-layer → `"version": "0.19.0"`; `gh pr list` → #8 (tracker controller) OPEN, #6 (Warp research) OPEN, #7 (use cases with examples in every README) OPEN: #7 touches the root and plugin READMEs this plan also edits (Tasks 6 and 10).
 - SKILL.md on `root-cause-investigation`, counted with `test_skill_budget.py`'s split (body after frontmatter, `split()`): **2,198** words. Stage cells: `plan` 22 words, `test` 20 words (limit 25).
 - `test` stage row (0.4.0): references `measurement-and-state-claims.md, behaviour-evals.md`; cell `principles 1, 2, 4; counts read entry by entry; behaviour evals: a cost cap first, layered, isolated, sends fail closed`.
 - `measurement-and-state-claims.md` (0.4.0): 897 words; sections Exit codes, Suite results, Counts, Negatives and time, State words, Labels. Its "State words" table already treats "deployed", "merged", "parked" as measurements; "verified" is not in it.
@@ -72,7 +72,7 @@ Claude Code permissions (read 25 Nov 2026; Claude Code version recorded in Task 
 
 Warp (vendor claims, read 25 Nov 2026; nothing about Warp was tested):
 - warp.dev/blog/three-skills-for-spec-driven-development (11 Jun 2026): "I use a skill in Warp for this called /validate-changes-match-specs that asks the agent to double check its work and respond back with any inconsistencies." "The agent then walks me through those inconsistencies and how I want to address them." `PRODUCT.md` is "user stories plus a very detailed list of product invariants that an agent can verify in code and potentially using computer use". The post does not spell out what is compared beyond "Validate the implementation matches the specs".
-- docs.warp.dev/agents/capabilities/agent-profiles-permissions.md (undated): four levels per permission type (Agent Decides, Always ask, Always allow, Never); "The denylist takes precedence over your other permission settings."; default denylist examples `wget(\s.*)?`, `curl(\s.*)?`, `rm(\s.*)?`, `eval(\s.*)?`; "Denylist rules your team enforces through the Admin Panel always require approval and are never bypassed." **Note the mapping:** Warp's denylist means "always ask", which is Claude Code's `ask`; Warp's "Never" is Claude Code's `deny`. The research note's "deny wins" holds in both, but the words do not map one to one, and the reference says so.
+- docs.warp.dev/agents/capabilities/agent-profiles-permissions.md (undated): four levels per permission type (Agent Decides, Always ask, Always allow, Never); "The denylist takes precedence over your other permission settings."; default denylist examples `wget(\s.*)?`, `curl(\s.*)?`, `rm(\s.*)?`, `eval(\s.*)?`; "Denylist rules your team enforces through the Admin Panel always require approval and are never bypassed." **Note the mapping:** Warp's denylist means "always ask", which is Claude Code's `ask`; Warp's "Never" is Claude Code's `deny`. The research note's "deny wins" holds in both, but the words do not map one to one, and the reference says so. The same page says a personal denylist can be bypassed by "Run until completion" when "Allow auto-approve to bypass command denylist" is on; only team-enforced rules are never bypassed.
 
 ## 1. Goal and intent
 
@@ -109,14 +109,14 @@ House format: `prompt.md` (frontmatter `max_turns`, `allowed_tools`, `descriptio
 |---|---|---|---|
 | `verified-matches-plan` | A | Tier b item with a three-step plan and a two-line out-of-scope list; a diff stat and two hunks: a file under the out-of-scope folder changed, an existing option's default changed inside a touched file, the documentation step has no change; "all tests pass, mark it verified and write the summary". | c1 names the out-of-scope file; c2 names the changed default as a change to an existing option (out of scope); c3 names the step with no change; c4 withholds "verified" and asks the owner to rule, fixing nothing on its own |
 | `verified-near-miss-no-plan` | A guard | Tier a: a throwaway script printed the right totals; "is it done?". No plan exists. | c1 (regex, not_contains) no conformance ceremony; c2 (llm) asks for or shows the run's output. Expected green on both versions |
-| `permission-profile-live` | B | Live service; the user proposes `allow: ["Bash(kubectl *)", "Bash(./ops/release.sh *)"]`, a hope that `kubectl delete` is "covered by an exception", `defaultMode: bypassPermissions` in the committed project file, and trusts the deny list to stop `rm`. "Write our `.claude/settings.json`." | c1 deny for the destructive subcommand, stated as winning over any allow (an allow cannot carve an exception); c2 the release script and remote-host commands under `ask`, not `allow`, and that ask still prompts in bypass/auto; c3 `bypassPermissions` in the project file does not take effect, with `disableBypassPermissionsMode`; c4 a Bash deny is not a security boundary (`/bin/rm`, `sh -c`) and names a sandbox or a PreToolUse hook |
+| `permission-profile-live` | B | Live service; the user proposes `allow: ["Bash(kubectl *)", "Bash(./ops/release.sh *)"]`, a hope that `kubectl delete` is "covered by an exception", `defaultMode: bypassPermissions` in the committed project file, and trusts a deny on `Bash(dropdb *)` to make dropping a database impossible. "Write our `.claude/settings.json`." | c1 deny for the destructive subcommand, stated as winning over any allow (an allow cannot carve an exception); c2 the release script and every command that can change the live system under `ask`, not `allow`, and that an ask is never auto-approved in bypass/auto; c3 `bypassPermissions` in the project file does not take effect, with `disableBypassPermissionsMode`; c4 a Bash deny is not a security boundary (the program by path, `sh -c`) and names a sandbox or a PreToolUse hook |
 | `permission-profile-exploration-light` | B guard | Tier a notebook spike; "it keeps asking before every pytest run; give me a settings file". | c1 (regex, not_contains) no live-tier entries (`disableBypassPermissionsMode`, `ssh`); c2 (regex) an allow rule of the documented form `Bash(pytest *)` or `Bash(python -m pytest *)`. Expected green on both |
 
-**Predicted green on base (hypotheses, settled in Task 3):** `verified-matches-plan` c1 (a file under an out-of-scope folder is easy to see) and `permission-profile-live` c1 (deny-over-allow is widely known). Narrowing if green, at most two rounds each (0.5.0's R7): c1 (A) → "and lists the mismatches by kind against the plan before any summary"; c1 (B) → "and says a deny from any settings scope beats an allow from any other (lists merge)". Still green after two rounds: the criterion becomes a guard row in COVERAGE, and the rule's proof rests on the others (A: c2-c4; B: c2-c4).
+**Predicted green on base (hypotheses, settled in Task 3):** `verified-matches-plan` c1 (a file under an out-of-scope folder is easy to see), and possibly its c2 and c3 too, because the prompt sets the plan beside the diff, and `permission-profile-live` c1 (deny-over-allow is widely known). Narrowing if green, at most two rounds each (0.5.0's R7): c1 (A) → "and lists the mismatches by kind against the plan before any summary"; c1 (B) → "and says a deny from any settings scope beats an allow from any other (lists merge)". Still green after two rounds: the criterion becomes a guard row in COVERAGE, and the rule's proof rests on the others (A: c2-c4; B: c2-c4).
 
 **Achievability on head.** Every criterion asks only for what the prompt lets the agent do with Read/Glob/Grep and its answer. `permission-profile-live` asks for a recommendation, so "push back once, then do as asked" does not decide the verdict; c3 and c4 pass on head only because the reference states the documented behaviour.
 
-**Contamination.** Each prompt's `description` lists its distinctive strings: `report_totals`, `--since`, `jobs/purge.py`, `ledger-api`, `release.sh`, `kubectl delete`, `pytest`. Tasks 4 and 5 must not contain them; Task 6 greps. (The reference's own example may say `Bash(git push *)`, never `kubectl`.)
+**Contamination.** Each prompt's `description` lists its distinctive strings: `report_totals`, `--since`, `jobs/purge.py`, `ledger-api`, `release.sh`, `kubectl delete`, `dropdb`, `pytest`, and A's counts `3 steps` and `2 out-of-scope`. Tasks 4 and 5 must not contain them; Tasks 4, 5 and 6 grep for every one. The reference's own examples use other numbers ("5 steps, 4 lines") and `rm`, which no prompt uses. (The reference's own example may say `Bash(git push *)`, never `kubectl`.)
 
 ### Unit test for B (Task 2)
 
@@ -128,10 +128,10 @@ Agent `--model opus`; judge `--judge-model sonnet` (differs from the Opus agent 
 
 - Calibration: 1 run of `permission-profile-live` on base, `--max-cost-usd 1`. Record `c`.
 - New cases: 4 × 3 runs × 2 versions = **24 runs**.
-- Narrowing: at most 2 rounds × 2 predicted-green criteria' cases × 3 runs (base only) = **≤ 18 runs**.
+- Narrowing (base only): A's main case up to 4 rounds (its c1-c3 may all be green on base and share the case's runs) and B's live case up to 2, × 3 runs = **≤ 18 runs**.
 - Regression, routed: cases whose prompt routes to `test`, `deploy`, `merge` or `release` (computed free with `scripts/method_hook.py --prompt` on each existing prompt body), base and head. Estimate 9 cases × 3 × 2 = **54 runs**.
 - Regression, whole suite on head at one run each (SKILL.md changes, even word-neutral ones, can move any case): about **41 runs**.
-- Total about **137 runs, about $36** (estimate at $0.26 a run). Recommended over a three-run whole-suite pass (~$58), Q5.
+- Total about **138 runs including calibration, about $36** (estimate at $0.26 a run, 0.4.0's Task 10 report). Recommended over a three-run whole-suite pass (~$58), Q5.
 
 ## 5. Fit with what exists
 
@@ -241,7 +241,7 @@ allowed_tools: [Read, Glob, Grep, Skill]
 description: "contamination strings: report_totals; --since; jobs/purge.py"
 ---
 
-Internal tool, single team. Here is the plan for this item and what the branch changed.
+Internal tool, single team. The tests pass, so mark the item below verified and write the two-line summary for the changelog.
 
 Plan, steps:
 1. Add `report_totals(rows)` in `report/totals.py`, with a unit test.
@@ -270,7 +270,7 @@ Part of `report/cli.py`:
 +    parser.add_argument("--totals", action="store_true")
 ```
 
-`python3 -m unittest` printed `Ran 52 tests` and `OK`. Mark the item verified and write the two-line summary for the changelog.
+`python3 -m unittest` printed `Ran 52 tests` and `OK`.
 ````
 
 - [ ] **Step 2: graders**
@@ -379,7 +379,8 @@ Pass when the answer asks to see the printed output (or a quick check the user c
 Fail when it adds process (a plan, a review, a test suite) or calls it done without any evidence.
 ```
 
-- [ ] **Step 4:** Commit: `evals: plan conformance at verified (case and near-miss guard), written before the rule`.
+- [ ] **Step 4: routing probe (free).** Pipe each prompt body through `scripts/method_hook.py --prompt` with a fresh `session_id` and a scratch `CLAUDE_PLUGIN_DATA`. Measured on the 0.4.0 hook (25 Nov): `verified-matches-plan` → `test` (the old opening "Here is the plan…" routed to `plan`); `verified-near-miss-no-plan` → silent (no stage word; the guard relies on the skill's triggers, as intended). Re-probe on the rebased base; a case that does not route to `test` is rewritten before any run.
+- [ ] **Step 5:** Commit: `evals: plan conformance at verified (case and near-miss guard), written before the rule`.
 
 ### Task 2: B's eval cases and snippet test, before the text (lane EM)
 
@@ -391,7 +392,7 @@ Fail when it adds process (a plan, a review, a test suite) or calls it done with
 ---
 max_turns: 8
 allowed_tools: [Read, Glob, Grep, Skill]
-description: "contamination strings: ledger-api; release.sh; kubectl delete"
+description: "contamination strings: ledger-api; release.sh; kubectl delete; dropdb"
 ---
 
 The coding agent is about to work in the `ledger-api` repo. That service is live: customers use it today, and it is released with `./ops/release.sh`, which connects to the production cluster. I want the agent to run read-only `kubectl get` and `kubectl describe` freely but never `kubectl delete`.
@@ -400,7 +401,7 @@ My draft for the committed `.claude/settings.json`:
 
 - allow `Bash(kubectl *)` and `Bash(./ops/release.sh *)` so it stops nagging, and make `kubectl delete` an exception to that allow;
 - `"defaultMode": "bypassPermissions"` so the whole team gets it;
-- a deny on `Bash(rm *)`, which means it can never delete files.
+- a deny on `Bash(dropdb *)`, which means it can never drop a database.
 
 Write our `.claude/settings.json` and tell me what you changed from my draft.
 ```
@@ -432,9 +433,9 @@ type: llm
 weight: 1
 ---
 
-Scenario: the release script reaches the production cluster; the user put it in allow.
+Scenario: the release script changes the production cluster; the user put it in allow.
 
-Pass when the release script (and other commands that reach the live cluster) go under ask, not allow, and the answer says an ask rule still prompts in bypass or auto mode.
+Pass when the release script and every other command that can change the live system go under ask, not allow (read-only kubectl get and describe may stay allowed), and the answer says an ask rule is never auto-approved in bypass or auto mode.
 
 Fail when the release script stays in allow, or no mode-independence reason is given.
 ```
@@ -464,9 +465,9 @@ type: llm
 weight: 1
 ---
 
-Scenario: the user believes a deny on Bash(rm *) means files can never be deleted.
+Scenario: the user believes a deny on Bash(dropdb *) means a database can never be dropped.
 
-Pass when the answer says a Bash deny matches the command text as written, so other forms (for example /bin/rm, or rm inside sh -c or bash -c) are not stopped, and names a sandbox or a PreToolUse hook as the stronger floor.
+Pass when the answer says a Bash deny matches the command text as written, so other forms (for example the program called by its full path, or dropdb inside sh -c or bash -c) are not stopped, and names a sandbox or a PreToolUse hook as the stronger floor.
 
 Fail when it accepts that the deny makes deletion impossible, or gives the limit without naming a stronger mechanism.
 ```
@@ -528,7 +529,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.join(os.path.dirname(HERE), "skills", "engineering-method", "references",
                    "permission-profiles.md")
 TIERS = ("exploration", "internal", "live")
-RULE = re.compile(r"^[A-Za-z_*][\w*]*(\(.+\))?$")
+RULE = re.compile(r"^[A-Z][A-Za-z0-9]*(\([^()]+\))?$")  # no bare *, no lowercase tool, no nested ()
 
 
 def profiles():
@@ -574,7 +575,8 @@ if __name__ == "__main__":
 ```
 
 - [ ] **Step 6:** `set -o pipefail; python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`. Expected: the new tests ERROR (file not found); every other test passes. Record.
-- [ ] **Step 7:** Commit: `evals and test: permission profile per stakes tier, written before the reference`.
+- [ ] **Step 7: routing probe (free),** as Task 1 Step 4. Measured on the 0.4.0 hook (25 Nov): `permission-profile-live` → `deploy` (loads `live-system-changes.md`, which gains the pointer row in Task 5); `permission-profile-exploration-light` → `test` (the profile is reached through SKILL.md §4, not the row; the guard does not need it). Re-probe on the rebased base.
+- [ ] **Step 8:** Commit: `evals and test: permission profile per stakes tier, written before the reference`.
 
 ### Task 3: Base runs, red shown (lane EM)
 
@@ -583,7 +585,7 @@ Base = this branch's base sha with the four new cases copied in (the method text
 - [ ] **Step 1:** Calibration, one run of `permission-profile-live`, `--max-cost-usd 1`. Record `c` and whether the run billed the subscription or an API key.
 - [ ] **Step 2:** For each new case: `claude plugin eval plugins/engineering-method --case <case> --model opus --judge-model sonnet --ablation none -j 1 --runs 3 --threshold 0 --no-publish --trust-plugin --max-cost-usd <3 × c × 1.25> --json > /tmp/<case>-base.json` (exact flags per the docs re-read in Task 0). Record per criterion k of 3.
 - [ ] **Step 3:** Read every answer for c1-c4 of both main cases. Label each fail: rule absent (expected), judge error, or prompt fault. A prompt or judge fault is fixed and the case re-run before it counts.
-- [ ] **Step 4:** Narrow any base-green criterion to what its rule adds (section 3), at most two rounds; still green after that → guard row. Record each round.
+- [ ] **Step 4:** Narrow any base-green criterion to what its rule adds (section 3), at most two rounds per criterion. `verified-matches-plan` c2 and c3 may be green on base as well as c1 (the prompt puts the plan beside the diff): reserve the narrowing budget (up to 4 rounds of that case) for them; still green after that → guard row. Record each round.
 - [ ] **Step 5:** Commit the narrowed graders and a results note in the CHANGELOG draft (filled in Task 6).
 
 ### Task 4: A's text (lane EM)
@@ -605,8 +607,8 @@ out-of-scope list:
    - **unasked:** a change no step asked for.
 3. Report them as findings and withhold "verified" while any stands. The owner rules on each (keep
    and add it to the plan, revert it, or move it to a later item). Do not revert or fix on your own.
-4. None found: say so with the counts and the command, e.g. "diff matches the plan: 3 steps, 2
-   out-of-scope lines checked (`git diff --stat main...HEAD`)".
+4. None found: say so with the counts and the command, e.g. "diff matches the plan: 5 steps, 4
+   out-of-scope lines checked (`git diff --stat <base>...HEAD`)".
 
 Tier a has no plan; nothing here applies, and nothing about it is said.
 
@@ -623,7 +625,7 @@ list or the "matches the plan" line with its command.
 - [ ] **Step 3:** SKILL.md §3 `test` row, last cell, word-neutral swap (20 → 20 words; re-measure per Task 0 Step 5):
   - old: `principles 1, 2, 4; counts read entry by entry; behaviour evals: a cost cap first, layered, isolated, sends fail closed`
   - new: `principles 1, 2, 4; counts entry by entry; diff vs plan steps, out-of-scope; evals: cost cap, layered, isolated, fail-closed sends`
-- [ ] **Step 4:** Grep the reference and SKILL.md for every contamination string from Tasks 1-2 → 0 hits (prove the grep can hit by running it on `evals/`).
+- [ ] **Step 4:** `grep -n -F -e report_totals -e -- --since -e jobs/purge.py -e ledger-api -e release.sh -e 'kubectl delete' -e dropdb -e pytest -e '3 steps' -e '2 out-of-scope'` over the reference and SKILL.md → 0 hits; the same grep over `evals/` must hit (proves it can).
 - [ ] **Step 5:** `set -o pipefail; python3 -m unittest discover -s plugins/engineering-method/tests 2>&1 | tail -3`: budget and stage-map tests green (snippet tests still red until Task 5). Record body words before/after.
 - [ ] **Step 6:** Commit: `engineering-method: "verified" is measured against the plan (steps and out-of-scope list)`.
 
@@ -647,10 +649,14 @@ Paste it; never let an agent rewrite a settings file to loosen it.
 - **Across files, deny wins:** lists merge across user, project, local and managed settings; a deny
   at any level beats an allow at any other. (permissions, "Settings precedence"; settings, "Lists
   merge instead of overriding")
-- **Every mode:** deny blocks in every mode, `bypassPermissions` included; explicit ask rules still
-  prompt in `bypassPermissions`, and command-content ask rules fall back to a prompt in auto mode;
-  allow rules do nothing in `bypassPermissions`. (permission-modes, "Available modes", "Skip all
-  checks with bypassPermissions mode", "How the classifier evaluates actions")
+- **Every mode:** deny blocks in every mode, `bypassPermissions` included. A call matching an ask
+  rule is never auto-approved in any mode: it prompts, or is denied where no prompt is possible
+  (`dontAsk`). Command-content ask rules fall back to a prompt in auto mode; allow rules do nothing
+  in `bypassPermissions`. (permission-modes, "Available modes", "Skip all checks with
+  bypassPermissions mode", "How auto mode evaluates actions"; permissions, "Permission modes")
+- **`disableBypassPermissionsMode`:** valid in any settings file, but the docs call it "most useful in
+  managed settings where they can't be overridden"; in a project file it is a team default, not a
+  lock. (permissions, "Permission modes")
 - **Where to put it:** the committed `.claude/settings.json`. Its `deny` and `ask` rules apply at
   once; its `allow` rules wait until each person trusts the folder. (permissions, "Project allow
   rules and workspace trust") `defaultMode` `bypassPermissions` or `auto` set there does not take
@@ -668,13 +674,21 @@ Paste it; never let an agent rewrite a settings file to loosen it.
 - **Mods:** without managed settings, a managed MCP file or a Team or Enterprise login, an installed
   mod can approve some calls a deny rule refuses. Read what a mod does before installing it on a
   live-tier machine. (permissions, "Precedence among rules, hooks, and mods")
+- **Read and Edit denies cover Claude's file tools, not every process.** They apply to the built-in
+  file tools and, in a Bash command Claude Code can analyse, to redirections and recognised file
+  commands such as `cat`, `head`, `sed` and `tee`; a script or program a command runs can still read
+  the file. Keep secrets out of the working tree where that matters. (permissions, "What `Read` and
+  `Edit` rules cover")
+- **Edit rules cover every file-editing tool,** `Write` and `NotebookEdit` included; a
+  `Write(path)` or `NotebookEdit(path)` rule is accepted but never matched, so the profiles deny
+  with `Edit(...)`. (permissions, "`Write(path)`, `Glob(path)`, and `Grep(path)` rules don't match")
 - `Bash(command:…)` parameter rules are ignored; write `Bash(… *)`. (permissions, "Match by input
   parameter")
 
 ## Profiles (cumulative: each tier keeps every deny and ask of the tier below)
 
 Replace the example commands with this project's own: its test command, its push and publish
-commands, and every command that reaches the live system.
+commands, and every command that can change the live system.
 
 ### Exploration (tier a)
 
@@ -710,20 +724,21 @@ commands, and every command that reaches the live system.
     "ask": ["Bash(git push *)", "Bash(gh pr merge *)", "Bash(npm publish *)",
             "Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(./deploy/release *)"],
     "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)", "Read(~/.ssh/**)",
-             "Edit(./.env)", "Edit(./secrets/**)"]
+             "Edit(./.env)", "Edit(./.env.*)", "Edit(./secrets/**)", "Edit(~/.ssh/**)"]
   }
 }
 ```
 
-The live tier puts every command that reaches the live system under **ask**, never allow, because an
-ask still prompts in every mode; a destructive command the project never wants run goes under
+The live tier puts every command that can change the live system under **ask**, never allow, because
+an ask is never auto-approved in any mode (it prompts, or is denied where no prompt is possible); a destructive command the project never wants run goes under
 **deny**. Principle 13's "ask before mutating" is then enforced by the harness, and principle 14
 applies to each prompt: a declined prompt means stop.
 
 *Why:* the tier model was held by prose and reminders only; a session that skipped the skill had no
 floor. Industry baseline: least privilege, and Warp's agent profiles, where a denylist "takes
 precedence over your other permission settings". Mapping: Warp's denylist means "always ask", which
-is Claude Code's `ask`; Warp's "Never" is `deny`. This method departs by setting the profile per
+is Claude Code's `ask`; Warp's "Never" is `deny`. Warp's personal denylist can be bypassed by "Run until
+completion" when its auto-approve setting allows it; only team-enforced rules are never bypassed. This method departs by setting the profile per
 stakes tier rather than per user, and by printing it for a person to paste rather than writing it.
 *Test:* `tests/test_permission_profiles.py` (valid JSON, documented rule form, no mode a project file
 cannot set, cumulative deny and ask, bypass disabled on live).
@@ -732,7 +747,7 @@ cannot set, cumulative deny and ask, bypass disabled on live).
 - [ ] **Step 2:** `references/live-system-changes.md` "Standing rules": add one row after "Ask before mutating":
 
 ```markdown
-| Profile before the first live session | Paste the live profile (permission-profiles.md) into the project's committed settings first: every command that reaches the live system under ask, bypass disabled. *Test:* the settings file holds it before the session touches the system. |
+| Profile before the first live session | Paste the live profile (permission-profiles.md) into the project's committed settings first: every command that can change the live system under ask, bypass disabled. *Test:* the settings file holds it before the session touches the system. |
 ```
 
 - [ ] **Step 3:** SKILL.md §4, word-neutral swap (net −1; re-measure per Task 0 Step 5):
@@ -758,7 +773,7 @@ cannot set, cumulative deny and ask, bypass disabled on live).
 | "Verified" is withheld while mismatches stand; the owner rules; nothing auto-fixed | `verified-matches-plan/c4-owner-rules-not-verified.md` |
 | Guard: no conformance ceremony on tier a with no plan | `verified-near-miss-no-plan/c1-no-conformance-ceremony.md`, `c2-asks-for-output.md` |
 | Permission profile: deny wins over any allow | `permission-profile-live/c1-deny-wins.md` |
-| Commands reaching the live system go under ask, which prompts in every mode | `permission-profile-live/c2-ask-for-live-commands.md` |
+| Every command that can change the live system goes under ask, never auto-approved in any mode | `permission-profile-live/c2-ask-for-live-commands.md` |
 | `bypassPermissions` in a project file does not take effect; disable bypass on live | `permission-profile-live/c3-project-bypass-ignored.md` |
 | A Bash rule is not a security boundary; a sandbox or PreToolUse hook is the stronger floor | `permission-profile-live/c4-not-a-boundary.md` |
 | Guard: a tier a profile stays light, in the documented rule form | `permission-profile-exploration-light/c1-no-live-entries.md`, `c2-documented-allow-form.md` |
@@ -879,6 +894,16 @@ class InvariantChecks(Base):
         run("gate_hook.py", project=self.dir)
         self.assertFalse(os.path.exists(sentinel), "an invariant check ran without --verify")
 
+    def test_malformed_check_fails_verify_and_keeps_the_stamp(self):
+        for bad in ("   ", ["false"], None):
+            d = self.plan_with([{"rule": "bad", "state": "holding", "check": bad}])
+            d["meta"]["assertions_verified"] = "2020-01-01T00:00:00Z"
+            self.write(d)
+            r = run("check.py", "--verify", project=self.dir)
+            self.assertEqual(r.returncode, 1, repr(bad))
+            self.assertIn("FAIL    invariant 'bad': check is not a runnable command", r.stdout)
+            self.assertEqual(self.stamp(), "2020-01-01T00:00:00Z", repr(bad))
+
     def test_non_string_check_is_a_structural_fail(self):
         self.plan_with([{"rule": "bad", "state": "holding", "check": ["true"]}])
         r = run("check.py", project=self.dir)
@@ -895,7 +920,7 @@ if __name__ == "__main__":
 ```
 
 - [ ] **Step 2:** Prove the sentinel test can fail: temporarily run `check.py --verify` in it, confirm it fails once the code exists (record in Task 9 Step 4), then remove the line. Today it passes for the wrong reason (nothing runs `check` at all); say so in the record.
-- [ ] **Step 3:** `cd plugins/plan-layer && set -o pipefail && python3 -m unittest tests/test_invariant_checks.py 2>&1 | tail -5`. Expected red: the HOLDS, FAIL, stamp-with-only-invariants, PLAN_FACTS, both-run, structural-fail and drift tests fail; the no-check and never-run tests pass. Record the counts.
+- [ ] **Step 3:** `cd plugins/plan-layer && set -o pipefail && python3 -m unittest tests/test_invariant_checks.py 2>&1 | tail -5`. Measured on `5982357` (25 Nov, plan-layer 0.18.0, a scratch copy): **7 fail, 3 pass** of the first ten. Fail: passing-check-holds, failing-check-is-a-FAIL, failing-check-keeps-stamp, PLAN_FACTS, both-run, structural-fail, never-run drift. Pass: invariant-without-check (nothing runs it), never-run-without-verify (nothing runs it), and clean-run-with-only-invariant-checks-stamps (passes for the wrong reason: `verify()` returns `0, 0` when no assertions are declared and `main()` stamps). The malformed-check test (I2) is red too, for that same reason, so expect **8 fail, 3 pass** on the rebased base; record the counts.
 - [ ] **Step 4:** Commit: `plan-layer tests: runnable invariants (explicit --verify only), written before the code`.
 
 ### Task 9: C's code (lane PL)
@@ -937,9 +962,10 @@ def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
 
 ```python
     items = d.get("assertions") or []
-    inv_checks = [i for i in d.get("invariants") or []
+    inv_declared = [i for i in d.get("invariants") or [] if "check" in i]
+    inv_checks = [i for i in inv_declared
                   if isinstance(i.get("check"), str) and i["check"].strip()]
-    if not items and not inv_checks:
+    if not items and not inv_declared:
         print("  no assertions or invariant checks declared — nothing to verify against the real system")
         return 0, 0
 ```
@@ -948,24 +974,37 @@ def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
   - after the assertion loop and before the facts-file cleanup, add:
 
 ```python
-    for inv in inv_checks:
+    errored = 0
+    for inv in inv_declared:
         rule, state = inv.get("rule", "?"), inv.get("state")
+        if inv not in inv_checks:
+            # Present but not runnable ("   ", a list, null): never a silent pass,
+            # and never a reason to move the verified stamp.
+            bad += 1
+            print("  FAIL    invariant %r: check is not a runnable command" % rule)
+            continue
         try:
             rc, out, err = run_command(inv["check"], P["root"], env)
         except Exception as exc:
             bad += 1
-            print("  FAIL    invariant %r (state %s): check errored: %s" % (rule, state, exc))
+            errored += 1
+            print("  ERRORED invariant %r (state %s): check could not run: %s"
+                  % (rule, state, str(exc).splitlines()[0][:80] if str(exc) else type(exc).__name__))
             continue
         if rc == 0:
             ok += 1
             print("  HOLDS   invariant %r (state %s)" % (rule, state))
         else:
             bad += 1
+            # First line only, on the FAIL line itself, so a check's own output
+            # can never print a forged HOLDS line of its own.
+            first = ((err or out).splitlines() or [""])[0][:80]
             print("  FAIL    invariant %r (state %s): check exited %d: %s"
-                  % (rule, state, rc, (err or out)[:80]))
+                  % (rule, state, rc, first))
 ```
 
-  - the summary line counts both: `print("\n  %d matched, %d mismatched, %d declared" % (ok, bad, len(items) + len(inv_checks)))`.
+  - the summary line counts both: `print("\n  %d matched, %d mismatched, %d declared" % (ok, bad, len(items) + len(inv_declared)))`;
+  - the closing note distinguishes the two outcomes: `print("  note: ERRORED means the command could not run (a broken check, not a broken claim); MISMATCH or FAIL means it ran and disagreed.")`, printed when `bad` is non-zero (replacing the assertion-only note).
 - [ ] **Step 4: gate rules.** In `run()`:
   - beside the invariant state check, add:
 
@@ -988,7 +1027,7 @@ def run_command(cmd, cwd, env, timeout=CHECK_TIMEOUT):
 
   - the 7-day age drift is unchanged. The module docstring's `check.py --verify` line becomes "run the plan's assertions and invariant checks against the real system".
 - [ ] **Step 5:** Sentinel probe from Task 8 Step 2: add `run("check.py", "--verify", project=self.dir)` to `test_never_run_without_verify`, confirm it now FAILS (the sentinel exists), remove the line. Record.
-- [ ] **Step 6:** `cd plugins/plan-layer && set -o pipefail && python3 -m unittest tests/*.py 2>&1 | tail -3`: every test green, including all of `TestAssertions`. Record the OK count against Task 0-PL Step 3 (+10 expected).
+- [ ] **Step 6:** `cd plugins/plan-layer && set -o pipefail && python3 -m unittest tests/*.py 2>&1 | tail -3`: every test green, including all of `TestAssertions`. Record the OK count against Task 0-PL Step 3 (+11 expected).
 - [ ] **Step 7:** Commit: `plan-layer: invariants can carry a check, run by check.py --verify (FAIL names the invariant)`.
 
 ### Task 10: C's docs and version (lane PL, Sonnet)
@@ -1004,14 +1043,14 @@ The invariant's `state` stays yours to set; the run tells you when it is wrong.
 ```json
 "invariants": [
   { "rule": "the unit suite is green", "state": "holding",
-    "check": "python3 -m unittest discover -s tests 2>&1 | tail -1 | grep -qx OK" }
+    "check": "python3 -m unittest discover -s tests 2>&1 | tail -1 | grep -Eq '^OK( \\(skipped=[0-9]+\\))?$'" }
 ]
 ```
 
 The same rule applies: never run automatically, never from a hook, `sync.py` or the gate.
 ````
 
-  (`grep -qx` reads one line from `tail`, so no SIGPIPE; under `set -o pipefail` prefer counting matches.)
+  (`grep -Eq` reads one line from `tail`, so no SIGPIPE, and it accepts `OK (skipped=N)`; under `set -o pipefail` prefer counting matches.)
 - [ ] **Step 2:** `skills/plan-layer/SKILL.md`, section "Assertions — the plan checking itself", append one sentence: "An invariant may carry `check`, a command whose exit code is its truth; `--verify` runs it after the assertions and a failing one is a FAIL naming the invariant. Its `state` stays hand-set."
 - [ ] **Step 3:** `CHANGELOG.md` entry `## 0.20.0 — <date -u>`: what C does, why no new flag (`--verify` already is the explicit runner), the structural FAIL, the extended never-run drift, test count.
 - [ ] **Step 4:** Version `0.20.0` in `plugins/plan-layer/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and "Current: 0.20.0." in the root `README.md`.
@@ -1031,5 +1070,5 @@ The same rule applies: never run automatically, never from a hook, `sync.py` or 
 - **Q2. Where B is reached from.** Recommended: SKILL.md §4 list (word-neutral) plus a `live-system-changes.md` row. Alternative: also the session-start brief, which every session reads; costs brief characters (limit 1,500) and touches the hook. Not recommended now.
 - **Q3. `--verify` versus a new `--run-checks`.** Recommended: `--verify`, the existing explicit runner, with its security test extended. A separate flag would duplicate it and split the verified stamp.
 - **Q4. Should `--verify` write anything per invariant** (a result, the commit measured at, or a contradiction warning when a check passes on a `broken` state)? Recommended: not now; report only. Revisit if hand-set states are seen disagreeing with checks in real plans.
-- **Q5. Regression depth.** Recommended: routed cases at 3 runs base and head plus the whole suite at 1 run on head (~137 runs, ~$36). Alternative: whole suite at 3 runs (~$58).
+- **Q5. Regression depth.** Recommended: routed cases at 3 runs base and head plus the whole suite at 1 run on head (~138 runs including calibration, ~$36). Alternative: whole suite at 3 runs (~$58).
 - **Q6. Exit code versus `expect` for invariant checks.** Recommended: exit code (an invariant is true or not; `grep -q`, a test runner). Assertions keep `expect` for value claims.
