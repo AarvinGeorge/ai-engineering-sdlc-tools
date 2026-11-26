@@ -50,6 +50,28 @@ python3 -m unittest discover -s plugins/engineering-method/tests -v
 - Each plugin keeps a `CHANGELOG.md`: one dated entry per version (`## 0.1.1 — 2026-10-15`), newest first. Add an entry for every user-visible change.
 - When you bump a version, change it in **both** `.claude-plugin/marketplace.json` and the plugin's own `.claude-plugin/plugin.json`, and update the version shown in the root `README.md`.
 
+## Release gates
+
+Three checks run on every pull request and on every push to `main` (`.github/workflows/release-gates.yml`), next to the unit suites. A fourth job runs the gates' own tests.
+
+- **`validate`**: `claude plugin validate --strict` on the marketplace and on every plugin, with the CLI version pinned in the workflow. An unknown field in a manifest fails it.
+- **`version-gate`** (`.github/release-gates/version_gate.py`): enforces the versioning rule above.
+  A file `plugins/<name>/<rest>` is **release-relevant** unless `<rest>` is exactly `README.md`, `ROADMAP.md` or `CHANGELOG.md`, or starts with `tests/` or `evals/`. Everything else (skills and their references, scripts, hooks, templates, schema, trackers, `.claude-plugin/plugin.json`) ships behaviour.
+  1. Always: for every relative-path entry in `marketplace.json`, its `version` equals the plugin's `plugin.json` version, the root `README.md` row for that plugin reads `Current: <version>.`, and the plugin's `CHANGELOG.md` newest heading is `## <version> — YYYY-MM-DD`.
+  2. On a pull request: for each plugin with a release-relevant file changed between the PR base and head, the `plugin.json` version is strictly greater (semver) than at the base. A plugin absent at the base is new and needs only rule 1.
+- **`payload-scan`** (`.github/release-gates/scan_payload.py`): scans every tracked file, every tracked path name and the commit messages of the pull request (or push) for secret shapes and for private identifiers. The marketplace installs from this public repository, so the whole tree is the payload.
+
+Things to know when a gate fails or when you write a test:
+
+- The generic secret shapes live in one file, `.github/release-gates/secret-patterns.txt`. The local pre-push guard and CI both read it, so there is one list.
+- Private identifiers are never in the repository. CI reads them from the repository secret `RELEASE_GATES_PRIVATE_LIST`; the maintainer's local guard reads its own file outside every repository.
+- There is **no allow marker** and no exempt file. A fake secret in a test is built by string concatenation (`"gh" + "p_" + "A" * 24`), so no committed line holds the shape.
+- Bump `CLAUDE_CODE_VERSION` in `release-gates.yml` when `validate` rejects a newer field.
+- Output names a file and line, a commit, or `path #<n>` and the kind of hit. It never prints the matched text.
+- Commit author names and emails are not scanned; only file contents, path names and commit messages are.
+- **Pull requests from a fork or from Dependabot**: CI cannot read the secret there, so the private-list check is skipped with a warning. The maintainer runs `python3 .github/release-gates/scan_payload.py --tokens-file <private list> --require-private-list` on the pull request head before merging. CI's check on the push to `main` is detection after publish, not prevention.
+- The local guard reads its private file with `grep -Ff`, which treats every line as an entry, comment lines included. Keep that file free of comments and blank lines (a blank line matches everything). The scanner strips both, so the two agree on a clean file.
+
 ## Review rule
 
 The reviewer must be someone other than the author, and the reviewer **runs the change**: checks out the branch, runs the tests, and exercises the behaviour that changed, rather than only reading the diff. Say in the pull request what you ran and what you saw.
