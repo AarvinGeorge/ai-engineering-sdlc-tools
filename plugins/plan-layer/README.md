@@ -49,7 +49,13 @@ drift.** **Session hooks brief the agent before the first word is typed.**
 
   Add the five to the script, or exempt each one with a written `why`.
 - **An invariant says "holding" and nobody has looked.** Give it a `check`, a command whose exit code
-  is the truth. `check.py --verify` runs it and prints:
+  is the truth. Declare it in `plan.json`:
+
+  ```json
+  { "rule": "no debug prints left in src", "state": "holding", "check": "! grep -rn 'print(\"DEBUG' src" }
+  ```
+
+  `check.py --verify` runs it and prints:
 
   ```
   FAIL    invariant 'no debug prints left in src' (state 'holding'): check exited 1: src/app.py:1:print("DEBUG x")
@@ -76,10 +82,31 @@ claude plugin install plan-layer@ai-engineering-sdlc-tools
 ```
 
 Then, in any project you want it for, ask the agent to run `/plan-layer init` — or
-`/plan-layer init --light` for a short project (see "Light and full" below).
+`/plan-layer init --light` for a short project (see "Light and full" below). In Claude Code this
+runs through the plan-layer skill, which follows the steps in `skills/plan-layer/SKILL.md` ("init").
+There is no `init` script, so outside Claude Code, or if you prefer to do it by hand, the
+equivalent is:
 
-**Nothing to install beyond Python 3**, which macOS and most Linux ship. Zero third-party
-packages, by design.
+```bash
+mkdir -p plan
+cp <plugin>/templates/plan.json plan/plan.json      # or templates/plan.light.json for --light
+cp <plugin>/templates/MAP.md plan/MAP.md            # skip for --light
+# edit plan/plan.json: meta.project, meta.subtitle, meta.updated (from a clock: date -u +%Y-%m-%dT%H:%M:%SZ),
+# and replace the placeholder capability and next item with real ones
+python3 <plugin>/scripts/render.py && python3 <plugin>/scripts/check.py
+```
+
+`<plugin>` is the installed plugin folder (or your clone's `plugins/plan-layer`). Commit
+`plan/index.html`: it is generated on purpose so anyone can open the page without running anything.
+
+**The fresh template fails the gate until `meta.updated` is set from a clock.** It ships with a
+placeholder (`REPLACE WITH ISO-8601 UTC READ FROM A CLOCK`) on purpose: a date recalled from memory
+is the usual way a plan goes stale, so the gate refuses the template until a real time is written.
+That first red `check.py` is expected, not a broken install. A DRIFT line about the next item naming
+no capability is a signal, not a failure.
+
+**Nothing to install beyond Python 3.10 or newer** (check `python3 --version`; the system Python on
+macOS can be older). Zero third-party packages, by design.
 
 ## What you get
 
@@ -88,10 +115,10 @@ your-project/
   plan/
     plan.json      the state — you and the agent both edit this
     index.html     the view — generated, committed, never hand-edited
-    archive/       rolled history, in full — written by sync.py, committed with plan.json and index.html
     figures.py     optional: your own diagrams
     MAP.md         the map a fresh session reads first: what lives where, the commands, the reading rules
-    archive/       history in full, machine-readable: older done items, old changelog, the queue beyond the front page
+    archive/       history in full, machine-readable: older done items, old changelog, the queue beyond
+                   the front page; written by sync.py, committed with plan.json and index.html
 ```
 
 - **`plan.json`** holds what is built, what is planned, what is active right now, the
