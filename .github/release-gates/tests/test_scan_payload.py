@@ -136,6 +136,18 @@ class Files(unittest.TestCase):
             r.add("img.bin", b"\x00\x01" + FAKE_GH.encode())
             self.assertEqual(r.run(), 0)
 
+    def test_tracked_symlink_to_directory_is_skipped(self):
+        with Repo() as r:
+            r.add("a.txt", "fine\n")
+            (r.root / "sub").mkdir()
+            (r.root / "sub/b.txt").write_text("x\n")
+            (r.root / "link").symlink_to("sub")
+            git(r.root, "add", "-A")
+            git(r.root, "commit", "-q", "-m", "link")
+            out = r.cli()
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertIn("1 binary skipped", out.stdout)
+
     def test_pattern_file_does_not_match_itself(self):
         with Repo() as r:
             r.add("a.txt", "1\n")

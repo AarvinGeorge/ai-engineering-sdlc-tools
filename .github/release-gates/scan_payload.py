@@ -89,6 +89,9 @@ def main(argv=None):
             for _, kind in scan_text(rel, patterns, tokens):
                 hits.append(f"{where}: {kind}")  # never the name itself
                 name_hit = True
+            if (root / rel).is_dir():  # a tracked symlink to a directory: nothing to read
+                skipped += 1
+                continue
             try:
                 data = (root / rel).read_bytes()
             except OSError as e:

@@ -66,6 +66,7 @@ Things to know when a gate fails or when you write a test:
 - The generic secret shapes live in one file, `.github/release-gates/secret-patterns.txt`. The local pre-push guard and CI both read it, so there is one list.
 - Private identifiers are never in the repository. CI reads them from the repository secret `RELEASE_GATES_PRIVATE_LIST`; the maintainer's local guard reads its own file outside every repository.
 - There is **no allow marker** and no exempt file. A fake secret in a test is built by string concatenation (`"gh" + "p_" + "A" * 24`), so no committed line holds the shape.
+- Bump `CLAUDE_CODE_VERSION` in `release-gates.yml` when `validate` rejects a newer field.
 - Output names a file and line, a commit, or `path #<n>` and the kind of hit. It never prints the matched text.
 - Commit author names and emails are not scanned; only file contents, path names and commit messages are.
 - **Pull requests from a fork or from Dependabot**: CI cannot read the secret there, so the private-list check is skipped with a warning. The maintainer runs `python3 .github/release-gates/scan_payload.py --tokens-file <private list> --require-private-list` on the pull request head before merging. CI's check on the push to `main` is detection after publish, not prevention.
