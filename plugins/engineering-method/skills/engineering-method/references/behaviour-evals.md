@@ -136,7 +136,7 @@ near 100%, and a capability case that holds graduates into the regression set.
   rewrite rounds; still green after that, it becomes a guard, not proof, and the rule rests on its
   other criteria. Each criterion asks only what the prompt lets the agent do, so a pass on the new
   version is achievable; where the user asks for the opposite of the rule, ask for a recommendation,
-  or the method's push back once, then do as asked (review-loop.md) decides the verdict.
+  or the method's push back once, then do as asked (SKILL.md, opening paragraph) decides the verdict.
 - **A stored baseline per artifact.** Each version of the instructions (or prompt, or tool set)
   has its stored result per case; a run compares against the baseline of the version it replaces,
   and the "without" arm is re-run only when that base changes, not on every commit. *Test:* every
