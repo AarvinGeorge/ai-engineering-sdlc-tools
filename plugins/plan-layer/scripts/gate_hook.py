@@ -47,6 +47,7 @@ import plan_lib as L  # noqa: E402
 WORK_IN_PROGRESS = (
     "uncommitted file",
     "is newer than meta.updated",
+    "measured nothing: HEAD is the base branch",
 )
 
 
@@ -83,7 +84,7 @@ def main():
 
     try:
         import check
-        fails, drifts, _summary = check.run()
+        fails, drifts, _summary = check.run(event="stop")
     except Exception:
         # A broken gate must never trap a session.
         return 0

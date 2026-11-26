@@ -1391,7 +1391,7 @@ class TestManifests(unittest.TestCase):
         # by hand. The hand-written version rejected `tempfile` and reported it
         # as "not standard library" -- a test that is wrong AND misleading about
         # why is worse than no test.
-        allowed = set(sys.stdlib_module_names) | {"plan_lib", "check", "render", "diagrams", "tracker"}
+        allowed = set(sys.stdlib_module_names) | {"plan_lib", "check", "render", "diagrams", "tracker", "controller"}
         for f in sorted(os.listdir(SCRIPTS)):
             if not f.endswith(".py"):
                 continue
